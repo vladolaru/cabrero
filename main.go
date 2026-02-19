@@ -3,30 +3,39 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/vladolaru/cabrero/internal/cmd"
+	"github.com/vladolaru/cabrero/internal/store"
 )
 
 const version = "0.1.0-dev"
 
 type command struct {
-	name  string
-	desc  string
-	run   func(args []string) error
+	name string
+	desc string
+	run  func(args []string) error
 }
 
 var commands = []command{
 	{"run", "Run the full pipeline on a session", cmdNotImplemented},
-	{"sessions", "List captured sessions", cmdNotImplemented},
-	{"status", "Show pipeline health and store overview", cmdNotImplemented},
+	{"sessions", "List captured sessions", cmd.Sessions},
+	{"status", "Show pipeline health and store overview", cmd.Status},
 	{"proposals", "List pending proposals", cmdNotImplemented},
 	{"inspect", "Show a proposal with full citation chain", cmdNotImplemented},
 	{"approve", "Approve and apply a proposal", cmdNotImplemented},
 	{"reject", "Reject a proposal with optional reason", cmdNotImplemented},
 	{"replay", "Re-run pipeline with a different prompt", cmdNotImplemented},
 	{"prompts", "List prompt files with versions", cmdNotImplemented},
-	{"import", "Seed the store from existing CC session files", cmdNotImplemented},
+	{"import", "Seed the store from existing CC session files", cmd.Import},
 }
 
 func main() {
+	// Initialize store on every invocation.
+	if err := store.Init(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing store: %v\n", err)
+		os.Exit(1)
+	}
+
 	if len(os.Args) < 2 {
 		printHelp()
 		os.Exit(0)
@@ -44,9 +53,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	for _, cmd := range commands {
-		if cmd.name == sub {
-			if err := cmd.run(os.Args[2:]); err != nil {
+	for _, c := range commands {
+		if c.name == sub {
+			if err := c.run(os.Args[2:]); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
@@ -64,13 +73,13 @@ func printHelp() {
 	fmt.Println()
 	fmt.Println("Commands:")
 	maxLen := 0
-	for _, cmd := range commands {
-		if len(cmd.name) > maxLen {
-			maxLen = len(cmd.name)
+	for _, c := range commands {
+		if len(c.name) > maxLen {
+			maxLen = len(c.name)
 		}
 	}
-	for _, cmd := range commands {
-		fmt.Printf("  %-*s  %s\n", maxLen, cmd.name, cmd.desc)
+	for _, c := range commands {
+		fmt.Printf("  %-*s  %s\n", maxLen, c.name, c.desc)
 	}
 	fmt.Println()
 	fmt.Println("Run 'cabrero help' for this message.")
