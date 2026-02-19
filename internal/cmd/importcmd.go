@@ -20,7 +20,6 @@ func Import(args []string) error {
 	}
 
 	if *from == "" {
-		// Default to ~/.claude/projects/
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("cannot determine home directory: %w", err)
@@ -67,7 +66,6 @@ func Import(args []string) error {
 		// Session ID is the filename without .jsonl extension.
 		sessionID := strings.TrimSuffix(info.Name(), ".jsonl")
 
-		// Skip empty session IDs or non-UUID-looking names.
 		if sessionID == "" || len(sessionID) < 8 {
 			return nil
 		}
@@ -82,13 +80,27 @@ func Import(args []string) error {
 			return nil
 		}
 
+		// Extract project slug from parent directory name.
+		project := filepath.Base(filepath.Dir(path))
+		if project == filepath.Base(*from) {
+			// File is directly in the root of --from, no project.
+			project = ""
+		}
+
+		// Use the file's modification time as the session timestamp.
+		modTime := info.ModTime()
+
 		if *dryRun {
-			fmt.Printf("  Would import: %s (%s)\n", sessionID, path)
+			display := store.ProjectDisplayName(project)
+			if display == "" {
+				display = "(none)"
+			}
+			fmt.Printf("  Would import: %s  [%s]  %s\n", sessionID, display, modTime.Format("2006-01-02 15:04"))
 			imported++
 			return nil
 		}
 
-		if err := store.WriteSession(sessionID, path, "imported", ""); err != nil {
+		if err := store.WriteSession(sessionID, path, "imported", "", modTime, project); err != nil {
 			fmt.Fprintf(os.Stderr, "  Warning: failed to import %s: %v\n", sessionID, err)
 			return nil
 		}

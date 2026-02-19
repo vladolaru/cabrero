@@ -3,6 +3,7 @@ package cmd
 import (
 	"flag"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/vladolaru/cabrero/internal/store"
@@ -13,6 +14,7 @@ func Sessions(args []string) error {
 	fs := flag.NewFlagSet("sessions", flag.ExitOnError)
 	limit := fs.Int("limit", 20, "maximum number of sessions to show")
 	statusFilter := fs.String("status", "all", "filter by status: pending, processed, all")
+	projectFilter := fs.String("project", "", "filter by project (substring match on slug or display name)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -39,6 +41,20 @@ func Sessions(args []string) error {
 		sessions = filtered
 	}
 
+	// Filter by project.
+	if *projectFilter != "" {
+		needle := strings.ToLower(*projectFilter)
+		var filtered []store.Metadata
+		for _, s := range sessions {
+			slug := strings.ToLower(s.Project)
+			display := strings.ToLower(store.ProjectDisplayName(s.Project))
+			if strings.Contains(slug, needle) || strings.Contains(display, needle) {
+				filtered = append(filtered, s)
+			}
+		}
+		sessions = filtered
+	}
+
 	total := len(sessions)
 
 	// Apply limit.
@@ -46,9 +62,14 @@ func Sessions(args []string) error {
 		sessions = sessions[:*limit]
 	}
 
-	// Print table header.
-	fmt.Printf("%-14s  %-20s  %-14s  %s\n", "SESSION ID", "CAPTURED", "TRIGGER", "STATUS")
-	fmt.Println("──────────────────────────────────────────────────────────────────")
+	if len(sessions) == 0 {
+		fmt.Println("No sessions match the given filters.")
+		return nil
+	}
+
+	// Print table.
+	fmt.Printf("%-14s  %-16s  %-30s  %-12s  %s\n", "SESSION ID", "CAPTURED", "PROJECT", "TRIGGER", "STATUS")
+	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────────")
 
 	for _, s := range sessions {
 		shortID := s.SessionID
@@ -61,19 +82,32 @@ func Sessions(args []string) error {
 			captured = ts.Local().Format("2006-01-02 15:04")
 		}
 
-		trigger := s.CaptureTrigger
-		if len(trigger) > 14 {
-			trigger = trigger[:14]
+		project := store.ProjectDisplayName(s.Project)
+		if len(project) > 30 {
+			project = "…" + project[len(project)-29:]
 		}
 
-		fmt.Printf("%-14s  %-20s  %-14s  %s\n", shortID, captured, trigger, s.Status)
+		trigger := s.CaptureTrigger
+		if len(trigger) > 12 {
+			trigger = trigger[:12]
+		}
+
+		fmt.Printf("%-14s  %-16s  %-30s  %-12s  %s\n", shortID, captured, project, trigger, s.Status)
 	}
 
+	// Footer.
+	var filters []string
 	if *statusFilter != "all" {
-		fmt.Printf("\nShowing %d of %d %s sessions.\n", len(sessions), total, *statusFilter)
-	} else {
-		fmt.Printf("\nShowing %d of %d sessions.\n", len(sessions), total)
+		filters = append(filters, "status="+*statusFilter)
 	}
+	if *projectFilter != "" {
+		filters = append(filters, "project="+*projectFilter)
+	}
+	filterNote := ""
+	if len(filters) > 0 {
+		filterNote = " (" + strings.Join(filters, ", ") + ")"
+	}
+	fmt.Printf("\nShowing %d of %d sessions%s.\n", len(sessions), total, filterNote)
 
 	return nil
 }
