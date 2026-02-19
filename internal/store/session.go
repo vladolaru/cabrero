@@ -109,35 +109,39 @@ func ListSessions() ([]Metadata, error) {
 	return sessions, nil
 }
 
-// ProjectDisplayName converts a CC project slug into a human-readable short
-// name by stripping the home directory prefix portion.
+// ProjectDisplayName returns a short, recognizable form of a CC project slug.
 //
-// Example: "-Users-vladolaru-Work-a8c-woocommerce-payments" → "Work/a8c/woocommerce-payments"
-//          "-Users-vladolaru--claude" → ".claude"
-//          "-private-tmp" → "/private/tmp"
+// CC encodes project paths by replacing both '/' and '.' with '-', making the
+// slug non-reversible (a '-' could be any of the three). Instead of guessing,
+// we strip the home directory prefix from the slug to shorten it while keeping
+// the original encoding intact.
+//
+// Example: "-Users-vladolaru-Work-a8c-woocommerce-payments" → "Work-a8c-woocommerce-payments"
+//          "-Users-vladolaru--claude" → "-claude"
+//          "-private-tmp" → "/private-tmp"
 func ProjectDisplayName(slug string) string {
 	if slug == "" {
 		return ""
 	}
 
-	// Convert slug back to a path: leading dash is /, dashes are /.
-	// Double dashes (--) encode a dot-prefixed component (e.g. /.claude → --claude).
-	path := "/" + strings.TrimPrefix(slug, "-")
-
-	// Replace -- with a placeholder, then convert single - to /, then restore dots.
-	path = strings.ReplaceAll(path, "--", "\x00DOT\x00")
-	path = strings.ReplaceAll(path, "-", "/")
-	path = strings.ReplaceAll(path, "\x00DOT\x00", "/.")
-
-	// Strip home directory prefix to shorten.
+	// Build the home directory prefix as CC would encode it.
 	home, err := os.UserHomeDir()
-	if err == nil && strings.HasPrefix(path, home+"/") {
-		path = path[len(home)+1:]
-	} else if strings.HasPrefix(path, home) && path == home {
-		path = "~"
+	if err != nil {
+		return slug
+	}
+	homeSlug := strings.ReplaceAll(home, "/", "-")
+	homeSlug = strings.ReplaceAll(homeSlug, ".", "-")
+
+	// Strip the home prefix. What remains is recognizable as the project
+	// path relative to ~, with the original hyphens preserved.
+	if strings.HasPrefix(slug, homeSlug+"-") {
+		return slug[len(homeSlug)+1:]
+	}
+	if slug == homeSlug {
+		return "~"
 	}
 
-	return path
+	return slug
 }
 
 // ListProjects returns a sorted list of unique project slugs from the store.
