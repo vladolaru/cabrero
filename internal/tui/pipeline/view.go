@@ -60,25 +60,90 @@ func (m Model) View() string {
 }
 
 func (m Model) renderDaemonHeader() string {
-	var b strings.Builder
-
-	b.WriteString(sectionHeaderStyle.Render("DAEMON"))
-	b.WriteString("\n")
-
+	// Build left column: DAEMON section.
+	var left strings.Builder
+	left.WriteString(sectionHeaderStyle.Render("DAEMON"))
+	left.WriteString("\n")
 	if m.dashStats.DaemonRunning {
-		b.WriteString(fmt.Sprintf("  Status:  %s (PID %d)\n", successStyle.Render("● running"), m.dashStats.DaemonPID))
+		left.WriteString(fmt.Sprintf("  Status:  %s (PID %d)\n", successStyle.Render("● running"), m.dashStats.DaemonPID))
+		if m.dashStats.DaemonStartTime != nil {
+			left.WriteString(fmt.Sprintf("  Uptime:  %s\n", formatUptime(time.Since(*m.dashStats.DaemonStartTime))))
+		}
 	} else {
-		b.WriteString(fmt.Sprintf("  Status:  %s\n", errorStyle.Render("● stopped")))
+		left.WriteString(fmt.Sprintf("  Status:  %s\n", errorStyle.Render("● stopped")))
+	}
+	if m.dashStats.PollInterval > 0 {
+		left.WriteString(fmt.Sprintf("  Poll:    every %s\n", formatInterval(m.dashStats.PollInterval)))
+		left.WriteString(fmt.Sprintf("  Stale:   every %s\n", formatInterval(m.dashStats.StaleInterval)))
+		left.WriteString(fmt.Sprintf("  Delay:   %s", formatInterval(m.dashStats.InterSessionDelay)))
 	}
 
-	b.WriteString("\n")
+	// Build right column: HOOKS + STORE.
+	var right strings.Builder
+	right.WriteString(sectionHeaderStyle.Render("HOOKS"))
+	right.WriteString("\n")
+	right.WriteString(fmt.Sprintf("  pre-compact:  %s\n", checkmark(m.dashStats.HookPreCompact)))
+	right.WriteString(fmt.Sprintf("  session-end:  %s\n", checkmark(m.dashStats.HookSessionEnd)))
+	right.WriteString("\n")
+	right.WriteString(sectionHeaderStyle.Render("STORE"))
+	right.WriteString("\n")
+	right.WriteString(fmt.Sprintf("  Path: %s\n", m.dashStats.StorePath))
+	right.WriteString(fmt.Sprintf("  Raw:  %d sessions\n", m.dashStats.SessionCount))
+	right.WriteString(fmt.Sprintf("  Disk: %s", formatBytes(m.dashStats.DiskBytes)))
 
-	b.WriteString(sectionHeaderStyle.Render("HOOKS"))
-	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  pre-compact:  %s\n", checkmark(m.dashStats.HookPreCompact)))
-	b.WriteString(fmt.Sprintf("  session-end:  %s", checkmark(m.dashStats.HookSessionEnd)))
+	// Two-column layout in wide mode, stacked otherwise.
+	if m.width >= 120 {
+		colWidth := m.width / 2
+		leftStyle := lipgloss.NewStyle().Width(colWidth)
+		return lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(left.String()), right.String())
+	}
+	return left.String() + "\n\n" + right.String()
+}
 
-	return b.String()
+// formatUptime formats a duration as "3d 14h 22m".
+func formatUptime(d time.Duration) string {
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	mins := int(d.Minutes()) % 60
+	if days > 0 {
+		return fmt.Sprintf("%dd %dh %dm", days, hours, mins)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, mins)
+	}
+	return fmt.Sprintf("%dm", mins)
+}
+
+// formatInterval formats a duration concisely: "2m", "30s", "5m".
+func formatInterval(d time.Duration) string {
+	if d >= time.Minute {
+		mins := int(d.Minutes())
+		secs := int(d.Seconds()) % 60
+		if secs > 0 {
+			return fmt.Sprintf("%dm%ds", mins, secs)
+		}
+		return fmt.Sprintf("%dm", mins)
+	}
+	return fmt.Sprintf("%ds", int(d.Seconds()))
+}
+
+// formatBytes formats a byte count as a human-readable string.
+func formatBytes(b int64) string {
+	const (
+		kb = 1024
+		mb = kb * 1024
+		gb = mb * 1024
+	)
+	switch {
+	case b >= gb:
+		return fmt.Sprintf("%.1f GB", float64(b)/float64(gb))
+	case b >= mb:
+		return fmt.Sprintf("%d MB", b/mb)
+	case b >= kb:
+		return fmt.Sprintf("%d KB", b/kb)
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
 }
 
 func (m Model) renderActivityStats() string {

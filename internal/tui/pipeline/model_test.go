@@ -48,6 +48,74 @@ func TestModelView(t *testing.T) {
 	}
 }
 
+func TestModelViewDaemonHeader(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+	view := ansi.Strip(m.View())
+
+	// Enriched daemon header fields.
+	if !strings.Contains(view, "Uptime:") {
+		t.Error("view missing Uptime field")
+	}
+	if !strings.Contains(view, "Poll:") {
+		t.Error("view missing Poll interval field")
+	}
+	if !strings.Contains(view, "Stale:") {
+		t.Error("view missing Stale interval field")
+	}
+
+	// Store section.
+	if !strings.Contains(view, "STORE") {
+		t.Error("view missing STORE section")
+	}
+	if !strings.Contains(view, "sessions") {
+		t.Error("view missing session count")
+	}
+
+	// Two-column layout at width >= 120: HOOKS should appear on same visual row as DAEMON.
+	lines := strings.Split(view, "\n")
+	hooksOnSameRow := false
+	for _, line := range lines {
+		if strings.Contains(line, "DAEMON") && strings.Contains(line, "HOOKS") {
+			// In wide mode they share a row via JoinHorizontal.
+			hooksOnSameRow = true
+			break
+		}
+	}
+	// Check for HOOKS appearing on a line that also has content from the left column.
+	// With two-column layout, HOOKS header appears on same row as DAEMON content.
+	daemonLine := -1
+	hooksLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, "DAEMON") {
+			daemonLine = i
+		}
+		if strings.Contains(line, "HOOKS") {
+			hooksLine = i
+		}
+	}
+	if !hooksOnSameRow && (daemonLine == -1 || hooksLine == -1 || hooksLine > daemonLine+1) {
+		t.Error("at width 120, HOOKS should be in two-column layout near DAEMON")
+	}
+}
+
+func TestModelViewNarrowLayout(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(80, 40) // narrow mode
+	view := ansi.Strip(m.View())
+
+	// Should still have all sections, just stacked.
+	if !strings.Contains(view, "DAEMON") {
+		t.Error("narrow view missing DAEMON section")
+	}
+	if !strings.Contains(view, "HOOKS") {
+		t.Error("narrow view missing HOOKS section")
+	}
+	if !strings.Contains(view, "STORE") {
+		t.Error("narrow view missing STORE section")
+	}
+}
+
 func TestModelNavigation(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 40)
