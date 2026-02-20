@@ -330,8 +330,9 @@ shared key handler or binding iterator would need to account for the overlap.
 
 ### Responsive layout
 
-The design (table above) specifies different behavior for wide (>=120),
-standard (80-119), and narrow (<80) terminals. The daemon/hooks/store header
-now uses two-column layout at width >= 120, but the remaining responsive
-behaviors (abbreviated narrow mode, hidden sparklines, truncated IDs) are
-not yet implemented.
+The responsive layout table is fully implemented for the pipeline monitor.
+Wide (>=120), standard (80-119), and narrow (<80) modes adjust daemon header
+content, activity stats format, sparkline visibility, run row detail level
+(ID length, project width, timing stages), and prompt visibility. Full
+responsive behavior for the dashboard and other views is out of scope for
+Phase 4c.

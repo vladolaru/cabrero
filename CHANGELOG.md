@@ -31,6 +31,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   viewer refreshes every 1 second when follow mode is active.
 - **PipelineConfig settings** — configurable sparkline days, recent runs limit,
   and log follow mode default via `shared.Config`.
+- **Pipeline monitor responsive layout** — three-tier layout (wide/standard/narrow)
+  adapts daemon header density, activity stats format, sparkline visibility,
+  run row detail level, and prompt section visibility to terminal width.
 
 ## [0.6.0] - 2026-02-20
 
