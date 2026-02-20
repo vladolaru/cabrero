@@ -805,17 +805,20 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - Hook scripts embedded in binary via `//go:embed`
 - `--yes` flag for scripted installs, `--dry-run` for preview
 
-**Phase 4a — Review TUI (core review loop)**
+**Phase 4a — Review TUI (core review loop)** ✓
 
 12. **Bubble Tea review interface** — dashboard with proposal list, proposal detail
-    view with colored diffs, keyboard navigation, approve/reject/defer
+    view with colored diffs, keyboard navigation, approve/reject/defer ✓
 13. **AI chat panel** — streaming Sonnet via `claude` CLI, citation chain as context,
-    question chips, revised proposal detection via ` ```revision ` marker
+    question chips, revised proposal detection via ` ```revision ` marker ✓
 14. **`cabrero approve` + `cabrero reject`** — apply flow via Sonnet + writing skill,
-    before/after diff confirmation, rollback entry written
+    before/after diff confirmation, rollback entry written ✓
 
 Phase 4a delivers the core value proposition: interactive proposal review with
-AI chat. Ships and validates before building operational views.
+AI chat. Implemented with Bubble Tea v1.x, Bubbles v1.x, Lip Gloss v1.x.
+Configurable via `~/.cabrero/config.json` (arrow/vim navigation, theme,
+chat panel width, confirmation toggles). See `docs/plans/2026-02-20-review-tui-design.md`
+for the full design specification.
 
 **Phase 4b — Review TUI (assessment & management)**
 

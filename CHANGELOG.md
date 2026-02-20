@@ -9,6 +9,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`cabrero review`** — interactive Bubble Tea TUI for reviewing proposals.
+  Dashboard shows proposal list with type indicators, confidence, and sort/filter.
+  Detail view renders colored unified diffs, rationale, and citation chains.
+  Stack-based navigation with configurable arrow or vim keybinding modes.
+
+- **AI chat panel** — streaming Sonnet integration via `claude` CLI for
+  interrogating proposals before deciding. Question chips for common queries,
+  revision detection via ` ```revision ` fenced blocks.
+
+- **`cabrero approve`** — non-interactive CLI command that reads a proposal,
+  invokes Claude to blend the change into the target file, shows a before/after
+  diff, and writes the file on confirmation.
+
+- **`cabrero reject`** — non-interactive CLI command that archives a proposal
+  with an optional rejection reason (`--reason "text"`).
+
+- **TUI configuration** — `~/.cabrero/config.json` with navigation mode,
+  theme, dashboard sort order, chat panel width, personality flavor text,
+  and per-action confirmation toggles. Partial configs merge with defaults.
+
 - **`cabrero uninstall`** — clean removal command that reverses setup: stops
   daemon, removes LaunchAgent, unregisters Claude Code hooks, deletes hook
   scripts and binary. Prompts whether to keep `~/.cabrero` data for

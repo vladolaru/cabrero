@@ -9,4 +9,10 @@ install: build
 	@echo "Installed to ~/.cabrero/bin/cabrero"
 	@echo "Run 'cabrero setup' to complete configuration."
 
-.PHONY: build install
+test:
+	go test ./...
+
+test-v:
+	go test -v ./...
+
+.PHONY: build install test test-v
