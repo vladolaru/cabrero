@@ -6,17 +6,19 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-// Diff rendering styles — use adaptive colors for terminal compatibility.
+// Diff rendering styles — reference shared color palette for consistency.
 var (
-	diffAddStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#2E7D32", Dark: "#66BB6A"})
-	diffDelStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#C62828", Dark: "#EF5350"})
-	diffHunkStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"}).Faint(true)
-	diffLineNum   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#9E9E9E", Dark: "#616161"})
+	diffAddStyle  = lipgloss.NewStyle().Foreground(shared.ColorSuccess)
+	diffDelStyle  = lipgloss.NewStyle().Foreground(shared.ColorError)
+	diffHunkStyle = lipgloss.NewStyle().Foreground(shared.ColorMuted).Faint(true)
+	diffLineNum   = lipgloss.NewStyle().Foreground(shared.ColorBorder)
 	flaggedBox    = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.AdaptiveColor{Light: "#E65100", Dark: "#FFA726"}).
+			BorderForeground(shared.ColorWarning).
 			Padding(0, 1)
 )
 

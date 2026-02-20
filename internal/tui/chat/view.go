@@ -5,16 +5,16 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 var (
-	chatAccent = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#4DB6AC"})
-	chatMuted = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"})
-	chipStyle = lipgloss.NewStyle().
+	chatAccent = lipgloss.NewStyle().Foreground(shared.ColorChat)
+	chatMuted  = lipgloss.NewStyle().Foreground(shared.ColorMuted)
+	chipStyle  = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#4DB6AC"}).
+			BorderForeground(shared.ColorChat).
 			Padding(0, 1)
 )
 
