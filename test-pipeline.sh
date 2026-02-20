@@ -575,9 +575,9 @@ for p in s['proposals']:
     if p.get('flaggedEntry'):
         print(f'      flagged: {p[\"flaggedEntry\"][:100]}')
     print(f'      rationale: {p[\"rationale\"][:120]}...')
-    print(f'      citedUuids: {len(p.get(\"citedUuids\", []))}')
-    print(f'      citedSkillSignals: {p.get(\"citedSkillSignals\", [])}')
-    print(f'      citedClaudeMdSignals: {p.get(\"citedClaudeMdSignals\", [])}')
+    print(f'      citedUuids: {len(p.get(\"citedUuids\") or [])}')
+    print(f'      citedSkillSignals: {p.get(\"citedSkillSignals\") or []}')
+    print(f'      citedClaudeMdSignals: {p.get(\"citedClaudeMdSignals\") or []}')
 
     # Validate proposal type.
     if p['type'] not in valid_types:
