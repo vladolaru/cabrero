@@ -93,7 +93,7 @@ func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput,
 	// Build batch prompt with indexed session data.
 	var dataBuilder strings.Builder
 	dataBuilder.WriteString(fmt.Sprintf("You are evaluating %d sessions from the same project in a single batch.\n", len(sessions)))
-	dataBuilder.WriteString("Generate proposals for ALL sessions that warrant them. Use the standard proposal ID format: prop-{first 6 chars of sessionId}-{index}.\n\n")
+	dataBuilder.WriteString("Generate proposals for ALL sessions that warrant them. Use the standard proposal ID format: prop-{first 8 chars of sessionId}-{index}.\n\n")
 
 	for i, s := range sessions {
 		haikuJSON, err := json.MarshalIndent(s.HaikuOutput, "", "  ")
@@ -163,7 +163,7 @@ func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput,
 }
 
 // validateSonnetBatchOutput validates proposals against all sessions in the batch.
-// UUIDs are checked against all sessions. Skill signals are merged from all Haiku outputs.
+// UUIDs are checked across all sessions. Skill signals are merged from all Haiku outputs.
 func validateSonnetBatchOutput(sessions []BatchSession, output *SonnetOutput) error {
 	// Build combined set of skill names from all Haiku outputs.
 	allSkills := make(map[string]bool)
@@ -173,71 +173,40 @@ func validateSonnetBatchOutput(sessions []BatchSession, output *SonnetOutput) er
 		}
 	}
 
-	// Validate cited UUIDs across all sessions in the batch.
+	// Resolve UUIDs across all sessions using batch lookup per session.
 	allUUIDs := collectSonnetUUIDs(output)
 	validUUIDs := make(map[string]bool)
+
+	// Collect unresolved UUIDs, then resolve per session with a single-pass scan.
+	unresolved := make([]string, 0, len(allUUIDs))
 	for _, uuid := range allUUIDs {
-		if validUUIDs[uuid] {
-			continue
-		}
-		// Try each session until we find the UUID.
-		found := false
-		for _, s := range sessions {
-			_, err := retrieval.GetEntry(s.SessionID, uuid)
-			if err == nil {
-				found = true
-				break
-			}
-		}
-		if !found {
-			fmt.Fprintf(os.Stderr, "  Warning: Sonnet batch cited non-existent UUID: %s\n", uuid)
-		} else {
-			validUUIDs[uuid] = true
-		}
+		unresolved = append(unresolved, uuid)
 	}
 
-	// Check proposal ID uniqueness and filter.
-	seenIDs := make(map[string]bool)
-	var validProposals []Proposal
-
-	for _, p := range output.Proposals {
-		if seenIDs[p.ID] {
-			fmt.Fprintf(os.Stderr, "  Warning: duplicate proposal ID: %s\n", p.ID)
+	for _, s := range sessions {
+		if len(unresolved) == 0 {
+			break
+		}
+		results, err := retrieval.GetTurns(s.SessionID, unresolved)
+		if err != nil {
 			continue
 		}
-		seenIDs[p.ID] = true
-
-		if p.Confidence == "low" {
-			fmt.Fprintf(os.Stderr, "  Warning: dropping low-confidence proposal: %s\n", p.ID)
-			continue
-		}
-
-		if p.Type == "skill_scaffold" && (p.ScaffoldSkillName == nil || *p.ScaffoldSkillName == "") {
-			fmt.Fprintf(os.Stderr, "  Warning: dropping skill_scaffold proposal without scaffoldSkillName: %s\n", p.ID)
-			continue
-		}
-
-		// Prune invalid UUID citations.
-		var validCited []string
-		for _, u := range p.CitedUUIDs {
-			if validUUIDs[u] {
-				validCited = append(validCited, u)
+		var stillUnresolved []string
+		for i, uuid := range unresolved {
+			if results[i] != nil {
+				validUUIDs[uuid] = true
+			} else {
+				stillUnresolved = append(stillUnresolved, uuid)
 			}
 		}
-		p.CitedUUIDs = validCited
-
-		// Validate skill signal references against combined set.
-		for _, skill := range p.CitedSkillSignals {
-			if !allSkills[skill] {
-				fmt.Fprintf(os.Stderr, "  Warning: proposal %s cites skill '%s' not in any Haiku output\n", p.ID, skill)
-			}
-		}
-
-		validProposals = append(validProposals, p)
+		unresolved = stillUnresolved
 	}
 
-	output.Proposals = validProposals
-	return nil
+	for _, uuid := range unresolved {
+		fmt.Fprintf(os.Stderr, "  Warning: Sonnet batch cited non-existent UUID: %s\n", uuid)
+	}
+
+	return filterAndValidateProposals(output, validUUIDs, allSkills)
 }
 
 func parseSonnetOutput(raw string) (*SonnetOutput, error) {
@@ -274,7 +243,13 @@ func validateSonnetOutput(sessionID string, output *SonnetOutput, haikuOutput *H
 		}
 	}
 
-	// Check proposal ID uniqueness.
+	return filterAndValidateProposals(output, validUUIDs, haikuSkills)
+}
+
+// filterAndValidateProposals validates proposals for duplicate IDs, low confidence,
+// valid skill_scaffold fields, UUID citations, and skill signal references.
+// Shared by both single-session and batch validation paths.
+func filterAndValidateProposals(output *SonnetOutput, validUUIDs map[string]bool, allSkills map[string]bool) error {
 	seenIDs := make(map[string]bool)
 	var validProposals []Proposal
 
@@ -309,7 +284,7 @@ func validateSonnetOutput(sessionID string, output *SonnetOutput, haikuOutput *H
 
 		// Validate skill signal references.
 		for _, skill := range p.CitedSkillSignals {
-			if !haikuSkills[skill] {
+			if !allSkills[skill] {
 				fmt.Fprintf(os.Stderr, "  Warning: proposal %s cites skill '%s' not in Haiku output\n", p.ID, skill)
 			}
 		}

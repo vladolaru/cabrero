@@ -236,10 +236,10 @@ func (d *Daemon) runSonnetBatch(sessions []pipeline.BatchSession) {
 	}
 
 	// Partition proposals by session: proposal IDs encode their session
-	// via the format "prop-{first 6 chars of sessionId}-{index}".
+	// via the format "prop-{first 8 chars of sessionId}-{index}".
 	totalMatched := 0
 	for _, s := range sessions {
-		prefix := "prop-" + shortID6(s.SessionID) + "-"
+		prefix := "prop-" + shortID(s.SessionID) + "-"
 		filtered := filterProposals(sonnetOutput, prefix)
 		filtered.SessionID = s.SessionID
 		totalMatched += len(filtered.Proposals)
@@ -249,14 +249,6 @@ func (d *Daemon) runSonnetBatch(sessions []pipeline.BatchSession) {
 		d.log.Error("batch: %d of %d proposals unmatched after partitioning",
 			len(sonnetOutput.Proposals)-totalMatched, len(sonnetOutput.Proposals))
 	}
-}
-
-// shortID6 returns the first 6 characters of an ID (proposal ID prefix).
-func shortID6(id string) string {
-	if len(id) > 6 {
-		return id[:6]
-	}
-	return id
 }
 
 // filterProposals returns a shallow copy of the SonnetOutput with only

@@ -46,17 +46,15 @@ type HaikuResult struct {
 	HaikuOutput      *HaikuOutput
 }
 
-// RunThroughHaiku runs pre-parser, aggregator, and Haiku classifier.
-// Returns enough data for batching. Does not invoke Sonnet.
-func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error) {
-	if !store.SessionExists(sessionID) {
-		return nil, fmt.Errorf("session %s not found in store", sessionID)
-	}
-	if err := EnsurePrompts(); err != nil {
-		return nil, fmt.Errorf("ensuring prompt files: %w", err)
-	}
+// preParseResult holds the output of the pre-parse and aggregation stages.
+type preParseResult struct {
+	Digest           *parser.Digest
+	AggregatorOutput *patterns.AggregatorOutput
+}
 
-	// Pre-parse.
+// runPreParseAndAggregate runs the pre-parser and pattern aggregator.
+// Shared by RunThroughHaiku and Run (dry-run path).
+func runPreParseAndAggregate(sessionID string) (*preParseResult, error) {
 	fmt.Printf("  Parsing session %s...\n", sessionID)
 	digest, err := parser.ParseSession(sessionID)
 	if err != nil {
@@ -68,7 +66,6 @@ func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error)
 	fmt.Printf("  Digest written: %d entries, %d turns, %d errors, %d friction signals\n",
 		digest.Shape.EntryCount, digest.Shape.TurnCount, len(digest.Errors), len(digest.ToolCalls.FrictionSignals))
 
-	// Pattern aggregation.
 	var aggregatorOutput *patterns.AggregatorOutput
 	meta, metaErr := store.ReadMetadata(sessionID)
 	if metaErr == nil && meta.Project != "" {
@@ -76,16 +73,36 @@ func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error)
 		aggregatorOutput, err = patterns.Aggregate(sessionID, meta.Project)
 		if err != nil {
 			fmt.Printf("  Warning: pattern aggregation failed: %v\n", err)
-			// Non-fatal: continue without cross-session context.
 		} else if aggregatorOutput != nil {
 			fmt.Printf("  Found %d recurring pattern(s) across %d sessions\n",
 				len(aggregatorOutput.Patterns), aggregatorOutput.SessionsScanned)
 		}
 	}
 
+	return &preParseResult{
+		Digest:           digest,
+		AggregatorOutput: aggregatorOutput,
+	}, nil
+}
+
+// RunThroughHaiku runs pre-parser, aggregator, and Haiku classifier.
+// Returns enough data for batching. Does not invoke Sonnet.
+func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error) {
+	if !store.SessionExists(sessionID) {
+		return nil, fmt.Errorf("session %s not found in store", sessionID)
+	}
+	if err := EnsurePrompts(); err != nil {
+		return nil, fmt.Errorf("ensuring prompt files: %w", err)
+	}
+
+	pre, err := runPreParseAndAggregate(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Haiku classifier.
 	fmt.Println("  Running Haiku classifier...")
-	haikuOutput, err := RunHaiku(sessionID, digest, aggregatorOutput, cfg)
+	haikuOutput, err := RunHaiku(sessionID, pre.Digest, pre.AggregatorOutput, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("haiku classifier failed: %w", err)
 	}
@@ -100,8 +117,8 @@ func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error)
 		haikuOutput.Triage)
 
 	return &HaikuResult{
-		Digest:           digest,
-		AggregatorOutput: aggregatorOutput,
+		Digest:           pre.Digest,
+		AggregatorOutput: pre.AggregatorOutput,
 		HaikuOutput:      haikuOutput,
 	}, nil
 }
@@ -119,34 +136,12 @@ func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) 
 	result := &RunResult{DryRun: dryRun}
 
 	if dryRun {
-		// Dry run: only pre-parse, no LLM invocations.
-		fmt.Printf("  Parsing session %s...\n", sessionID)
-		digest, err := parser.ParseSession(sessionID)
+		pre, err := runPreParseAndAggregate(sessionID)
 		if err != nil {
-			return nil, fmt.Errorf("pre-parser failed: %w", err)
+			return nil, err
 		}
-		result.Digest = digest
-
-		if err := parser.WriteDigest(digest); err != nil {
-			return nil, fmt.Errorf("writing digest: %w", err)
-		}
-		fmt.Printf("  Digest written: %d entries, %d turns, %d errors, %d friction signals\n",
-			digest.Shape.EntryCount, digest.Shape.TurnCount, len(digest.Errors), len(digest.ToolCalls.FrictionSignals))
-
-		// Pattern aggregation (no LLM cost).
-		meta, metaErr := store.ReadMetadata(sessionID)
-		if metaErr == nil && meta.Project != "" {
-			fmt.Println("  Aggregating cross-session patterns...")
-			aggregatorOutput, err := patterns.Aggregate(sessionID, meta.Project)
-			if err != nil {
-				fmt.Printf("  Warning: pattern aggregation failed: %v\n", err)
-			} else if aggregatorOutput != nil {
-				fmt.Printf("  Found %d recurring pattern(s) across %d sessions\n",
-					len(aggregatorOutput.Patterns), aggregatorOutput.SessionsScanned)
-			}
-			result.AggregatorOutput = aggregatorOutput
-		}
-
+		result.Digest = pre.Digest
+		result.AggregatorOutput = pre.AggregatorOutput
 		fmt.Println("  Dry run — stopping after pre-parser.")
 		return result, nil
 	}
