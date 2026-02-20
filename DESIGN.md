@@ -157,13 +157,13 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
   digests/
     {sessionId}.json         # pre-parser output (structured digest)
   evaluations/
-    {sessionId}-haiku.json   # Haiku classification output
-    {sessionId}-sonnet.json  # Sonnet evaluator output
+    {sessionId}-classifier.json   # Classifier output
+    {sessionId}-evaluator.json    # Evaluator output
   proposals/
     {proposalId}.json        # improvement proposals awaiting human approval
   prompts/
-    haiku-classifier-v2.txt  # Haiku stage prompt (versioned, v2 adds friction + patterns)
-    sonnet-evaluator-v2.txt  # Sonnet stage prompt (versioned, v2 adds skill_scaffold)
+    classifier-v3.txt        # Classifier stage prompt (v3: agentic with Read/Grep, triage, turn budget)
+    evaluator-v3.txt         # Evaluator stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
   blocklist.json             # session IDs to never process (loop prevention)
   daemon.log                 # background daemon log (rotated, 5MB × 3)
   daemon.pid                 # PID file for single-instance enforcement
@@ -209,22 +209,26 @@ Pre-parser (pure code, fast) → structured digest with citations + friction sig
         ↓
 Pattern aggregator (pure code) → cross-session recurring patterns (if 3+ project sessions)
         ↓
-claude --model haiku  (goal inference, error classification, key turn selection,
-                       pattern assessment if cross-session data available)
-        ↓
-claude --model sonnet (skill performance assessment, proposal generation,
-                       skill_scaffold proposals for recurring patterns)
+Agentic Classifier (Read/Grep on ~/.cabrero/raw/)
+  → digest as system context, verifies ambiguous signals by reading raw turns
+  → enriched classification with triage: worth evaluating or clean session
+        ↓ (only sessions Classifier flagged as worth evaluating)
+Agentic Evaluator (Read/Grep — unrestricted filesystem access)
+  → digest + Classifier output as system context
+  → reads current skill files, compares against session-time versions in transcript
+  → proposal generation, skill_scaffold proposals for recurring patterns
         ↓
 macOS notification if proposals generated
         ↓
 Human approval gate
         ↓
-claude --model sonnet (blends approved change into SKILL.md via writing skill)
+claude --model sonnet --print (blends approved change into SKILL.md via writing skill)
 ```
 
-All LLM calls are mediated by the `claude` CLI using `--model` to select the right model
-per stage. No API keys in the app — CC's existing auth is reused throughout. The daemon
-sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
+All LLM calls are mediated by the `claude` CLI. No API keys in the app — CC's existing
+auth is reused throughout. Classifier and Evaluator run as agentic tool-using sessions with
+constrained tool access (Read, Grep). Apply stage uses `--print` (non-agentic). The
+daemon sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
 
 **Trigger:** session-end, not every file write. The daemon only processes sessions where
 `capture_trigger` contains `"session-end"` (session is complete). PreCompact-only sessions
@@ -232,7 +236,7 @@ wait until session-end fires.
 
 ### Pre-Parser (pure code, no LLM)
 
-Defensive design: skip anything ambiguous, leave nulls for Haiku to fill, validate
+Defensive design: skip anything ambiguous, leave nulls for Classifier to fill, validate
 JSONL line-by-line, preserve unknown entry types in `raw_unknown` bucket.
 
 Extracts deterministically:
@@ -255,39 +259,53 @@ Output explicitly distinguishes extracted fields from skipped/null fields.
 
 ### Retrieval Interface (shared across all layers)
 
-All layers (pre-parser, Haiku, evaluator) can reach back to raw JSONL:
+Both Classifier and Evaluator are agentic — they run as tool-using `claude` sessions (not
+`--print`) with access to the `claude` CLI's built-in Read and Grep tools. This
+replaces the earlier design of custom retrieval functions; the built-in tools are
+sufficient for navigating JSONL by UUID, reading raw turns, and inspecting files.
 
-```
-get_entry(session_id, uuid) → raw JSONL line
-get_turns(session_id, uuid_list) → ordered raw entries
-get_agent_transcript(agent_short_id) → full agent JSONL
-get_session_range(session_id, from_uuid, to_uuid) → slice
-```
+The pre-parser digest provides the map: every signal includes `uuid` + `sessionId`
+references. Classifier and Evaluator use these to pull raw turns on demand via Read/Grep
+against `~/.cabrero/raw/`.
 
-Full citation chain: every Haiku classification and evaluator finding cites the UUIDs
-it's based on. Skill proposals trace back through evaluator → Haiku → pre-parser → raw entries.
+Full citation chain: every Classifier classification and Evaluator finding cites the UUIDs
+it's based on. Skill proposals trace back through Evaluator → Classifier → pre-parser → raw entries.
 
 ### LLM Stack
 
-All models invoked via `claude --model <model> --print`. CC's existing authentication
-is reused — no separate API key management.
+CC's existing authentication is reused — no separate API key management. Classifier and
+Evaluator run as agentic tool-using sessions via the `claude` CLI with constrained
+tool access. Apply and chat stages remain non-agentic.
 
-- **Haiku** (`claude-haiku-4-5`) — classifier: goal inference, error classification,
-  key turn selection, skill/CLAUDE.md signal assessment, cross-session pattern assessment.
-  Runs per session. Receives digest + optional cross-session patterns.
-- **Sonnet** (`claude-sonnet-4-6`) — evaluator: skill performance assessment and
-  proposal generation (including `skill_scaffold` proposals for recurring patterns)
-  with `--effort high`. Receives structured digest + Haiku output, not raw JSONL.
-  Validates citations against retrieval layer.
-- **Sonnet** — apply: blends approved changes into SKILL.md using the writing skill.
-  Runs on approval only — infrequent, quality-critical.
-- **Sonnet** — chat: interactive proposal interrogation in the Review App. Latency-
-  sensitive; Sonnet is fast enough to feel conversational.
+- **Classifier** (`claude-haiku-4-5`) — agentic classifier with Read and Grep tools
+  scoped to `~/.cabrero/raw/`. Receives the pre-parser digest as system context.
+  Classifies signals (goal inference, error classification, key turn selection,
+  skill/CLAUDE.md signal assessment, cross-session pattern assessment) and
+  verifies ambiguous signals by reading surrounding raw turns. Exercises judgment
+  about when to deep-read — the prompt provides guidance on situations that
+  benefit from raw turn inspection (near-threshold friction, ambiguous error
+  attribution, sparse sessions) but the Classifier decides. Guardrails: max retrieval
+  calls per session, token budget for retrieved content, session timeout.
+  Produces enriched classification with higher-confidence triage, reducing false
+  positives passed to the Evaluator and catching signals the pre-parser's structural
+  extraction missed.
+- **Evaluator** (`claude-sonnet-4-6`) — agentic evaluator with unrestricted Read and
+  Grep access (same filesystem access as the user). Receives
+  the digest + Classifier's enriched classification as system context. Reads current
+  versions of skills and instruction files to compare against what CC saw during
+  the session (captured in the raw transcript). Generates proposals including
+  `skill_scaffold` proposals for recurring patterns. Only runs on sessions the Classifier
+  marked as worth evaluating — the Classifier's improved triage reduces unnecessary
+  Evaluator invocations.
+- **Evaluator** — apply: blends approved changes into SKILL.md using the writing skill.
+  Runs on approval only — infrequent, quality-critical. Non-agentic (`--print`).
+- **Evaluator** — chat: interactive proposal interrogation in the Review App. Latency-
+  sensitive; fast enough to feel conversational. Non-agentic (`--print`).
 
 ### Cross-Session Pattern Aggregation
 
 The pipeline processes sessions in isolation, but some inefficiencies only become visible
-across sessions. The pattern aggregator runs between the pre-parser and Haiku, detecting
+across sessions. The pattern aggregator runs between the pre-parser and the Classifier, detecting
 recurring friction by comparing the current session's digest against recent sessions in
 the same project.
 
@@ -302,53 +320,78 @@ the same project.
    from repetition alone
 
 **Context budget:** Aggregator output is ~200–500 tokens (pre-filtered in code, limited to
-top 5 patterns). Haiku classifies each pattern as "confirmed", "coincidental", or "resolved"
-(~300 tokens added to Haiku output). Sonnet sees Haiku's assessment, never the raw
-cross-session data.
+top 5 patterns). Included in the Classifier's system context alongside the digest. The Classifier
+classifies each pattern as "confirmed", "coincidental", or "resolved" — and can deep-read raw turns
+to verify patterns rather than classifying blind. The Evaluator sees the Classifier's assessment, never
+the raw cross-session data.
 
 **Graceful degradation:** No project metadata → aggregator skipped. Fewer than 3 sessions →
 returns nil. Aggregator error → non-fatal warning, pipeline continues without cross-session
 context.
 
-### Context Window Budget (known gap)
+### Context & Cost Budget
 
-LLM evaluators receive all data via stdin — no tool access, pure classification. Current
-worst-case input sizes (measured across ~60 digests):
+The agentic architecture changes the budget model. Instead of fitting everything into
+a single stdin payload, the digest is the starting context and evaluators pull
+additional data on demand via tool calls. This mitigates the unbounded digest problem
+— evaluators don't need everything upfront, they start with the digest map and drill
+into areas of interest.
 
-| Component | Haiku input | Sonnet input |
-|-----------|-------------|--------------|
+**Starting context** (system prompt, loaded once per session):
+
+| Component | Classifier | Evaluator |
+|-----------|------------|-----------|
 | System prompt | ~1.5K tokens | ~1.1K tokens |
 | Digest | ~15K tokens (largest: 3923-entry session) | ~15K tokens |
 | Cross-session patterns | ~500 tokens | — |
-| Haiku output | — | ~2K tokens |
-| **Total** | **~17K tokens** | **~18K tokens** |
+| Classifier output | — | ~2K tokens |
+| **Starting total** | **~17K tokens** | **~18K tokens** |
 
-Against a 200K context window this is comfortable (~10x headroom). However, digest size
-scales with session length and is currently unbounded. The two largest cost centers are:
+Against a 200K context window the starting context is comfortable (~10x headroom).
+Each tool call (Read/Grep on raw JSONL) adds context incrementally. The risk shifts
+from "digest too large for stdin" to "too many retrieval calls accumulating context."
 
-- **`toolCalls` section** (35% of largest digest) — friction signals are the main driver;
-  one session had 76 signals at 16KB. Grows linearly with session tool call count.
-- **`errors` section** (23% of largest digest) — snippets are capped at 200 chars each,
-  but error count is unbounded; one session had 32 errors.
+**Guardrails per agentic session:**
 
-**No safeguards exist yet.** A session with 10K+ entries or hundreds of errors could
-produce a digest that exceeds context limits. Needed:
+1. **Max turns** — cap agentic turns per invocation (default: Classifier 15, Evaluator 20).
+   Configurable in daemon config. Prevents runaway exploration.
+2. **Session timeout** — hard wall-clock limit (default: Classifier 2 min, Evaluator 5 min).
+   Configurable in daemon config. The daemon needs predictable throughput.
+3. **Digest size cap** — still needed for the starting context. Truncate or summarize
+   sections when total digest exceeds a configurable token budget (e.g. 50K tokens).
+   Less critical than before since evaluators can pull what the digest omitted.
+4. **Per-section limits** — cap friction signals (e.g. top 20 by severity), errors
+   (e.g. top 30, deduplicated), retry anomalies (e.g. top 10). These keep the
+   starting map readable rather than exhaustive.
 
-1. **Digest size cap** — truncate or summarize sections when total digest exceeds a
-   configurable token budget (e.g. 50K tokens). Priority for retention: shape > toolCalls
-   summary > errors (deduplicated) > friction signals (top N per type) > agents > skills.
-2. **Per-section limits** — cap friction signals (e.g. top 20 by severity), cap errors
-   (e.g. top 30, deduplicated by normalized snippet), cap retry anomalies (e.g. top 10).
-3. **Token estimation** — lightweight char-based estimate before invoking claude, with
-   a warning log and truncation fallback if over budget.
-4. **Sonnet double-input** — Sonnet receives both the digest and Haiku output, so its
-   budget is tighter. If digest truncation is needed, Sonnet's copy could be more
-   aggressively summarized since Haiku has already classified the key signals.
+**Cost model:** The Classifier (`claude-haiku-4-5`) is cheap per call but agentic sessions
+use more tokens than `--print`. The cost guard is the Classifier's triage quality — sessions
+classified as clean skip the Evaluator entirely. If 60% of sessions are clean, the agentic
+Classifier's higher per-session cost is offset by eliminating 60% of Evaluator invocations.
+
+### Smart Batching
+
+When multiple pending sessions belong to the same project, the daemon batches them
+to reduce Evaluator invocations and improve cross-session reasoning:
+
+1. Group pending sessions by project
+2. Run Classifier individually on each (cheap, independent triage)
+3. Collect sessions where `triage == "evaluate"`
+4. If 1 session: individual Evaluator call
+5. If 2+ sessions: batched Evaluator call with all digests + Classifier outputs
+
+The batching decision is pure code — no orchestrator agent needed. The only
+criterion is "same project," which is available from session metadata. The Evaluator's
+max turns and timeout scale linearly with batch size (capped at reasonable
+maximums). Sessions without project metadata fall back to individual processing.
+
+`cabrero run <session_id>` always processes one session individually — batching
+only happens in the daemon when multiple sessions are pending.
 
 ### Human Approval Gate
 
 All SKILL.md modifications require explicit approval before writing. Gate shows full
-citation chain (proposal → evaluator reasoning → Haiku classification → raw turns).
+citation chain (proposal → Evaluator reasoning → Classifier classification → raw turns).
 Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 
 ### Background Daemon
@@ -366,6 +409,10 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (5 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
+- **Smart batching** — groups pending sessions by project, runs Classifier individually (cheap
+  triage), then batches "evaluate" sessions into a single Evaluator call per project
+- **Evaluator tuning** — turn budgets and timeouts configurable via CLI flags
+  (`--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`, `--evaluator-timeout`)
 
 LaunchAgent plist template at `launchd/com.cabrero.daemon.plist` with `KeepAlive`,
 `RunAtLoad`, low-priority I/O, and `Nice: 10`.
@@ -390,9 +437,9 @@ header and a short changelog:
 
 ```
 ~/.cabrero/prompts/
-  haiku-classifier-v3.txt
-  opus-evaluator-v5.txt
-  opus-apply-v2.txt
+  classifier-v3.txt
+  evaluator-v5.txt
+  apply-v2.txt
 ```
 
 Editing a file and bumping the version is all it takes to deploy a change — the next
@@ -413,7 +460,7 @@ store, re-run the pipeline with a new prompt and compare its output against the 
 output and your actual approval or rejection at the time:
 
 ```bash
-cabrero replay --session abc123 --prompt prompts/opus-evaluator-v6.txt
+cabrero replay --session abc123 --prompt prompts/evaluator-v6.txt
 ```
 
 This is a CLI command — see the Cabrero CLI section.
@@ -474,7 +521,7 @@ make the guarantee structural rather than behavioral.
 - Hooks are the primary capture mechanism, daemon stale scan is the safety net
 - Raw backups are immutable and always written first
 - Pre-parser is dumb and fast — no inference, explicit about what it skipped
-- AI layers are protected from noise: Haiku sees digests, Sonnet sees curated digests + Haiku output
+- AI layers are protected from noise: Classifier sees digests, Evaluator sees curated digests + Classifier output
 - Full traceability from proposal back to raw JSONL at every layer
 - Schema versioning from day one — CC JSONL format is undocumented and can change
 - Cabrero's own CLI sessions are never analyzed — env var sentinel, session ID blocklist, and skill path restriction work in concert
@@ -515,6 +562,11 @@ Lives at `~/.cabrero/bin/cabrero`, added to PATH on install.
 
 ```
 cabrero run <session_id>        Run the full pipeline on a session
+  --dry-run                       Run only the pre-parser, skip LLM invocations
+  --classifier-max-turns <int>    Max agentic turns for Classifier (default 15)
+  --evaluator-max-turns <int>     Max agentic turns for Evaluator (default 20)
+  --classifier-timeout <duration> Timeout for Classifier (default 2m)
+  --evaluator-timeout <duration>  Timeout for Evaluator (default 5m)
 cabrero sessions                List captured sessions with status (processed/pending/error)
 cabrero status                  Show pipeline health: sessions, daemon, hooks
 cabrero proposals               List pending proposals
@@ -526,6 +578,10 @@ cabrero daemon                  Run background session processor (for launchd)
   --poll <duration>               Pending session check interval (default 2m)
   --stale <duration>              Stale session scan interval (default 30m)
   --delay <duration>              Pause between processing sessions (default 30s)
+  --classifier-max-turns <int>    Max agentic turns for Classifier (default 15)
+  --evaluator-max-turns <int>     Max agentic turns for Evaluator (default 20)
+  --classifier-timeout <duration> Timeout for Classifier (default 2m)
+  --evaluator-timeout <duration>  Timeout for Evaluator (default 5m)
 cabrero replay                  Re-run pipeline with a different prompt against a past session
   --session <id>
   --prompt <path>
@@ -598,8 +654,8 @@ EVALUATOR REASONING
 "Skill was read after 3 write attempts in session abc123.
  Pattern observed across 2 sessions in the past 7 days."
 
-HAIKU CLASSIFICATION
-────────────────────
+CLASSIFIER OUTPUT
+─────────────────
 Goal inferred: "Create a formatted Word report"
 Signal: skill read at turn 18, first write at turn 9
 Confidence: high
@@ -624,8 +680,8 @@ The detail view includes an AI chat panel for interrogating proposals you want t
 understand before deciding. This is not a general-purpose chatbot — it is scoped
 entirely to the current proposal.
 
-**Cold start** — the panel never opens blank. Haiku generates 3–4 proposal-specific
-question chips as part of its evaluation output, e.g.:
+**Cold start** — the panel never opens blank. The Classifier generates 3–4 proposal-specific
+question chips as part of its classification output, e.g.:
 
 ```
 Why was this flagged?
@@ -781,9 +837,9 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - Error attribution: tool_use_id → tool_name mapping, ErrorCount incremented per tool
 - Retrieval interface (UUID-based raw entry access shared across all pipeline stages)
 - Cross-session pattern aggregator (recurring errors/friction across 3+ project sessions)
-- Haiku classifier prompt (`haiku-classifier-v2.txt`) — goal, errors, key turns,
-  skill/CLAUDE.md signals, friction signal awareness, pattern assessment
-- Sonnet evaluator prompt (`sonnet-evaluator-v2.txt`) — proposal generation with citation
+- Classifier prompt (`classifier-v3.txt`) — agentic with Read/Grep on raw store,
+  goal, errors, key turns, skill/CLAUDE.md signals, friction signals, triage gate, turn budget
+- Evaluator prompt (`evaluator-v3.txt`) — proposal generation with citation
   validation, `skill_scaffold` proposals for recurring cross-session patterns
 - `cabrero run` + `cabrero proposals` + `cabrero inspect`
 
@@ -809,9 +865,9 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 
 12. **Bubble Tea review interface** — dashboard with proposal list, proposal detail
     view with colored diffs, keyboard navigation, approve/reject/defer ✓
-13. **AI chat panel** — streaming Sonnet via `claude` CLI, citation chain as context,
+13. **AI chat panel** — streaming Evaluator via `claude` CLI, citation chain as context,
     question chips, revised proposal detection via ` ```revision ` marker ✓
-14. **`cabrero approve` + `cabrero reject`** — apply flow via Sonnet + writing skill,
+14. **`cabrero approve` + `cabrero reject`** — apply flow via Evaluator + writing skill,
     before/after diff confirmation, rollback entry written ✓
 
 Phase 4a delivers the core value proposition: interactive proposal review with
