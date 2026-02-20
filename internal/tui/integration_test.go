@@ -362,3 +362,123 @@ func TestSourceManagerGroupCollapse(t *testing.T) {
 		t.Error("collapsing group should change the view")
 	}
 }
+
+// Phase 4c integration tests.
+
+func TestDashboardToPipelineAndBack(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Press 'p' to open pipeline monitor.
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	if cmd == nil {
+		t.Fatal("p should produce cmd")
+	}
+	pushMsg := cmd()
+	push, ok := pushMsg.(message.PushView)
+	if !ok {
+		t.Fatalf("expected PushView, got %T", pushMsg)
+	}
+	if push.View != message.ViewPipelineMonitor {
+		t.Errorf("PushView = %d, want ViewPipelineMonitor", push.View)
+	}
+
+	// Process the push.
+	m, _ = update(m, push)
+	if m.state != message.ViewPipelineMonitor {
+		t.Errorf("state = %d, want ViewPipelineMonitor", m.state)
+	}
+
+	// Pipeline monitor should render.
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "DAEMON") || !strings.Contains(view, "RECENT RUNS") {
+		t.Error("pipeline monitor view missing expected sections")
+	}
+
+	// Press Esc to go back.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		m, _ = update(m, cmd())
+	}
+	if m.state != message.ViewDashboard {
+		t.Errorf("state after pop = %d, want ViewDashboard", m.state)
+	}
+}
+
+func TestPipelineToLogViewerAndBack(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Push to pipeline monitor.
+	m, _ = update(m, message.PushView{View: message.ViewPipelineMonitor})
+	if m.state != message.ViewPipelineMonitor {
+		t.Fatal("should be in pipeline monitor")
+	}
+
+	// Press 'L' to open log viewer.
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
+	if cmd == nil {
+		t.Fatal("L should produce cmd")
+	}
+	pushMsg := cmd()
+	push, ok := pushMsg.(message.PushView)
+	if !ok {
+		t.Fatalf("expected PushView, got %T", pushMsg)
+	}
+	if push.View != message.ViewLogViewer {
+		t.Errorf("PushView = %d, want ViewLogViewer", push.View)
+	}
+
+	// Process the push.
+	m, _ = update(m, push)
+	if m.state != message.ViewLogViewer {
+		t.Errorf("state = %d, want ViewLogViewer", m.state)
+	}
+	if len(m.viewStack) != 2 {
+		t.Errorf("viewStack len = %d, want 2", len(m.viewStack))
+	}
+
+	// Press Esc to go back to pipeline.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		m, _ = update(m, cmd())
+	}
+	if m.state != message.ViewPipelineMonitor {
+		t.Errorf("state after pop = %d, want ViewPipelineMonitor", m.state)
+	}
+
+	// Press Esc again to go back to dashboard.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		m, _ = update(m, cmd())
+	}
+	if m.state != message.ViewDashboard {
+		t.Errorf("state after second pop = %d, want ViewDashboard", m.state)
+	}
+}
+
+func TestFullStackNavigation(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Dashboard -> Pipeline -> Log -> back -> back -> Dashboard.
+	m, _ = update(m, message.PushView{View: message.ViewPipelineMonitor})
+	m, _ = update(m, message.PushView{View: message.ViewLogViewer})
+
+	if m.state != message.ViewLogViewer {
+		t.Fatal("should be in log viewer")
+	}
+	if len(m.viewStack) != 2 {
+		t.Fatalf("viewStack = %d, want 2", len(m.viewStack))
+	}
+
+	m, _ = update(m, message.PopView{})
+	if m.state != message.ViewPipelineMonitor {
+		t.Errorf("after first pop: state = %d, want ViewPipelineMonitor", m.state)
+	}
+
+	m, _ = update(m, message.PopView{})
+	if m.state != message.ViewDashboard {
+		t.Errorf("after second pop: state = %d, want ViewDashboard", m.state)
+	}
+}
