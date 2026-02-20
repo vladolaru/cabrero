@@ -46,9 +46,9 @@ func (m Model) View() string {
 		sections = append(sections, m.renderPrompts())
 	}
 
-	// Confirm overlay.
+	// Confirmation prompt overlay — exclusive return, matching sources pattern.
 	if m.confirm.Active {
-		sections = append(sections, m.confirm.View())
+		return m.confirm.View()
 	}
 
 	content := strings.Join(sections, "\n\n")
@@ -115,10 +115,7 @@ func (m Model) renderRecentRuns() string {
 		}
 
 		status := statusIndicator(run.Status)
-		shortID := run.SessionID
-		if len(shortID) > 8 {
-			shortID = shortID[:8]
-		}
+		shortID := truncateID(run.SessionID)
 		age := relativeTime(run.Timestamp)
 		project := truncate(run.Project, 16)
 		timing := formatTiming(run)
@@ -223,12 +220,12 @@ func relativeTime(t time.Time) string {
 	}
 }
 
-func truncate(s string, max int) string {
-	if len(s) <= max {
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
 		return s
 	}
-	if max <= 1 {
-		return s[:max]
+	if maxLen <= 3 {
+		return s[:maxLen]
 	}
-	return s[:max-1] + "…"
+	return s[:maxLen-3] + "..."
 }

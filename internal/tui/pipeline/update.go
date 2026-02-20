@@ -59,8 +59,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Retry):
 		run := m.SelectedRun()
 		if run != nil && run.Status == "error" {
-			m.confirm = components.NewConfirm("Retry session " + truncateID(run.SessionID) + "?")
-			return m, nil
+			if m.config.Confirmations.RetryRequiresConfirm {
+				m.confirm = components.NewConfirm("Retry session " + truncateID(run.SessionID) + "?")
+				return m, nil
+			}
+			// Skip confirmation — retry immediately.
+			sessionID := run.SessionID
+			m.retrying = sessionID
+			return m, func() tea.Msg {
+				return message.RetryRunStarted{SessionID: sessionID}
+			}
 		}
 		return m, nil
 

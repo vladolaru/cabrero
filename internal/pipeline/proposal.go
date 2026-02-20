@@ -14,17 +14,17 @@ import (
 
 // ClassifierOutput is the structured output from the Classifier.
 type ClassifierOutput struct {
-	Version        int    `json:"version"`
-	SessionID      string `json:"sessionId"`
-	PromptVersion  string `json:"promptVersion"`
-	Triage         string `json:"triage"` // "evaluate" or "clean"
+	Version       int    `json:"version"`
+	SessionID     string `json:"sessionId"`
+	PromptVersion string `json:"promptVersion"`
+	Triage        string `json:"triage"` // "evaluate" or "clean"
 
 	Goal                ClassifierGoal                `json:"goal"`
-	ErrorClassification []ClassifierErrorClass         `json:"errorClassification"`
-	KeyTurns            []ClassifierKeyTurn            `json:"keyTurns"`
-	SkillSignals        []ClassifierSkillSignal        `json:"skillSignals"`
-	ClaudeMdSignals     []ClassifierClaudeMdSignal     `json:"claudeMdSignals"`
-	PatternAssessments  []ClassifierPatternAssessment  `json:"patternAssessments,omitempty"`
+	ErrorClassification []ClassifierErrorClass        `json:"errorClassification"`
+	KeyTurns            []ClassifierKeyTurn           `json:"keyTurns"`
+	SkillSignals        []ClassifierSkillSignal       `json:"skillSignals"`
+	ClaudeMdSignals     []ClassifierClaudeMdSignal    `json:"claudeMdSignals"`
+	PatternAssessments  []ClassifierPatternAssessment `json:"patternAssessments,omitempty"`
 }
 
 // ClassifierGoal describes the user's intent in the session.
@@ -51,26 +51,26 @@ type ClassifierKeyTurn struct {
 
 // ClassifierSkillSignal assesses a skill's impact in the session.
 type ClassifierSkillSignal struct {
-	SkillName    string `json:"skillName"`
+	SkillName     string `json:"skillName"`
 	InvokedAtUUID string `json:"invokedAtUuid"`
-	Assessment   string `json:"assessment"`
-	Evidence     string `json:"evidence"`
-	Confidence   string `json:"confidence"`
+	Assessment    string `json:"assessment"`
+	Evidence      string `json:"evidence"`
+	Confidence    string `json:"confidence"`
 }
 
 // ClassifierClaudeMdSignal assesses a CLAUDE.md file's impact.
 type ClassifierClaudeMdSignal struct {
 	Path       string `json:"path"`
 	Assessment string `json:"assessment"`
-	Evidence    string `json:"evidence"`
-	Confidence  string `json:"confidence"`
+	Evidence   string `json:"evidence"`
+	Confidence string `json:"confidence"`
 }
 
 // ClassifierPatternAssessment assesses a cross-session recurring pattern.
 type ClassifierPatternAssessment struct {
 	PatternType string `json:"patternType"` // matches RecurringPattern.Type
 	ToolName    string `json:"toolName"`
-	Assessment  string `json:"assessment"`  // "confirmed" | "coincidental" | "resolved"
+	Assessment  string `json:"assessment"` // "confirmed" | "coincidental" | "resolved"
 	Evidence    string `json:"evidence"`
 	Confidence  string `json:"confidence"`
 }
@@ -79,12 +79,12 @@ type ClassifierPatternAssessment struct {
 
 // EvaluatorOutput is the structured output from the Evaluator.
 type EvaluatorOutput struct {
-	Version                int        `json:"version"`
-	SessionID              string     `json:"sessionId"`
-	PromptVersion          string     `json:"promptVersion"`
-	ClassifierPromptVersion string    `json:"classifierPromptVersion"`
-	Proposals              []Proposal `json:"proposals"`
-	NoProposalReason       *string    `json:"noProposalReason"`
+	Version                 int        `json:"version"`
+	SessionID               string     `json:"sessionId"`
+	PromptVersion           string     `json:"promptVersion"`
+	ClassifierPromptVersion string     `json:"classifierPromptVersion"`
+	Proposals               []Proposal `json:"proposals"`
+	NoProposalReason        *string    `json:"noProposalReason"`
 }
 
 // Proposal describes a suggested improvement from the Evaluator.
