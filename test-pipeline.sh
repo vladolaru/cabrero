@@ -296,6 +296,8 @@ SMOKE_OUTPUT=$(echo 'The user asked Claude to fix a bug in the login form.' | \
     --print \
     --system-prompt 'Output ONLY valid JSON. No markdown, no preamble. Schema: {"summary":"string"}' \
     --no-session-persistence \
+    --disable-slash-commands \
+    --tools "" \
   2>&1) || true
 
 echo "  Raw output (first 300 chars): ${SMOKE_OUTPUT:0:300}"

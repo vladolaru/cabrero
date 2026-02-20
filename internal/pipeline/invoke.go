@@ -27,6 +27,8 @@ func invokeClaude(cfg claudeConfig, stdin io.Reader) (string, error) {
 		"--print",
 		"--system-prompt", cfg.SystemPrompt,
 		"--no-session-persistence",
+		"--disable-slash-commands",
+		"--tools", "",
 	}
 
 	if cfg.Effort != "" {
