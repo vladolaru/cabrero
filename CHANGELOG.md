@@ -5,7 +5,7 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-02-20
 
 ### Changed
 
@@ -24,6 +24,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   context within one call while keeping Classifier independent.
 - **Prompt versions** — Classifier upgraded to v3 (`classifier-v3.txt`),
   Evaluator upgraded to v3 (`evaluator-v3.txt`).
+- **Model-agnostic naming** — renamed "Haiku classifier" → "Classifier" and
+  "Sonnet evaluator" → "Evaluator" throughout the codebase, CLI flags, file
+  suffixes, and documentation. Decouples pipeline stage names from the Claude
+  models that back them. CLI flags renamed: `--haiku-*` → `--classifier-*`,
+  `--sonnet-*` → `--evaluator-*`. Output files renamed: `*-haiku.json` →
+  `*-classifier.json`, `*-sonnet.json` → `*-evaluator.json`.
 
 ### Added
 
@@ -88,4 +94,5 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.6.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.6.0
 [0.5.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.5.0
