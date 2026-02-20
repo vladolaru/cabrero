@@ -29,6 +29,7 @@ var commands = []command{
 	{"import", "Seed the store from existing CC session files", cmd.Import},
 	{"daemon", "Run background session processor (for launchd)", cmd.Daemon},
 	{"setup", "Install and configure Cabrero", cmdSetup},
+	{"update", "Update Cabrero to latest release", cmdUpdate},
 }
 
 func main() {
@@ -89,6 +90,13 @@ func printHelp() {
 
 func cmdSetup(args []string) error {
 	return cmd.Setup(args, cmd.EmbeddedHooks{
+		PreCompact: preCompactHookScript,
+		SessionEnd: sessionEndHookScript,
+	})
+}
+
+func cmdUpdate(args []string) error {
+	return cmd.Update(args, version, cmd.EmbeddedHooks{
 		PreCompact: preCompactHookScript,
 		SessionEnd: sessionEndHookScript,
 	})
