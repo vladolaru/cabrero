@@ -20,6 +20,25 @@ var (
 	mutedStyle         = lipgloss.NewStyle().Foreground(shared.ColorMuted)
 )
 
+type layout int
+
+const (
+	layoutNarrow   layout = iota // < 80
+	layoutStandard               // 80-119
+	layoutWide                   // >= 120
+)
+
+func (m Model) layoutMode() layout {
+	switch {
+	case m.width >= 120:
+		return layoutWide
+	case m.width >= 80:
+		return layoutStandard
+	default:
+		return layoutNarrow
+	}
+}
+
 // View renders the pipeline monitor.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {

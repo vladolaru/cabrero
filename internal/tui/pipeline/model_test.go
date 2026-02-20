@@ -167,6 +167,31 @@ func TestModelRetryKey(t *testing.T) {
 	}
 }
 
+func TestLayoutMode(t *testing.T) {
+	m := newTestModel()
+
+	m.SetSize(120, 40)
+	if m.layoutMode() != layoutWide {
+		t.Errorf("width 120 should be wide, got %d", m.layoutMode())
+	}
+
+	m.SetSize(100, 40)
+	if m.layoutMode() != layoutStandard {
+		t.Errorf("width 100 should be standard, got %d", m.layoutMode())
+	}
+
+	m.SetSize(79, 40)
+	if m.layoutMode() != layoutNarrow {
+		t.Errorf("width 79 should be narrow, got %d", m.layoutMode())
+	}
+
+	// Boundary: 80 is standard, not narrow.
+	m.SetSize(80, 40)
+	if m.layoutMode() != layoutStandard {
+		t.Errorf("width 80 should be standard, got %d", m.layoutMode())
+	}
+}
+
 func TestModelPipelineKeyEmitsPushLogView(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 40)
