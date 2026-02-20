@@ -24,6 +24,7 @@ func Backfill(args []string) error {
 	dryRun := fs.Bool("dry-run", false, "show preview only, don't process")
 	autoYes := fs.Bool("yes", false, "skip confirmation prompt")
 	retryErrors := fs.Bool("retry-errors", false, "also re-process sessions with status 'error'")
+	enqueue := fs.Bool("enqueue", false, "mark matching sessions as 'queued' for background daemon processing (non-blocking)")
 
 	classifierMaxTurns := fs.Int("classifier-max-turns", 0, "override Classifier max turns")
 	evaluatorMaxTurns := fs.Int("evaluator-max-turns", 0, "override Evaluator max turns")
@@ -81,6 +82,10 @@ func Backfill(args []string) error {
 		}
 	}
 
+	if *enqueue {
+		return enqueueSessions(sessions)
+	}
+
 	// Process.
 	return runBackfill(sessions, cfg)
 }
@@ -88,7 +93,7 @@ func Backfill(args []string) error {
 func buildBackfillFilter(sinceStr, untilStr, project string, retryErrors bool) (store.SessionFilter, error) {
 	filter := store.SessionFilter{
 		Project:  project,
-		Statuses: []string{"pending"},
+		Statuses: []string{"imported"},
 	}
 
 	if retryErrors {
@@ -118,6 +123,21 @@ func buildBackfillFilter(sinceStr, untilStr, project string, retryErrors bool) (
 	return filter, nil
 }
 
+// enqueueSessions marks sessions as "queued" so the daemon processes them.
+func enqueueSessions(sessions []store.Metadata) error {
+	enqueued := 0
+	for _, s := range sessions {
+		if err := store.MarkQueued(s.SessionID); err != nil {
+			fmt.Fprintf(os.Stderr, "  Warning: failed to enqueue %s: %v\n", s.SessionID, err)
+			continue
+		}
+		enqueued++
+	}
+	fmt.Printf("Enqueued %d session(s) for background processing.\n", enqueued)
+	fmt.Println("The daemon will process them automatically.")
+	return nil
+}
+
 func showBackfillPreview(sessions []store.Metadata, filter store.SessionFilter) {
 	fmt.Println()
 	fmt.Println("Backfill Preview")
@@ -125,18 +145,18 @@ func showBackfillPreview(sessions []store.Metadata, filter store.SessionFilter) 
 	fmt.Println()
 
 	// Count by status.
-	pendingCount := 0
+	importedCount := 0
 	errorCount := 0
 	for _, s := range sessions {
 		switch s.Status {
-		case "pending":
-			pendingCount++
+		case "imported":
+			importedCount++
 		case "error":
 			errorCount++
 		}
 	}
 
-	statusDesc := fmt.Sprintf("pending (%d)", pendingCount)
+	statusDesc := fmt.Sprintf("imported (%d)", importedCount)
 	if errorCount > 0 {
 		statusDesc += fmt.Sprintf(", error (%d)", errorCount)
 	}
