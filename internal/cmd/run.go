@@ -3,6 +3,7 @@ package cmd
 import (
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/pipeline"
 )
@@ -11,6 +12,10 @@ import (
 func Run(args []string) error {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	dryRun := fs.Bool("dry-run", false, "run only the pre-parser, skip LLM invocations")
+	haikuMaxTurns := fs.Int("haiku-max-turns", 15, "max agentic turns for Haiku classifier")
+	sonnetMaxTurns := fs.Int("sonnet-max-turns", 20, "max agentic turns for Sonnet evaluator")
+	haikuTimeout := fs.Duration("haiku-timeout", 2*time.Minute, "timeout for Haiku classifier")
+	sonnetTimeout := fs.Duration("sonnet-timeout", 5*time.Minute, "timeout for Sonnet evaluator")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -22,7 +27,13 @@ func Run(args []string) error {
 	sessionID := fs.Arg(0)
 	fmt.Printf("Running pipeline on session %s\n", sessionID)
 
-	result, err := pipeline.Run(sessionID, *dryRun, pipeline.DefaultPipelineConfig())
+	cfg := pipeline.DefaultPipelineConfig()
+	cfg.HaikuMaxTurns = *haikuMaxTurns
+	cfg.SonnetMaxTurns = *sonnetMaxTurns
+	cfg.HaikuTimeout = *haikuTimeout
+	cfg.SonnetTimeout = *sonnetTimeout
+
+	result, err := pipeline.Run(sessionID, *dryRun, cfg)
 	if err != nil {
 		return err
 	}
