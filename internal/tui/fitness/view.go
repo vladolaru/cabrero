@@ -84,7 +84,7 @@ func (m Model) renderViewportContent() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("\u2500", 17))
 	b.WriteString("\n")
-	b.WriteString(indentBlock(m.report.Verdict, 2))
+	b.WriteString(shared.IndentBlock(m.report.Verdict, 2))
 	b.WriteString("\n\n")
 
 	// SESSION EVIDENCE section.
@@ -133,7 +133,7 @@ func (m Model) renderEvidence() string {
 					fitnessMuted.Render(ts),
 					entry.Summary))
 				if entry.Detail != "" {
-					b.WriteString(indentBlock(entry.Detail, 8))
+					b.WriteString(shared.IndentBlock(entry.Detail, 8))
 					b.WriteString("\n")
 				}
 			}
@@ -159,12 +159,3 @@ func formatCategory(category string) string {
 	}
 }
 
-// indentBlock indents every line by the given number of spaces.
-func indentBlock(s string, spaces int) string {
-	indent := strings.Repeat(" ", spaces)
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		lines[i] = indent + line
-	}
-	return strings.Join(lines, "\n")
-}

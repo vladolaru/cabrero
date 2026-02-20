@@ -6,6 +6,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 // Update handles messages for the pipeline monitor.
@@ -60,7 +61,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		run := m.SelectedRun()
 		if run != nil && run.Status == "error" {
 			if m.config.Confirmations.RetryRequiresConfirm {
-				m.confirm = components.NewConfirm("Retry session " + truncateID(run.SessionID) + "?")
+				m.confirm = components.NewConfirm("Retry session " + shared.TruncateID(run.SessionID, 8) + "?")
 				return m, nil
 			}
 			// Skip confirmation — retry immediately.
@@ -107,10 +108,3 @@ func (m Model) handleConfirmResult(result components.ConfirmResult) (Model, tea.
 	return m, nil
 }
 
-// truncateID returns the first 8 characters of an ID string.
-func truncateID(id string) string {
-	if len(id) > 8 {
-		return id[:8]
-	}
-	return id
-}

@@ -25,13 +25,13 @@ const (
 )
 
 var (
-	headerStyle   = lipgloss.NewStyle().Bold(true)
-	mutedStyle    = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
-	successStyle  = lipgloss.NewStyle().Foreground(shared.ColorSuccess)
-	warningStyle  = lipgloss.NewStyle().Foreground(shared.ColorWarning)
-	accentStyle   = lipgloss.NewStyle().Foreground(shared.ColorAccent)
-	errorStyle    = lipgloss.NewStyle().Foreground(shared.ColorError)
+	headerStyle   = shared.HeaderStyle
+	mutedStyle    = shared.MutedStyle
+	selectedStyle = shared.SelectedStyle
+	successStyle  = shared.SuccessStyle
+	warningStyle  = shared.WarningStyle
+	accentStyle   = shared.AccentStyle
+	errorStyle    = shared.ErrorStyle
 )
 
 // View renders the source manager.
@@ -111,14 +111,14 @@ func (m Model) renderColumnHeaders() string {
 	cols := m.columnLayout()
 
 	var parts []string
-	parts = append(parts, padRight("  SOURCE", cols.nameWidth))
+	parts = append(parts, shared.PadRight("  SOURCE", cols.nameWidth))
 	if cols.showOwnership {
-		parts = append(parts, padRight("OWNERSHIP", cols.ownershipWidth))
+		parts = append(parts, shared.PadRight("OWNERSHIP", cols.ownershipWidth))
 	}
-	parts = append(parts, padRight("APPROACH", cols.approachWidth))
-	parts = append(parts, padRight("SESSIONS", colSessions))
+	parts = append(parts, shared.PadRight("APPROACH", cols.approachWidth))
+	parts = append(parts, shared.PadRight("SESSIONS", colSessions))
 	if cols.showHealth {
-		parts = append(parts, padRight("HEALTH", colHealth))
+		parts = append(parts, shared.PadRight("HEALTH", colHealth))
 	}
 
 	return mutedStyle.Render(strings.Join(parts, "  "))
@@ -179,22 +179,22 @@ func (m Model) renderSourceRow(gi, si int, isCursor bool, cols columnSpec) strin
 	var parts []string
 
 	// Name column.
-	name := truncate(s.Name, cols.nameWidth-4) // account for prefix
-	parts = append(parts, prefix+padRight(name, cols.nameWidth-4))
+	name := shared.Truncate(s.Name, cols.nameWidth-4) // account for prefix
+	parts = append(parts, prefix+shared.PadRight(name, cols.nameWidth-4))
 
 	// Ownership column (wide/standard only).
 	if cols.showOwnership {
 		ownership := renderOwnership(s.Ownership)
-		parts = append(parts, padRight(ownership, cols.ownershipWidth))
+		parts = append(parts, shared.PadRight(ownership, cols.ownershipWidth))
 	}
 
 	// Approach column.
 	approach := renderApproach(s.Approach)
-	parts = append(parts, padRight(approach, cols.approachWidth))
+	parts = append(parts, shared.PadRight(approach, cols.approachWidth))
 
 	// Sessions column.
 	sessions := fmt.Sprintf("%d", s.SessionCount)
-	parts = append(parts, padRight(sessions, colSessions))
+	parts = append(parts, shared.PadRight(sessions, colSessions))
 
 	// Health column (wide only).
 	if cols.showHealth {
@@ -386,25 +386,3 @@ func (m Model) columnLayout() columnSpec {
 
 // Helpers.
 
-func truncate(s string, maxLen int) string {
-	if maxLen <= 0 {
-		return ""
-	}
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
-}
-
-func padRight(s string, width int) string {
-	if width <= 0 {
-		return s
-	}
-	if len(s) >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-len(s))
-}

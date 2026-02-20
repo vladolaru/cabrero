@@ -35,7 +35,7 @@ func (m Model) View() string {
 	b.WriteString(fmt.Sprintf("  Target: %s\n", p.Target))
 	b.WriteString(fmt.Sprintf("  Confidence: %s  │  Session: %s\n",
 		detailAccent.Render(p.Confidence),
-		detailMuted.Render(truncateID(m.proposal.SessionID, 12))))
+		detailMuted.Render(shared.TruncateID(m.proposal.SessionID, 12))))
 	b.WriteString("\n")
 
 	// Proposed change.
@@ -43,7 +43,7 @@ func (m Model) View() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("─", 17))
 	b.WriteString("\n")
-	b.WriteString(indentBlock(m.diffViewport.View(), 2))
+	b.WriteString(shared.IndentBlock(m.diffViewport.View(), 2))
 	b.WriteString("\n\n")
 
 	// Rationale.
@@ -51,7 +51,7 @@ func (m Model) View() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("─", 17))
 	b.WriteString("\n")
-	b.WriteString(indentBlock(p.Rationale, 2))
+	b.WriteString(shared.IndentBlock(p.Rationale, 2))
 	b.WriteString("\n\n")
 
 	// Citation chain.
@@ -81,7 +81,7 @@ func (m Model) View() string {
 			b.WriteString("\n")
 			b.WriteString(detailSection.Render("  BLENDED RESULT"))
 			b.WriteString("\n")
-			b.WriteString(indentBlock(*m.blendResult, 2))
+			b.WriteString(shared.IndentBlock(*m.blendResult, 2))
 			b.WriteString("\n\n")
 			b.WriteString("  " + m.confirm.View())
 		}
@@ -116,25 +116,10 @@ func renderCitations(citations []shared.CitationEntry, width int) string {
 		}
 		b.WriteString(fmt.Sprintf("  %s%s\n", prefix, detailMuted.Render(c.Summary)))
 		if c.Expanded {
-			b.WriteString(indentBlock(c.RawJSON, 6))
+			b.WriteString(shared.IndentBlock(c.RawJSON, 6))
 			b.WriteString("\n")
 		}
 	}
 	return b.String()
 }
 
-func truncateID(id string, maxLen int) string {
-	if len(id) <= maxLen {
-		return id
-	}
-	return id[:maxLen]
-}
-
-func indentBlock(s string, spaces int) string {
-	indent := strings.Repeat(" ", spaces)
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		lines[i] = indent + line
-	}
-	return strings.Join(lines, "\n")
-}

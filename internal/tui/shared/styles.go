@@ -17,9 +17,32 @@ var (
 	ColorHighlightBg = lipgloss.AdaptiveColor{Light: "#6A1B9A", Dark: "#9C27B0"}
 )
 
+// Common reusable lipgloss styles.
+var (
+	HeaderStyle   = lipgloss.NewStyle().Bold(true)
+	MutedStyle    = lipgloss.NewStyle().Foreground(ColorMuted)
+	SuccessStyle  = lipgloss.NewStyle().Foreground(ColorSuccess)
+	ErrorStyle    = lipgloss.NewStyle().Foreground(ColorError)
+	WarningStyle  = lipgloss.NewStyle().Foreground(ColorWarning)
+	AccentStyle   = lipgloss.NewStyle().Foreground(ColorAccent)
+	SelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(ColorFgBold)
+)
+
 // HighlightFg returns the foreground color string for search match highlighting.
-func HighlightFg() string { return ColorHighlightFg.Dark }
+// Selects the correct adaptive variant based on terminal background.
+func HighlightFg() string {
+	if lipgloss.HasDarkBackground() {
+		return ColorHighlightFg.Dark
+	}
+	return ColorHighlightFg.Light
+}
 
 // HighlightBg returns the background color string for search match highlighting.
-func HighlightBg() string { return ColorHighlightBg.Dark }
+// Selects the correct adaptive variant based on terminal background.
+func HighlightBg() string {
+	if lipgloss.HasDarkBackground() {
+		return ColorHighlightBg.Dark
+	}
+	return ColorHighlightBg.Light
+}
 

@@ -63,15 +63,6 @@ func (d DashboardItem) Target() string {
 	return d.FitnessReport.SourceName
 }
 
-// Age returns a human-readable age string for the item.
-func (d DashboardItem) Age() string {
-	if d.IsFitnessReport() {
-		return timeAgo(d.FitnessReport.GeneratedAt)
-	}
-	// Proposals don't carry a timestamp on the struct, so return empty.
-	return ""
-}
-
 // Confidence returns the confidence level for proposals, or a health summary for reports.
 func (d DashboardItem) Confidence() string {
 	if d.IsProposal() {

@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	headerStyle   = lipgloss.NewStyle().Bold(true)
-	mutedStyle    = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	accentStyle   = lipgloss.NewStyle().Foreground(shared.ColorAccent)
-	warningStyle  = lipgloss.NewStyle().Foreground(shared.ColorWarning)
-	successStyle  = lipgloss.NewStyle().Foreground(shared.ColorSuccess)
-	errorStyle    = lipgloss.NewStyle().Foreground(shared.ColorError)
-	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
+	headerStyle   = shared.HeaderStyle
+	mutedStyle    = shared.MutedStyle
+	accentStyle   = shared.AccentStyle
+	warningStyle  = shared.WarningStyle
+	successStyle  = shared.SuccessStyle
+	errorStyle    = shared.ErrorStyle
+	selectedStyle = shared.SelectedStyle
 )
 
 // Type indicator characters.
@@ -129,8 +129,8 @@ func (m Model) renderItemList() string {
 			indicator = warningStyle.Render(indicatorFitness)
 		}
 
-		typeName := padRight(item.TypeName(), 18)
-		target := truncate(item.Target(), m.targetWidth())
+		typeName := shared.PadRight(item.TypeName(), 18)
+		target := shared.TruncatePad(item.Target(), m.targetWidth())
 		confidence := mutedStyle.Render(item.Confidence())
 
 		line := fmt.Sprintf("%s %s %s  %s  %s", prefix, indicator, typeName, target, confidence)
@@ -183,16 +183,3 @@ func checkMark(ok bool) string {
 	return errorStyle.Render("✗")
 }
 
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return padRight(s, maxLen)
-	}
-	return s[:maxLen-3] + "..."
-}
-
-func padRight(s string, width int) string {
-	if len(s) >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-len(s))
-}

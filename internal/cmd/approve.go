@@ -8,6 +8,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/apply"
 	"github.com/vladolaru/cabrero/internal/pipeline"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 // Approve runs the non-interactive approve flow for a proposal.
@@ -30,7 +31,7 @@ func Approve(args []string) error {
 	fmt.Printf("Confidence: %s\n", p.Confidence)
 	fmt.Println()
 	if p.Rationale != "" {
-		fmt.Printf("Rationale: %s\n\n", truncateStr(p.Rationale, 200))
+		fmt.Printf("Rationale: %s\n\n", shared.Truncate(p.Rationale, 200))
 	}
 
 	// Confirm.
@@ -81,9 +82,3 @@ func promptYesNo(question string) bool {
 	return strings.TrimSpace(strings.ToLower(input)) == "y"
 }
 
-func truncateStr(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}

@@ -15,9 +15,9 @@ import (
 var (
 	titleStyle         = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
 	sectionHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
-	successStyle       = lipgloss.NewStyle().Foreground(shared.ColorSuccess)
-	errorStyle         = lipgloss.NewStyle().Foreground(shared.ColorError)
-	mutedStyle         = lipgloss.NewStyle().Foreground(shared.ColorMuted)
+	successStyle       = shared.SuccessStyle
+	errorStyle         = shared.ErrorStyle
+	mutedStyle         = shared.MutedStyle
 )
 
 type layout int
@@ -230,12 +230,12 @@ func (m Model) renderRecentRuns() string {
 		}
 
 		status := statusIndicator(run.Status)
-		shortID := truncateID(run.SessionID)
+		shortID := shared.TruncateID(run.SessionID, 8)
 		if len(shortID) > idLen {
 			shortID = shortID[:idLen]
 		}
 		age := relativeTime(run.Timestamp)
-		project := truncate(run.Project, projectMax)
+		project := shared.Truncate(run.Project, projectMax)
 		timing := formatTimingForMode(run, mode)
 
 		line := fmt.Sprintf("%s%s %s  %-8s  %-*s  %s", cursor, status, shortID, age, projectMax, project, timing)
@@ -353,12 +353,3 @@ func relativeTime(t time.Time) string {
 	}
 }
 
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
-}
