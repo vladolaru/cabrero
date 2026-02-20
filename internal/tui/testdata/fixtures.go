@@ -6,7 +6,6 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui"
-	"github.com/vladolaru/cabrero/internal/tui/detail"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 )
 
@@ -120,8 +119,8 @@ func TestConfig(overrides ...func(*tui.Config)) *tui.Config {
 }
 
 // TestCitations returns a set of citation entries for testing.
-func TestCitations() []detail.CitationEntry {
-	return []detail.CitationEntry{
+func TestCitations() []tui.CitationEntry {
+	return []tui.CitationEntry{
 		{
 			UUID:    "uuid-turn-9",
 			Summary: "[1] Turn 9:  tool_use write -> report.docx",
