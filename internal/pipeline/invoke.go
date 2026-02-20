@@ -36,6 +36,14 @@ type claudeConfig struct {
 //     --allowedTools for selective tool access, and --output-format text for clean output.
 //     MaxTurns is informational only (embedded in the prompt by callers, not a CLI flag).
 func invokeClaude(cfg claudeConfig) (string, error) {
+	// Validate required fields per mode.
+	if cfg.Agentic && cfg.Prompt == "" {
+		return "", fmt.Errorf("invokeClaude: Prompt is required for agentic mode")
+	}
+	if !cfg.Agentic && cfg.Stdin == nil {
+		return "", fmt.Errorf("invokeClaude: Stdin is required for print mode")
+	}
+
 	var args []string
 
 	if cfg.Agentic {
@@ -69,23 +77,28 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 		}
 	}
 
-	var cmd *exec.Cmd
+	// Always create a context so we can detect timeout in error handling.
+	var ctx context.Context
+	var cancel context.CancelFunc
 	if cfg.Timeout > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
-		defer cancel()
-		cmd = exec.CommandContext(ctx, "claude", args...)
+		ctx, cancel = context.WithTimeout(context.Background(), cfg.Timeout)
 	} else {
-		cmd = exec.Command("claude", args...)
+		ctx, cancel = context.WithCancel(context.Background())
 	}
+	defer cancel()
 
+	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
 
-	if !cfg.Agentic && cfg.Stdin != nil {
+	if !cfg.Agentic {
 		cmd.Stdin = cfg.Stdin
 	}
 
 	out, err := cmd.Output()
 	if err != nil {
+		if cfg.Timeout > 0 && ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("claude timed out after %s", cfg.Timeout)
+		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return "", fmt.Errorf("claude exited with code %d: %s", exitErr.ExitCode(), string(exitErr.Stderr))
 		}
