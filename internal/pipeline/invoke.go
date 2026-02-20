@@ -1,12 +1,14 @@
 package pipeline
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -16,28 +18,71 @@ type claudeConfig struct {
 	Model        string // model name (e.g. "claude-haiku-4-5", "claude-sonnet-4-6")
 	SystemPrompt string // system prompt text passed via --system-prompt
 	Effort       string // reasoning effort ("" for default, "high" for Sonnet)
+	// Agentic mode fields (ignored when Agentic is false).
+	Agentic      bool          // true = use -p with tools; false = use --print with stdin
+	Prompt       string        // user prompt (agentic mode: positional arg; print mode: ignored)
+	AllowedTools string        // comma-separated tool names for --allowedTools
+	MaxTurns     int           // turn budget (passed in prompt, NOT as CLI flag)
+	Timeout      time.Duration // hard wall-clock timeout via context.WithTimeout
+	Stdin        io.Reader     // only used in --print mode (Agentic=false)
 }
 
-// invokeClaude runs the claude CLI with the given config and data on stdin.
-// The system prompt is passed via --system-prompt, keeping it separate from the
-// data which is piped through stdin.
-func invokeClaude(cfg claudeConfig, stdin io.Reader) (string, error) {
-	args := []string{
-		"--model", cfg.Model,
-		"--print",
-		"--system-prompt", cfg.SystemPrompt,
-		"--no-session-persistence",
-		"--disable-slash-commands",
-		"--tools", "",
+// invokeClaude runs the claude CLI with the given config.
+//
+// Two modes are supported:
+//   - Print mode (Agentic=false): uses --print with stdin pipe and all tools disabled.
+//     Data is provided via cfg.Stdin.
+//   - Agentic mode (Agentic=true): uses -p with the prompt as a positional argument,
+//     --allowedTools for selective tool access, and --output-format text for clean output.
+//     MaxTurns is informational only (embedded in the prompt by callers, not a CLI flag).
+func invokeClaude(cfg claudeConfig) (string, error) {
+	var args []string
+
+	if cfg.Agentic {
+		// Agentic mode: prompt as positional arg, tools enabled.
+		args = []string{
+			"--model", cfg.Model,
+			"-p", cfg.Prompt,
+			"--system-prompt", cfg.SystemPrompt,
+			"--output-format", "text",
+			"--no-session-persistence",
+			"--disable-slash-commands",
+		}
+		if cfg.AllowedTools != "" {
+			args = append(args, "--allowedTools", cfg.AllowedTools)
+		}
+		if cfg.Effort != "" {
+			args = append(args, "--effort", cfg.Effort)
+		}
+	} else {
+		// Print mode: stdin pipe, all tools disabled.
+		args = []string{
+			"--model", cfg.Model,
+			"--print",
+			"--system-prompt", cfg.SystemPrompt,
+			"--no-session-persistence",
+			"--disable-slash-commands",
+			"--tools", "",
+		}
+		if cfg.Effort != "" {
+			args = append(args, "--effort", cfg.Effort)
+		}
 	}
 
-	if cfg.Effort != "" {
-		args = append(args, "--effort", cfg.Effort)
+	var cmd *exec.Cmd
+	if cfg.Timeout > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
+		defer cancel()
+		cmd = exec.CommandContext(ctx, "claude", args...)
+	} else {
+		cmd = exec.Command("claude", args...)
 	}
 
-	cmd := exec.Command("claude", args...)
 	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
-	cmd.Stdin = stdin
+
+	if !cfg.Agentic && cfg.Stdin != nil {
+		cmd.Stdin = cfg.Stdin
+	}
 
 	out, err := cmd.Output()
 	if err != nil {

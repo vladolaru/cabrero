@@ -38,7 +38,8 @@ func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput
 		Model:        "claude-sonnet-4-6",
 		SystemPrompt: systemPrompt,
 		Effort:       "high",
-	}, strings.NewReader(data))
+		Stdin:        strings.NewReader(data),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking sonnet: %w", err)
 	}

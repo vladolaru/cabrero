@@ -41,7 +41,8 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 	stdout, err := invokeClaude(claudeConfig{
 		Model:        "claude-haiku-4-5",
 		SystemPrompt: systemPrompt,
-	}, strings.NewReader(data))
+		Stdin:        strings.NewReader(data),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking haiku: %w", err)
 	}
