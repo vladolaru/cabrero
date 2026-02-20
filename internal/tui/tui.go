@@ -67,13 +67,19 @@ func Run() error {
 
 // gatherStats collects dashboard statistics from the store and daemon.
 func gatherStats(proposals []pipeline.ProposalWithSession) message.DashboardStats {
+	sessions, _ := store.ListSessions()
+	return gatherStatsFromSessions(sessions, proposals)
+}
+
+// gatherStatsFromSessions is like gatherStats but accepts pre-loaded sessions
+// to avoid redundant store.ListSessions() calls.
+func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.ProposalWithSession) message.DashboardStats {
 	stats := message.DashboardStats{}
 
 	// Proposal count from already-loaded data.
 	stats.PendingCount = len(proposals)
 
 	// Session counts for last capture time.
-	sessions, _ := store.ListSessions()
 	if len(sessions) > 0 {
 		ts, err := time.Parse(time.RFC3339, sessions[0].Timestamp)
 		if err == nil {

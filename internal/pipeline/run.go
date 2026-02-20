@@ -58,7 +58,12 @@ func ListPipelineRuns(limit int) ([]PipelineRun, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ListPipelineRunsFromSessions(sessions, limit)
+}
 
+// ListPipelineRunsFromSessions is like ListPipelineRuns but accepts pre-loaded sessions
+// to avoid redundant I/O when multiple functions need the same session list.
+func ListPipelineRunsFromSessions(sessions []store.Metadata, limit int) ([]PipelineRun, error) {
 	var runs []PipelineRun
 	for i, meta := range sessions {
 		if limit > 0 && i >= limit {
@@ -135,7 +140,18 @@ func GatherPipelineStats(days int) (PipelineStats, error) {
 	if err != nil {
 		return PipelineStats{}, err
 	}
+	// Build runs to avoid separate evaluator file reads.
+	runs, err := ListPipelineRunsFromSessions(sessions, 0)
+	if err != nil {
+		return PipelineStats{}, err
+	}
+	return GatherPipelineStatsFromSessions(sessions, runs, days)
+}
 
+// GatherPipelineStatsFromSessions is like GatherPipelineStats but accepts pre-loaded sessions
+// and runs to avoid redundant I/O. Pass runs from ListPipelineRunsFromSessions to reuse
+// the already-read evaluator data for ProposalsGenerated counts.
+func GatherPipelineStatsFromSessions(sessions []store.Metadata, runs []PipelineRun, days int) (PipelineStats, error) {
 	cutoff := time.Now().AddDate(0, 0, -days)
 	stats := PipelineStats{}
 	var timestamps []time.Time
@@ -163,32 +179,27 @@ func GatherPipelineStats(days int) (PipelineStats, error) {
 	proposals, _ := ListProposals()
 	stats.ProposalsPending = len(proposals)
 
-	// Count generated proposals from evaluator outputs.
-	for _, meta := range sessions {
-		ts, _ := time.Parse(time.RFC3339, meta.Timestamp)
-		if ts.Before(cutoff) {
-			continue
-		}
-		if so, err := ReadEvaluatorOutput(meta.SessionID); err == nil {
-			stats.ProposalsGenerated += len(so.Proposals)
+	// Count generated proposals from pre-loaded runs (avoids re-reading evaluator files).
+	for _, run := range runs {
+		if !run.Timestamp.Before(cutoff) {
+			stats.ProposalsGenerated += run.ProposalCount
 		}
 	}
 
-	stats.SessionsPerDay = bucketSessionsByDay(timestamps, days)
+	stats.SessionsPerDay = bucketSessionsByDay(timestamps, days, time.Now())
 
 	return stats, nil
 }
 
-// bucketSessionsByDay groups timestamps into daily buckets.
-// Index 0 = today, index 1 = yesterday, etc.
-func bucketSessionsByDay(timestamps []time.Time, days int) []int {
+// bucketSessionsByDay groups timestamps into daily buckets relative to refTime.
+// Index 0 = refTime's day, index 1 = day before, etc.
+func bucketSessionsByDay(timestamps []time.Time, days int, refTime time.Time) []int {
 	buckets := make([]int, days)
-	now := time.Now()
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	todayStart := time.Date(refTime.Year(), refTime.Month(), refTime.Day(), 0, 0, 0, 0, refTime.Location())
 
 	for _, ts := range timestamps {
-		local := ts.In(now.Location())
-		tsDay := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, now.Location())
+		local := ts.In(refTime.Location())
+		tsDay := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, refTime.Location())
 		dayOffset := int(todayStart.Sub(tsDay).Hours() / 24)
 		if dayOffset >= 0 && dayOffset < days {
 			buckets[dayOffset]++
