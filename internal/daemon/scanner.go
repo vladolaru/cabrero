@@ -6,16 +6,23 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
-// ScanPending returns session IDs that are ready for processing:
+// PendingSession holds a session ID and its project for batching.
+type PendingSession struct {
+	SessionID string
+	Project   string
+}
+
+// ScanPending returns sessions that are ready for processing:
 // status is "pending" and capture_trigger contains "session-end".
 // Results are ordered oldest-first so the daemon processes in chronological order.
-func ScanPending() ([]string, error) {
+// Each result includes the session's project slug for batch grouping.
+func ScanPending() ([]PendingSession, error) {
 	sessions, err := store.ListSessions()
 	if err != nil {
 		return nil, err
 	}
 
-	var ready []string
+	var ready []PendingSession
 	for _, s := range sessions {
 		if s.Status != "pending" {
 			continue
@@ -26,7 +33,10 @@ func ScanPending() ([]string, error) {
 		if store.IsBlocked(s.SessionID) {
 			continue
 		}
-		ready = append(ready, s.SessionID)
+		ready = append(ready, PendingSession{
+			SessionID: s.SessionID,
+			Project:   s.Project,
+		})
 	}
 
 	// ListSessions returns newest-first; reverse for oldest-first processing.

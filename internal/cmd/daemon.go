@@ -7,25 +7,32 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/vladolaru/cabrero/internal/daemon"
 )
 
 // Daemon starts the background session processor.
 func Daemon(args []string) error {
+	cfg := daemon.DefaultConfig()
 	fs := flag.NewFlagSet("daemon", flag.ExitOnError)
-	poll := fs.Duration("poll", 2*time.Minute, "how often to check for pending sessions")
-	stale := fs.Duration("stale", 30*time.Minute, "how often to scan for stale sessions")
-	delay := fs.Duration("delay", 30*time.Second, "pause between processing sessions")
+	poll := fs.Duration("poll", cfg.PollInterval, "how often to check for pending sessions")
+	stale := fs.Duration("stale", cfg.StaleInterval, "how often to scan for stale sessions")
+	delay := fs.Duration("delay", cfg.InterSessionDelay, "pause between processing sessions")
+	classifierMaxTurns := fs.Int("classifier-max-turns", cfg.Pipeline.ClassifierMaxTurns, "max agentic turns for Classifier")
+	evaluatorMaxTurns := fs.Int("evaluator-max-turns", cfg.Pipeline.EvaluatorMaxTurns, "max agentic turns for Evaluator")
+	classifierTimeout := fs.Duration("classifier-timeout", cfg.Pipeline.ClassifierTimeout, "timeout for Classifier")
+	evaluatorTimeout := fs.Duration("evaluator-timeout", cfg.Pipeline.EvaluatorTimeout, "timeout for Evaluator")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	cfg := daemon.DefaultConfig()
 	cfg.PollInterval = *poll
 	cfg.StaleInterval = *stale
 	cfg.InterSessionDelay = *delay
+	cfg.Pipeline.ClassifierMaxTurns = *classifierMaxTurns
+	cfg.Pipeline.EvaluatorMaxTurns = *evaluatorMaxTurns
+	cfg.Pipeline.ClassifierTimeout = *classifierTimeout
+	cfg.Pipeline.EvaluatorTimeout = *evaluatorTimeout
 
 	d, err := daemon.New(cfg)
 	if err != nil {

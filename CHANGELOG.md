@@ -7,7 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Agentic evaluators** — Classifier and Evaluator now run in
+  agentic mode with Read/Grep tool access instead of single-shot `--print`.
+  Classifier can verify ambiguous signals by reading raw JSONL turns (scoped to
+  `~/.cabrero/raw/`). Evaluator can read current skill files and CLAUDE.md to
+  inform proposals (unrestricted filesystem access). Both have prompt-based
+  turn budgets and wall-clock timeouts.
+- **Triage gate** — Classifier now outputs a `triage` field (`"evaluate"` or
+  `"clean"`). Clean sessions skip the Evaluator entirely, reducing
+  cost for sessions with no actionable signals.
+- **Smart batching** — daemon groups pending sessions by project, runs Classifier
+  individually (cheap triage), then batches sessions flagged as "evaluate"
+  into a single Evaluator invocation per project. Gives Evaluator cross-session
+  context within one call while keeping Classifier independent.
+- **Prompt versions** — Classifier upgraded to v3 (`classifier-v3.txt`),
+  Evaluator upgraded to v3 (`evaluator-v3.txt`).
+
 ### Added
+
+- **CLI flags** — `--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`,
+  `--evaluator-timeout` on both `cabrero daemon` and `cabrero run` for tuning
+  agentic evaluator limits.
 
 - **`cabrero uninstall`** — clean removal command that reverses setup: stops
   daemon, removes LaunchAgent, unregisters Claude Code hooks, deletes hook
@@ -37,9 +59,9 @@ First tagged release. Covers Phases 0–3.5 of the design.
   search fumbles, backtracking)
 - **Cross-session pattern aggregator** — detects recurring errors and
   error-prone tool sequences across 3+ project sessions
-- **Haiku classifier** (v2 prompt) — goal inference, error classification,
+- **Classifier** (v2 prompt) — goal inference, error classification,
   key turn selection, skill/CLAUDE.md signal assessment, pattern assessment
-- **Sonnet evaluator** (v2 prompt) — proposal generation with citation
+- **Evaluator** (v2 prompt) — proposal generation with citation
   validation and `skill_scaffold` proposals for recurring patterns
 - **Background daemon** — `cabrero daemon` polls for pending sessions, runs
   pipeline, sends macOS notifications, with stale session recovery, PID-based
