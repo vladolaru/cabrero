@@ -17,11 +17,11 @@ type command struct {
 }
 
 var commands = []command{
-	{"run", "Run the full pipeline on a session", cmdNotImplemented},
+	{"run", "Run the full pipeline on a session", cmd.Run},
 	{"sessions", "List captured sessions", cmd.Sessions},
 	{"status", "Show pipeline health and store overview", cmd.Status},
-	{"proposals", "List pending proposals", cmdNotImplemented},
-	{"inspect", "Show a proposal with full citation chain", cmdNotImplemented},
+	{"proposals", "List pending proposals", cmd.Proposals},
+	{"inspect", "Show a proposal with full citation chain", cmd.Inspect},
 	{"approve", "Approve and apply a proposal", cmdNotImplemented},
 	{"reject", "Reject a proposal with optional reason", cmdNotImplemented},
 	{"replay", "Re-run pipeline with a different prompt", cmdNotImplemented},
