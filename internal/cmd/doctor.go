@@ -1064,27 +1064,27 @@ func (d *doctorRunner) checkPipeline() []checkResult {
 		})
 	}
 
-	// Sessions stuck pending for >24h.
-	var stuckPending []store.Metadata
+	// Sessions stuck in queued status for >24h.
+	var stuckQueued []store.Metadata
 	for _, s := range sessions {
-		if s.Status != "pending" {
+		if s.Status != "queued" {
 			continue
 		}
 		ts, err := time.Parse(time.RFC3339, s.Timestamp)
 		if err != nil {
 			continue
 		}
-		if time.Since(ts) > 24*time.Hour && strings.Contains(s.CaptureTrigger, "session-end") {
-			stuckPending = append(stuckPending, s)
+		if time.Since(ts) > 24*time.Hour {
+			stuckQueued = append(stuckQueued, s)
 		}
 	}
 
-	if len(stuckPending) > 0 {
+	if len(stuckQueued) > 0 {
 		results = append(results, checkResult{
-			name:     "Stuck pending sessions",
+			name:     "Stuck queued sessions",
 			category: "Pipeline",
 			status:   checkWarn,
-			message:  fmt.Sprintf("%d session(s) pending >24h with session-end trigger", len(stuckPending)),
+			message:  fmt.Sprintf("%d session(s) queued >24h", len(stuckQueued)),
 		})
 	}
 

@@ -30,18 +30,20 @@ func Status(args []string) error {
 	if err != nil {
 		fmt.Printf("Sessions:       error reading (%v)\n", err)
 	} else {
-		pending := 0
+		queued := 0
+		imported := 0
 		processed := 0
 		for _, s := range sessions {
 			switch s.Status {
+			case "queued":
+				queued++
+			case "imported":
+				imported++
 			case "processed":
 				processed++
-			default:
-				pending++
 			}
 		}
-		fmt.Printf("Sessions:       %d captured, %d pending processing\n", len(sessions), pending)
-		_ = processed
+		fmt.Printf("Sessions:       %d captured, %d queued, %d imported, %d processed\n", len(sessions), queued, imported, processed)
 	}
 
 	// Blocklist count.
