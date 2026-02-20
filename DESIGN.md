@@ -172,6 +172,26 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
 **Rules:** immutable writes on raw backups. Configurable retention (e.g. 90 days raw,
 indefinite digests). CC version captured at copy time for schema drift detection.
 
+### Store Write Invariants
+
+The `~/.cabrero/` store is shared between the CLI, daemon, and TUI. All writers
+must follow these invariants to prevent corrupt reads:
+
+- **Atomic writes.** Every file write uses a temp file in the same directory
+  followed by `os.Rename()`. Rename is atomic on POSIX filesystems when source
+  and destination are on the same volume. This guarantees readers never see
+  partial JSON files.
+- **No in-place mutation.** Files are replaced whole, never patched. A proposal
+  status change writes a new version of the proposal JSON, not a partial update.
+- **Directory as index.** Listing proposals or sessions means listing a
+  directory. Individual file reads are always of complete, atomically-written
+  files. No separate index file that could drift from the directory contents.
+
+These invariants are enforced in the `internal/store` package. The TUI's file
+watcher (fsnotify) relies on rename events to trigger reloads — which aligns
+with the atomic write pattern since the final rename is the event that signals
+a complete write.
+
 ### JSONL Structure (key facts)
 
 Each line is a JSON entry with: `type`, `message`, `uuid`, `parentUuid`, `sessionId`, `timestamp`.
@@ -511,9 +531,16 @@ cabrero replay                  Re-run pipeline with a different prompt against 
   --prompt <path>
   --compare                     Diff new output against original and show your decision
 cabrero prompts                 List prompt files with current versions
+cabrero doctor                  Diagnose issues and auto-fix problems
+  --fix                           Auto-fix all fixable issues without prompting
+  --json                          Output results as JSON (for scripting)
 cabrero setup                   Install and configure Cabrero (interactive wizard)
   --yes                           Skip all confirmations
   --dry-run                       Show what would be done without doing it
+cabrero uninstall               Remove Cabrero from this system
+  --yes                           Skip all confirmations
+  --keep-data                     Keep ~/.cabrero data directory
+  --remove-data                   Remove ~/.cabrero data directory
 cabrero update                  Update Cabrero to latest release from GitHub
   --check                         Check for updates without downloading
 ```
@@ -778,18 +805,34 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - Hook scripts embedded in binary via `//go:embed`
 - `--yes` flag for scripted installs, `--dry-run` for preview
 
-**Phase 4 — Review TUI**
+**Phase 4a — Review TUI (core review loop)**
 
-12. **Bubble Tea review interface** — proposal list, detail view with colored diffs,
-    keyboard navigation, approve/reject/defer
+12. **Bubble Tea review interface** — dashboard with proposal list, proposal detail
+    view with colored diffs, keyboard navigation, approve/reject/defer
 13. **AI chat panel** — streaming Sonnet via `claude` CLI, citation chain as context,
-    question chips, revised proposal rendering
+    question chips, revised proposal detection via ` ```revision ` marker
 14. **`cabrero approve` + `cabrero reject`** — apply flow via Sonnet + writing skill,
     before/after diff confirmation, rollback entry written
 
+Phase 4a delivers the core value proposition: interactive proposal review with
+AI chat. Ships and validates before building operational views.
+
+**Phase 4b — Review TUI (assessment & management)**
+
+15. **Fitness report detail view** — visual assessment bars, session evidence,
+    action recommendations
+16. **Source manager** — ownership classification, iterate/evaluate toggles,
+    rollback history, new source classification via huh forms
+
+**Phase 4c — Review TUI (operational monitoring)**
+
+17. **Pipeline monitor** — daemon health, recent runs with timing, sparkline
+    activity chart, prompt versions
+18. **Log viewer** — full-screen scrollable log with search, follow mode
+
 **Phase 5 — Iteration tooling**
 
-15. **`cabrero replay`** — re-run pipeline against past session with alternate prompt,
+19. **`cabrero replay`** — re-run pipeline against past session with alternate prompt,
     compare against original output and recorded decision
-16. **Calibration set tagging** — mark proposals as canonical examples for regression
+20. **Calibration set tagging** — mark proposals as canonical examples for regression
     testing new prompt versions
