@@ -32,8 +32,10 @@ type RunResult struct {
 	Digest           *parser.Digest
 	AggregatorOutput *patterns.AggregatorOutput
 	HaikuOutput      *HaikuOutput
-	SonnetOutput     *SonnetOutput
-	DryRun           bool
+	// SonnetOutput is nil when DryRun is true, when Haiku triages the session
+	// as "clean", or when the Sonnet stage was not reached.
+	SonnetOutput *SonnetOutput
+	DryRun       bool
 }
 
 // Run executes the full analysis pipeline for a session.

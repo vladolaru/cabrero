@@ -1,4 +1,4 @@
-// Package pipeline implements the analysis pipeline: pre-parser → Haiku → Opus.
+// Package pipeline implements the analysis pipeline: pre-parser → Haiku → Sonnet.
 package pipeline
 
 import (
