@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/vladolaru/cabrero/internal/parser"
@@ -11,7 +12,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/retrieval"
 )
 
-const haikuPromptFile = "haiku-classifier-v2.txt"
+const haikuPromptFile = "haiku-classifier-v3.txt"
 
 // RunHaiku constructs the prompt, invokes the Haiku classifier via the claude CLI,
 // validates the output, and returns the parsed result.
@@ -27,7 +28,10 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 		return nil, fmt.Errorf("marshalling digest: %w", err)
 	}
 
-	// System prompt goes via --system-prompt flag; data goes via stdin.
+	// Inject turn budget into the prompt template.
+	systemPrompt = strings.Replace(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.HaikuMaxTurns), 1)
+
+	// System prompt goes via --system-prompt; data goes as the -p prompt.
 	data := "<session_digest>\n" + string(digestJSON) + "\n</session_digest>"
 
 	// Conditionally append cross-session patterns.
@@ -41,7 +45,11 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 	stdout, err := invokeClaude(claudeConfig{
 		Model:        "claude-haiku-4-5",
 		SystemPrompt: systemPrompt,
-		Stdin:        strings.NewReader(data),
+		Agentic:      true,
+		Prompt:       data,
+		AllowedTools: "Read,Grep",
+		MaxTurns:     cfg.HaikuMaxTurns,
+		Timeout:      cfg.HaikuTimeout,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking haiku: %w", err)
