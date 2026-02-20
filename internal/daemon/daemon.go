@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -196,8 +197,11 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 	}
 
 	if len(toEvaluate) == 0 {
+		d.log.Info("batch: all %d session(s) triaged as clean", len(sessions))
 		return
 	}
+
+	d.log.Info("batch: %d of %d session(s) need Sonnet evaluation", len(toEvaluate), len(sessions))
 
 	// Phase 2: Run Sonnet — batch if 2+, individual if 1.
 	if len(toEvaluate) == 1 {
@@ -231,15 +235,41 @@ func (d *Daemon) runSonnetBatch(sessions []pipeline.BatchSession) {
 		return
 	}
 
-	// Persist output and proposals for each session in the batch.
+	// Partition proposals by session: proposal IDs encode their session
+	// via the format "prop-{first 6 chars of sessionId}-{index}".
 	for _, s := range sessions {
-		d.persistSonnetOutput(s.SessionID, sonnetOutput)
+		prefix := "prop-" + shortID6(s.SessionID) + "-"
+		filtered := filterProposals(sonnetOutput, prefix)
+		d.persistSonnetOutput(s.SessionID, filtered)
 	}
+}
+
+// shortID6 returns the first 6 characters of an ID (proposal ID prefix).
+func shortID6(id string) string {
+	if len(id) > 6 {
+		return id[:6]
+	}
+	return id
+}
+
+// filterProposals returns a shallow copy of the SonnetOutput with only
+// the proposals whose ID starts with the given prefix.
+func filterProposals(output *pipeline.SonnetOutput, prefix string) *pipeline.SonnetOutput {
+	filtered := *output // shallow copy
+	filtered.Proposals = nil
+	for _, p := range output.Proposals {
+		if strings.HasPrefix(p.ID, prefix) {
+			filtered.Proposals = append(filtered.Proposals, p)
+		}
+	}
+	return &filtered
 }
 
 func (d *Daemon) persistSonnetOutput(sessionID string, output *pipeline.SonnetOutput) {
 	if err := pipeline.WriteSonnetOutput(sessionID, output); err != nil {
 		d.log.Error("writing sonnet output for %s: %v", sessionID, err)
+		d.markError(sessionID)
+		return
 	}
 
 	proposalCount := 0
@@ -247,6 +277,7 @@ func (d *Daemon) persistSonnetOutput(sessionID string, output *pipeline.SonnetOu
 		p := &output.Proposals[i]
 		if err := pipeline.WriteProposal(p, sessionID); err != nil {
 			d.log.Error("writing proposal %s: %v", p.ID, err)
+			continue
 		}
 		proposalCount++
 	}
