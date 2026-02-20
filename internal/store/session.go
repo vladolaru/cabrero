@@ -16,7 +16,7 @@ type Metadata struct {
 	Timestamp      string `json:"timestamp"`
 	CaptureTrigger string `json:"capture_trigger"`
 	CCVersion      string `json:"cc_version,omitempty"`
-	Status         string `json:"status"`              // "pending" or "processed"
+	Status         string `json:"status"`              // "pending", "processed", or "error"
 	Project        string `json:"project,omitempty"`    // CC project slug (parent dir name)
 }
 
@@ -77,6 +77,26 @@ func ReadMetadata(sessionID string) (Metadata, error) {
 		return Metadata{}, fmt.Errorf("parsing metadata for %s: %w", sessionID, err)
 	}
 	return meta, nil
+}
+
+// MarkProcessed sets a session's status to "processed".
+func MarkProcessed(sessionID string) error {
+	meta, err := ReadMetadata(sessionID)
+	if err != nil {
+		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
+	}
+	meta.Status = "processed"
+	return WriteMetadata(RawDir(sessionID), meta)
+}
+
+// MarkError sets a session's status to "error".
+func MarkError(sessionID string) error {
+	meta, err := ReadMetadata(sessionID)
+	if err != nil {
+		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
+	}
+	meta.Status = "error"
+	return WriteMetadata(RawDir(sessionID), meta)
 }
 
 // ListSessions returns metadata for all sessions in the store, sorted by
