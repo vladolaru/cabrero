@@ -12,10 +12,10 @@ func Run(args []string) error {
 	defaults := pipeline.DefaultPipelineConfig()
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	dryRun := fs.Bool("dry-run", false, "run only the pre-parser, skip LLM invocations")
-	haikuMaxTurns := fs.Int("haiku-max-turns", defaults.HaikuMaxTurns, "max agentic turns for Haiku classifier")
-	sonnetMaxTurns := fs.Int("sonnet-max-turns", defaults.SonnetMaxTurns, "max agentic turns for Sonnet evaluator")
-	haikuTimeout := fs.Duration("haiku-timeout", defaults.HaikuTimeout, "timeout for Haiku classifier")
-	sonnetTimeout := fs.Duration("sonnet-timeout", defaults.SonnetTimeout, "timeout for Sonnet evaluator")
+	classifierMaxTurns := fs.Int("classifier-max-turns", defaults.ClassifierMaxTurns, "max agentic turns for Classifier")
+	evaluatorMaxTurns := fs.Int("evaluator-max-turns", defaults.EvaluatorMaxTurns, "max agentic turns for Evaluator")
+	classifierTimeout := fs.Duration("classifier-timeout", defaults.ClassifierTimeout, "timeout for Classifier")
+	evaluatorTimeout := fs.Duration("evaluator-timeout", defaults.EvaluatorTimeout, "timeout for Evaluator")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -28,10 +28,10 @@ func Run(args []string) error {
 	fmt.Printf("Running pipeline on session %s\n", sessionID)
 
 	cfg := defaults
-	cfg.HaikuMaxTurns = *haikuMaxTurns
-	cfg.SonnetMaxTurns = *sonnetMaxTurns
-	cfg.HaikuTimeout = *haikuTimeout
-	cfg.SonnetTimeout = *sonnetTimeout
+	cfg.ClassifierMaxTurns = *classifierMaxTurns
+	cfg.EvaluatorMaxTurns = *evaluatorMaxTurns
+	cfg.ClassifierTimeout = *classifierTimeout
+	cfg.EvaluatorTimeout = *evaluatorTimeout
 
 	result, err := pipeline.Run(sessionID, *dryRun, cfg)
 	if err != nil {
@@ -43,8 +43,8 @@ func Run(args []string) error {
 		fmt.Println("Dry run complete. Digest written to ~/.cabrero/digests/")
 	} else {
 		fmt.Println("Pipeline complete.")
-		if result.SonnetOutput != nil && len(result.SonnetOutput.Proposals) > 0 {
-			fmt.Printf("Run 'cabrero proposals' to see %d new proposals.\n", len(result.SonnetOutput.Proposals))
+		if result.EvaluatorOutput != nil && len(result.EvaluatorOutput.Proposals) > 0 {
+			fmt.Printf("Run 'cabrero proposals' to see %d new proposals.\n", len(result.EvaluatorOutput.Proposals))
 		}
 	}
 

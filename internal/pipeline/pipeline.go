@@ -11,19 +11,19 @@ import (
 
 // PipelineConfig controls LLM invocation parameters.
 type PipelineConfig struct {
-	HaikuMaxTurns  int
-	SonnetMaxTurns int
-	HaikuTimeout   time.Duration
-	SonnetTimeout  time.Duration
+	ClassifierMaxTurns int
+	EvaluatorMaxTurns  int
+	ClassifierTimeout  time.Duration
+	EvaluatorTimeout   time.Duration
 }
 
 // DefaultPipelineConfig returns production defaults.
 func DefaultPipelineConfig() PipelineConfig {
 	return PipelineConfig{
-		HaikuMaxTurns:  15,
-		SonnetMaxTurns: 20,
-		HaikuTimeout:   2 * time.Minute,
-		SonnetTimeout:  5 * time.Minute,
+		ClassifierMaxTurns: 15,
+		EvaluatorMaxTurns:  20,
+		ClassifierTimeout:  2 * time.Minute,
+		EvaluatorTimeout:   5 * time.Minute,
 	}
 }
 
@@ -31,19 +31,19 @@ func DefaultPipelineConfig() PipelineConfig {
 type RunResult struct {
 	Digest           *parser.Digest
 	AggregatorOutput *patterns.AggregatorOutput
-	HaikuOutput      *HaikuOutput
-	// SonnetOutput is nil when DryRun is true, when Haiku triages the session
-	// as "clean", or when the Sonnet stage was not reached.
-	SonnetOutput *SonnetOutput
-	DryRun       bool
+	ClassifierOutput *ClassifierOutput
+	// EvaluatorOutput is nil when DryRun is true, when the Classifier triages
+	// the session as "clean", or when the Evaluator stage was not reached.
+	EvaluatorOutput *EvaluatorOutput
+	DryRun          bool
 }
 
-// HaikuResult holds the output of the pre-parser through Haiku stages.
-// Used by RunThroughHaiku to return enough data for batch processing.
-type HaikuResult struct {
+// ClassifierResult holds the output of the pre-parser through Classifier stages.
+// Used by RunThroughClassifier to return enough data for batch processing.
+type ClassifierResult struct {
 	Digest           *parser.Digest
 	AggregatorOutput *patterns.AggregatorOutput
-	HaikuOutput      *HaikuOutput
+	ClassifierOutput *ClassifierOutput
 }
 
 // preParseResult holds the output of the pre-parse and aggregation stages.
@@ -53,7 +53,7 @@ type preParseResult struct {
 }
 
 // runPreParseAndAggregate runs the pre-parser and pattern aggregator.
-// Shared by RunThroughHaiku and Run (dry-run path).
+// Shared by RunThroughClassifier and Run (dry-run path).
 func runPreParseAndAggregate(sessionID string) (*preParseResult, error) {
 	fmt.Printf("  Parsing session %s...\n", sessionID)
 	digest, err := parser.ParseSession(sessionID)
@@ -85,9 +85,9 @@ func runPreParseAndAggregate(sessionID string) (*preParseResult, error) {
 	}, nil
 }
 
-// RunThroughHaiku runs pre-parser, aggregator, and Haiku classifier.
-// Returns enough data for batching. Does not invoke Sonnet.
-func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error) {
+// RunThroughClassifier runs pre-parser, aggregator, and Classifier.
+// Returns enough data for batching. Does not invoke the Evaluator.
+func RunThroughClassifier(sessionID string, cfg PipelineConfig) (*ClassifierResult, error) {
 	if !store.SessionExists(sessionID) {
 		return nil, fmt.Errorf("session %s not found in store", sessionID)
 	}
@@ -100,26 +100,26 @@ func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error)
 		return nil, err
 	}
 
-	// Haiku classifier.
-	fmt.Println("  Running Haiku classifier...")
-	haikuOutput, err := RunHaiku(sessionID, pre.Digest, pre.AggregatorOutput, cfg)
+	// Classifier.
+	fmt.Println("  Running Classifier...")
+	classifierOutput, err := RunClassifier(sessionID, pre.Digest, pre.AggregatorOutput, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("haiku classifier failed: %w", err)
+		return nil, fmt.Errorf("classifier failed: %w", err)
 	}
-	if err := WriteHaikuOutput(sessionID, haikuOutput); err != nil {
-		return nil, fmt.Errorf("writing haiku output: %w", err)
+	if err := WriteClassifierOutput(sessionID, classifierOutput); err != nil {
+		return nil, fmt.Errorf("writing classifier output: %w", err)
 	}
-	fmt.Printf("  Haiku: goal=%q, %d errors, %d key turns, %d skill signals, triage=%s\n",
-		haikuOutput.Goal.Summary,
-		len(haikuOutput.ErrorClassification),
-		len(haikuOutput.KeyTurns),
-		len(haikuOutput.SkillSignals),
-		haikuOutput.Triage)
+	fmt.Printf("  Classifier: goal=%q, %d errors, %d key turns, %d skill signals, triage=%s\n",
+		classifierOutput.Goal.Summary,
+		len(classifierOutput.ErrorClassification),
+		len(classifierOutput.KeyTurns),
+		len(classifierOutput.SkillSignals),
+		classifierOutput.Triage)
 
-	return &HaikuResult{
+	return &ClassifierResult{
 		Digest:           pre.Digest,
 		AggregatorOutput: pre.AggregatorOutput,
-		HaikuOutput:      haikuOutput,
+		ClassifierOutput: classifierOutput,
 	}, nil
 }
 
@@ -146,19 +146,19 @@ func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) 
 		return result, nil
 	}
 
-	// Full run: delegate to RunThroughHaiku then continue to Sonnet.
-	haikuResult, err := RunThroughHaiku(sessionID, cfg)
+	// Full run: delegate to RunThroughClassifier then continue to Evaluator.
+	classifierResult, err := RunThroughClassifier(sessionID, cfg)
 	if err != nil {
 		return nil, err
 	}
-	result.Digest = haikuResult.Digest
-	result.AggregatorOutput = haikuResult.AggregatorOutput
-	result.HaikuOutput = haikuResult.HaikuOutput
+	result.Digest = classifierResult.Digest
+	result.AggregatorOutput = classifierResult.AggregatorOutput
+	result.ClassifierOutput = classifierResult.ClassifierOutput
 
-	// Triage gate: skip Sonnet for clean sessions.
+	// Triage gate: skip Evaluator for clean sessions.
 	meta, metaErr := store.ReadMetadata(sessionID)
-	if haikuResult.HaikuOutput.Triage == "clean" {
-		fmt.Println("  Haiku triage: clean session — skipping Sonnet evaluator")
+	if classifierResult.ClassifierOutput.Triage == "clean" {
+		fmt.Println("  Classifier triage: clean session — skipping Evaluator")
 		if metaErr == nil {
 			meta.Status = "processed"
 			if err := store.WriteMetadata(store.RawDir(sessionID), meta); err != nil {
@@ -167,36 +167,36 @@ func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) 
 		}
 		return result, nil
 	}
-	fmt.Println("  Haiku triage: session worth evaluating")
+	fmt.Println("  Classifier triage: session worth evaluating")
 
-	// Sonnet evaluator.
-	fmt.Println("  Running Sonnet evaluator...")
-	sonnetOutput, err := RunSonnet(sessionID, haikuResult.Digest, haikuResult.HaikuOutput, cfg)
+	// Evaluator.
+	fmt.Println("  Running Evaluator...")
+	evaluatorOutput, err := RunEvaluator(sessionID, classifierResult.Digest, classifierResult.ClassifierOutput, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("sonnet evaluator failed: %w", err)
+		return nil, fmt.Errorf("evaluator failed: %w", err)
 	}
-	result.SonnetOutput = sonnetOutput
+	result.EvaluatorOutput = evaluatorOutput
 
-	if err := WriteSonnetOutput(sessionID, sonnetOutput); err != nil {
-		return nil, fmt.Errorf("writing sonnet output: %w", err)
+	if err := WriteEvaluatorOutput(sessionID, evaluatorOutput); err != nil {
+		return nil, fmt.Errorf("writing evaluator output: %w", err)
 	}
 
 	// Persist proposals.
-	for i := range sonnetOutput.Proposals {
-		p := &sonnetOutput.Proposals[i]
+	for i := range evaluatorOutput.Proposals {
+		p := &evaluatorOutput.Proposals[i]
 		if err := WriteProposal(p, sessionID); err != nil {
 			fmt.Printf("  Warning: failed to write proposal %s: %v\n", p.ID, err)
 		}
 	}
 
-	if len(sonnetOutput.Proposals) > 0 {
-		fmt.Printf("  Sonnet: %d proposals generated\n", len(sonnetOutput.Proposals))
+	if len(evaluatorOutput.Proposals) > 0 {
+		fmt.Printf("  Evaluator: %d proposals generated\n", len(evaluatorOutput.Proposals))
 	} else {
 		reason := "no improvement signals detected"
-		if sonnetOutput.NoProposalReason != nil {
-			reason = *sonnetOutput.NoProposalReason
+		if evaluatorOutput.NoProposalReason != nil {
+			reason = *evaluatorOutput.NoProposalReason
 		}
-		fmt.Printf("  Sonnet: no proposals (%s)\n", reason)
+		fmt.Printf("  Evaluator: no proposals (%s)\n", reason)
 	}
 
 	// Mark session as processed.

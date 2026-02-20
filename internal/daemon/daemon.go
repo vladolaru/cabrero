@@ -162,12 +162,12 @@ func (d *Daemon) processPending(ctx context.Context) {
 	}
 }
 
-// processProjectBatch runs Haiku individually on each session in a project,
-// then batches sessions flagged as "evaluate" into a single Sonnet invocation.
+// processProjectBatch runs the Classifier individually on each session in a project,
+// then batches sessions flagged as "evaluate" into a single Evaluator invocation.
 func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessions []PendingSession) {
 	d.log.Info("batch: %d session(s) for project %s", len(sessions), store.ProjectDisplayName(project))
 
-	// Phase 1: Run Haiku individually on each session.
+	// Phase 1: Run Classifier individually on each session.
 	var toEvaluate []pipeline.BatchSession
 	for _, s := range sessions {
 		select {
@@ -176,23 +176,23 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 		default:
 		}
 
-		result, err := pipeline.RunThroughHaiku(s.SessionID, d.config.Pipeline)
+		result, err := pipeline.RunThroughClassifier(s.SessionID, d.config.Pipeline)
 		if err != nil {
-			d.log.Error("haiku failed for %s: %v", s.SessionID, err)
+			d.log.Error("classifier failed for %s: %v", s.SessionID, err)
 			d.markError(s.SessionID)
 			continue
 		}
 
-		if result.HaikuOutput.Triage == "clean" {
+		if result.ClassifierOutput.Triage == "clean" {
 			d.log.Info("session %s triaged as clean", shortID(s.SessionID))
 			d.markProcessed(s.SessionID)
 			continue
 		}
 
 		toEvaluate = append(toEvaluate, pipeline.BatchSession{
-			SessionID:   s.SessionID,
-			Digest:      result.Digest,
-			HaikuOutput: result.HaikuOutput,
+			SessionID:        s.SessionID,
+			Digest:           result.Digest,
+			ClassifierOutput: result.ClassifierOutput,
 		})
 	}
 
@@ -201,34 +201,34 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 		return
 	}
 
-	d.log.Info("batch: %d of %d session(s) need Sonnet evaluation", len(toEvaluate), len(sessions))
+	d.log.Info("batch: %d of %d session(s) need evaluation", len(toEvaluate), len(sessions))
 
-	// Phase 2: Run Sonnet — batch if 2+, individual if 1.
+	// Phase 2: Run Evaluator — batch if 2+, individual if 1.
 	if len(toEvaluate) == 1 {
 		s := toEvaluate[0]
-		d.runSonnetSingle(s)
+		d.runEvaluatorSingle(s)
 	} else {
-		d.runSonnetBatch(toEvaluate)
+		d.runEvaluatorBatch(toEvaluate)
 	}
 }
 
-func (d *Daemon) runSonnetSingle(s pipeline.BatchSession) {
-	d.log.Info("running Sonnet on session %s", shortID(s.SessionID))
-	sonnetOutput, err := pipeline.RunSonnet(s.SessionID, s.Digest, s.HaikuOutput, d.config.Pipeline)
+func (d *Daemon) runEvaluatorSingle(s pipeline.BatchSession) {
+	d.log.Info("running Evaluator on session %s", shortID(s.SessionID))
+	evaluatorOutput, err := pipeline.RunEvaluator(s.SessionID, s.Digest, s.ClassifierOutput, d.config.Pipeline)
 	if err != nil {
-		d.log.Error("sonnet failed for %s: %v", s.SessionID, err)
+		d.log.Error("evaluator failed for %s: %v", s.SessionID, err)
 		d.markError(s.SessionID)
 		return
 	}
 
-	d.persistSonnetOutput(s.SessionID, sonnetOutput)
+	d.persistEvaluatorOutput(s.SessionID, evaluatorOutput)
 }
 
-func (d *Daemon) runSonnetBatch(sessions []pipeline.BatchSession) {
-	d.log.Info("running batched Sonnet on %d sessions", len(sessions))
-	sonnetOutput, err := pipeline.RunSonnetBatch(sessions, d.config.Pipeline)
+func (d *Daemon) runEvaluatorBatch(sessions []pipeline.BatchSession) {
+	d.log.Info("running batched Evaluator on %d sessions", len(sessions))
+	evaluatorOutput, err := pipeline.RunEvaluatorBatch(sessions, d.config.Pipeline)
 	if err != nil {
-		d.log.Error("sonnet batch failed: %v", err)
+		d.log.Error("evaluator batch failed: %v", err)
 		for _, s := range sessions {
 			d.markError(s.SessionID)
 		}
@@ -240,20 +240,20 @@ func (d *Daemon) runSonnetBatch(sessions []pipeline.BatchSession) {
 	totalMatched := 0
 	for _, s := range sessions {
 		prefix := "prop-" + shortID(s.SessionID) + "-"
-		filtered := filterProposals(sonnetOutput, prefix)
+		filtered := filterProposals(evaluatorOutput, prefix)
 		filtered.SessionID = s.SessionID
 		totalMatched += len(filtered.Proposals)
-		d.persistSonnetOutput(s.SessionID, filtered)
+		d.persistEvaluatorOutput(s.SessionID, filtered)
 	}
-	if totalMatched != len(sonnetOutput.Proposals) {
+	if totalMatched != len(evaluatorOutput.Proposals) {
 		d.log.Error("batch: %d of %d proposals unmatched after partitioning",
-			len(sonnetOutput.Proposals)-totalMatched, len(sonnetOutput.Proposals))
+			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
 	}
 }
 
-// filterProposals returns a shallow copy of the SonnetOutput with only
+// filterProposals returns a shallow copy of the EvaluatorOutput with only
 // the proposals whose ID starts with the given prefix.
-func filterProposals(output *pipeline.SonnetOutput, prefix string) *pipeline.SonnetOutput {
+func filterProposals(output *pipeline.EvaluatorOutput, prefix string) *pipeline.EvaluatorOutput {
 	filtered := *output // shallow copy
 	filtered.Proposals = []pipeline.Proposal{}
 	for _, p := range output.Proposals {
@@ -264,9 +264,9 @@ func filterProposals(output *pipeline.SonnetOutput, prefix string) *pipeline.Son
 	return &filtered
 }
 
-func (d *Daemon) persistSonnetOutput(sessionID string, output *pipeline.SonnetOutput) {
-	if err := pipeline.WriteSonnetOutput(sessionID, output); err != nil {
-		d.log.Error("writing sonnet output for %s: %v", sessionID, err)
+func (d *Daemon) persistEvaluatorOutput(sessionID string, output *pipeline.EvaluatorOutput) {
+	if err := pipeline.WriteEvaluatorOutput(sessionID, output); err != nil {
+		d.log.Error("writing evaluator output for %s: %v", sessionID, err)
 		d.markError(sessionID)
 		return
 	}
@@ -314,8 +314,8 @@ func (d *Daemon) processOne(sessionID string) {
 	}
 
 	proposalCount := 0
-	if result.SonnetOutput != nil {
-		proposalCount = len(result.SonnetOutput.Proposals)
+	if result.EvaluatorOutput != nil {
+		proposalCount = len(result.EvaluatorOutput.Proposals)
 	}
 
 	d.log.Info("processed %s: %d proposals", sessionID, proposalCount)

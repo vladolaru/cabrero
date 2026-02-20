@@ -17,7 +17,7 @@ import (
 type claudeConfig struct {
 	Model        string // model name (e.g. "claude-haiku-4-5", "claude-sonnet-4-6")
 	SystemPrompt string // system prompt text passed via --system-prompt
-	Effort       string // reasoning effort ("" for default, "high" for Sonnet)
+	Effort       string // reasoning effort ("" for default, "high" for Evaluator)
 	// Agentic mode fields (ignored when Agentic is false).
 	Agentic      bool          // true = use -p with tools; false = use --print with stdin
 	Prompt       string        // user prompt (agentic mode: positional arg; print mode: ignored)

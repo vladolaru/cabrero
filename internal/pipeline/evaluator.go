@@ -12,26 +12,26 @@ import (
 	"github.com/vladolaru/cabrero/internal/retrieval"
 )
 
-const sonnetPromptFile = "sonnet-evaluator-v3.txt"
+const evaluatorPromptFile = "evaluator-v3.txt"
 
-// BatchSession holds data for one session in a Sonnet batch.
+// BatchSession holds data for one session in an Evaluator batch.
 type BatchSession struct {
-	SessionID   string
-	Digest      *parser.Digest
-	HaikuOutput *HaikuOutput
+	SessionID        string
+	Digest           *parser.Digest
+	ClassifierOutput *ClassifierOutput
 }
 
-// RunSonnet constructs the prompt, invokes the Sonnet evaluator via the claude CLI,
+// RunEvaluator constructs the prompt, invokes the Evaluator via the claude CLI,
 // validates the output, and returns the parsed result.
-func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput, cfg PipelineConfig) (*SonnetOutput, error) {
-	systemPrompt, err := readPromptTemplate(sonnetPromptFile)
+func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, error) {
+	systemPrompt, err := readPromptTemplate(evaluatorPromptFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading sonnet prompt: %w", err)
+		return nil, fmt.Errorf("reading evaluator prompt: %w", err)
 	}
 
-	haikuJSON, err := json.MarshalIndent(haikuOutput, "", "  ")
+	classifierJSON, err := json.MarshalIndent(classifierOutput, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshalling haiku output: %w", err)
+		return nil, fmt.Errorf("marshalling classifier output: %w", err)
 	}
 
 	digestJSON, err := json.MarshalIndent(digest, "", "  ")
@@ -40,11 +40,11 @@ func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput
 	}
 
 	// System prompt goes via --system-prompt; data goes as the -p prompt.
-	data := "<haiku_classification>\n" + string(haikuJSON) + "\n</haiku_classification>" +
+	data := "<classification>\n" + string(classifierJSON) + "\n</classification>" +
 		"\n\n<session_digest>\n" + string(digestJSON) + "\n</session_digest>"
 
 	// Inject turn budget into the prompt template.
-	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.SonnetMaxTurns))
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.EvaluatorMaxTurns))
 
 	stdout, err := invokeClaude(claudeConfig{
 		Model:        "claude-sonnet-4-6",
@@ -53,41 +53,41 @@ func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput
 		Agentic:      true,
 		Prompt:       data,
 		AllowedTools: "Read,Grep",
-		MaxTurns:     cfg.SonnetMaxTurns,
-		Timeout:      cfg.SonnetTimeout,
+		MaxTurns:     cfg.EvaluatorMaxTurns,
+		Timeout:      cfg.EvaluatorTimeout,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invoking sonnet: %w", err)
+		return nil, fmt.Errorf("invoking evaluator: %w", err)
 	}
 
 	// Parse JSON output (instructed via system prompt, cleaned defensively).
-	output, err := parseSonnetOutput(stdout)
+	output, err := parseEvaluatorOutput(stdout)
 	if err != nil {
-		return nil, fmt.Errorf("parsing sonnet output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
+		return nil, fmt.Errorf("parsing evaluator output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
 	}
 
 	output.SessionID = sessionID
-	output.PromptVersion = strings.TrimSuffix(sonnetPromptFile, ".txt")
-	output.HaikuPromptVersion = haikuOutput.PromptVersion
+	output.PromptVersion = strings.TrimSuffix(evaluatorPromptFile, ".txt")
+	output.ClassifierPromptVersion = classifierOutput.PromptVersion
 
-	if err := validateSonnetOutput(sessionID, output, haikuOutput); err != nil {
+	if err := validateEvaluatorOutput(sessionID, output, classifierOutput); err != nil {
 		return nil, err
 	}
 
 	return output, nil
 }
 
-// RunSonnetBatch evaluates multiple sessions in a single Sonnet invocation.
-// Each session's Haiku classification and digest are included as indexed entries.
+// RunEvaluatorBatch evaluates multiple sessions in a single Evaluator invocation.
+// Each session's Classifier output and digest are included as indexed entries.
 // Max turns and timeout scale with batch size, capped at 60 turns and 15 minutes.
-func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput, error) {
+func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, error) {
 	if len(sessions) == 0 {
-		return nil, fmt.Errorf("RunSonnetBatch called with zero sessions")
+		return nil, fmt.Errorf("RunEvaluatorBatch called with zero sessions")
 	}
 
-	systemPrompt, err := readPromptTemplate(sonnetPromptFile)
+	systemPrompt, err := readPromptTemplate(evaluatorPromptFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading sonnet prompt: %w", err)
+		return nil, fmt.Errorf("reading evaluator prompt: %w", err)
 	}
 
 	// Build batch prompt with indexed session data.
@@ -96,9 +96,9 @@ func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput,
 	dataBuilder.WriteString("Generate proposals for ALL sessions that warrant them. Use the standard proposal ID format: prop-{first 8 chars of sessionId}-{index}.\n\n")
 
 	for i, s := range sessions {
-		haikuJSON, err := json.MarshalIndent(s.HaikuOutput, "", "  ")
+		classifierJSON, err := json.MarshalIndent(s.ClassifierOutput, "", "  ")
 		if err != nil {
-			return nil, fmt.Errorf("marshalling haiku output for session %d: %w", i, err)
+			return nil, fmt.Errorf("marshalling classifier output for session %d: %w", i, err)
 		}
 
 		digestJSON, err := json.MarshalIndent(s.Digest, "", "  ")
@@ -107,9 +107,9 @@ func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput,
 		}
 
 		dataBuilder.WriteString(fmt.Sprintf("<session index=\"%d\" id=\"%s\">\n", i+1, s.SessionID))
-		dataBuilder.WriteString("<haiku_classification>\n")
-		dataBuilder.Write(haikuJSON)
-		dataBuilder.WriteString("\n</haiku_classification>\n\n")
+		dataBuilder.WriteString("<classification>\n")
+		dataBuilder.Write(classifierJSON)
+		dataBuilder.WriteString("\n</classification>\n\n")
 		dataBuilder.WriteString("<session_digest>\n")
 		dataBuilder.Write(digestJSON)
 		dataBuilder.WriteString("\n</session_digest>\n")
@@ -117,12 +117,12 @@ func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput,
 	}
 
 	// Scale turns and timeout with batch size, with caps.
-	maxTurns := cfg.SonnetMaxTurns * len(sessions)
+	maxTurns := cfg.EvaluatorMaxTurns * len(sessions)
 	if maxTurns > 60 {
 		maxTurns = 60
 	}
 
-	timeout := cfg.SonnetTimeout * time.Duration(len(sessions))
+	timeout := cfg.EvaluatorTimeout * time.Duration(len(sessions))
 	if timeout > 15*time.Minute {
 		timeout = 15 * time.Minute
 	}
@@ -141,40 +141,40 @@ func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput,
 		Timeout:      timeout,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invoking sonnet batch: %w", err)
+		return nil, fmt.Errorf("invoking evaluator batch: %w", err)
 	}
 
-	output, err := parseSonnetOutput(stdout)
+	output, err := parseEvaluatorOutput(stdout)
 	if err != nil {
-		return nil, fmt.Errorf("parsing sonnet batch output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
+		return nil, fmt.Errorf("parsing evaluator batch output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
 	}
 
 	// Set metadata from the first session (batch output covers multiple sessions).
 	output.SessionID = sessions[0].SessionID
-	output.PromptVersion = strings.TrimSuffix(sonnetPromptFile, ".txt")
-	output.HaikuPromptVersion = sessions[0].HaikuOutput.PromptVersion
+	output.PromptVersion = strings.TrimSuffix(evaluatorPromptFile, ".txt")
+	output.ClassifierPromptVersion = sessions[0].ClassifierOutput.PromptVersion
 
 	// Validate: build combined skill set and UUID set from all sessions.
-	if err := validateSonnetBatchOutput(sessions, output); err != nil {
+	if err := validateEvaluatorBatchOutput(sessions, output); err != nil {
 		return nil, err
 	}
 
 	return output, nil
 }
 
-// validateSonnetBatchOutput validates proposals against all sessions in the batch.
-// UUIDs are checked across all sessions. Skill signals are merged from all Haiku outputs.
-func validateSonnetBatchOutput(sessions []BatchSession, output *SonnetOutput) error {
-	// Build combined set of skill names from all Haiku outputs.
+// validateEvaluatorBatchOutput validates proposals against all sessions in the batch.
+// UUIDs are checked across all sessions. Skill signals are merged from all Classifier outputs.
+func validateEvaluatorBatchOutput(sessions []BatchSession, output *EvaluatorOutput) error {
+	// Build combined set of skill names from all Classifier outputs.
 	allSkills := make(map[string]bool)
 	for _, s := range sessions {
-		for _, ss := range s.HaikuOutput.SkillSignals {
+		for _, ss := range s.ClassifierOutput.SkillSignals {
 			allSkills[ss.SkillName] = true
 		}
 	}
 
 	// Resolve UUIDs across all sessions using batch lookup per session.
-	allUUIDs := collectSonnetUUIDs(output)
+	allUUIDs := collectEvaluatorUUIDs(output)
 	validUUIDs := make(map[string]bool)
 
 	// Collect unresolved UUIDs, then resolve per session with a single-pass scan.
@@ -203,33 +203,33 @@ func validateSonnetBatchOutput(sessions []BatchSession, output *SonnetOutput) er
 	}
 
 	for _, uuid := range unresolved {
-		fmt.Fprintf(os.Stderr, "  Warning: Sonnet batch cited non-existent UUID: %s\n", uuid)
+		fmt.Fprintf(os.Stderr, "  Warning: Evaluator batch cited non-existent UUID: %s\n", uuid)
 	}
 
 	return filterAndValidateProposals(output, validUUIDs, allSkills)
 }
 
-func parseSonnetOutput(raw string) (*SonnetOutput, error) {
+func parseEvaluatorOutput(raw string) (*EvaluatorOutput, error) {
 	cleaned := cleanLLMJSON(raw)
 
-	var output SonnetOutput
+	var output EvaluatorOutput
 	if err := json.Unmarshal([]byte(cleaned), &output); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 	return &output, nil
 }
 
-// validateSonnetOutput checks proposals for valid UUIDs, skill references, uniqueness,
+// validateEvaluatorOutput checks proposals for valid UUIDs, skill references, uniqueness,
 // and filters out low-confidence proposals.
-func validateSonnetOutput(sessionID string, output *SonnetOutput, haikuOutput *HaikuOutput) error {
-	// Build set of skill names from Haiku output for cross-reference.
-	haikuSkills := make(map[string]bool)
-	for _, ss := range haikuOutput.SkillSignals {
-		haikuSkills[ss.SkillName] = true
+func validateEvaluatorOutput(sessionID string, output *EvaluatorOutput, classifierOutput *ClassifierOutput) error {
+	// Build set of skill names from Classifier output for cross-reference.
+	classifierSkills := make(map[string]bool)
+	for _, ss := range classifierOutput.SkillSignals {
+		classifierSkills[ss.SkillName] = true
 	}
 
 	// Validate cited UUIDs.
-	allUUIDs := collectSonnetUUIDs(output)
+	allUUIDs := collectEvaluatorUUIDs(output)
 	validUUIDs := make(map[string]bool)
 	for _, uuid := range allUUIDs {
 		if validUUIDs[uuid] {
@@ -237,19 +237,19 @@ func validateSonnetOutput(sessionID string, output *SonnetOutput, haikuOutput *H
 		}
 		_, err := retrieval.GetEntry(sessionID, uuid)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "  Warning: Sonnet cited non-existent UUID: %s\n", uuid)
+			fmt.Fprintf(os.Stderr, "  Warning: Evaluator cited non-existent UUID: %s\n", uuid)
 		} else {
 			validUUIDs[uuid] = true
 		}
 	}
 
-	return filterAndValidateProposals(output, validUUIDs, haikuSkills)
+	return filterAndValidateProposals(output, validUUIDs, classifierSkills)
 }
 
 // filterAndValidateProposals validates proposals for duplicate IDs, low confidence,
 // valid skill_scaffold fields, UUID citations, and skill signal references.
 // Shared by both single-session and batch validation paths.
-func filterAndValidateProposals(output *SonnetOutput, validUUIDs map[string]bool, allSkills map[string]bool) error {
+func filterAndValidateProposals(output *EvaluatorOutput, validUUIDs map[string]bool, allSkills map[string]bool) error {
 	seenIDs := make(map[string]bool)
 	var validProposals []Proposal
 
@@ -285,7 +285,7 @@ func filterAndValidateProposals(output *SonnetOutput, validUUIDs map[string]bool
 		// Validate skill signal references.
 		for _, skill := range p.CitedSkillSignals {
 			if !allSkills[skill] {
-				fmt.Fprintf(os.Stderr, "  Warning: proposal %s cites skill '%s' not in Haiku output\n", p.ID, skill)
+				fmt.Fprintf(os.Stderr, "  Warning: proposal %s cites skill '%s' not in Classifier output\n", p.ID, skill)
 			}
 		}
 
@@ -296,7 +296,7 @@ func filterAndValidateProposals(output *SonnetOutput, validUUIDs map[string]bool
 	return nil
 }
 
-func collectSonnetUUIDs(output *SonnetOutput) []string {
+func collectEvaluatorUUIDs(output *EvaluatorOutput) []string {
 	seen := make(map[string]bool)
 	var uuids []string
 

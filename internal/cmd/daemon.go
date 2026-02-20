@@ -18,10 +18,10 @@ func Daemon(args []string) error {
 	poll := fs.Duration("poll", cfg.PollInterval, "how often to check for pending sessions")
 	stale := fs.Duration("stale", cfg.StaleInterval, "how often to scan for stale sessions")
 	delay := fs.Duration("delay", cfg.InterSessionDelay, "pause between processing sessions")
-	haikuMaxTurns := fs.Int("haiku-max-turns", cfg.Pipeline.HaikuMaxTurns, "max agentic turns for Haiku classifier")
-	sonnetMaxTurns := fs.Int("sonnet-max-turns", cfg.Pipeline.SonnetMaxTurns, "max agentic turns for Sonnet evaluator")
-	haikuTimeout := fs.Duration("haiku-timeout", cfg.Pipeline.HaikuTimeout, "timeout for Haiku classifier")
-	sonnetTimeout := fs.Duration("sonnet-timeout", cfg.Pipeline.SonnetTimeout, "timeout for Sonnet evaluator")
+	classifierMaxTurns := fs.Int("classifier-max-turns", cfg.Pipeline.ClassifierMaxTurns, "max agentic turns for Classifier")
+	evaluatorMaxTurns := fs.Int("evaluator-max-turns", cfg.Pipeline.EvaluatorMaxTurns, "max agentic turns for Evaluator")
+	classifierTimeout := fs.Duration("classifier-timeout", cfg.Pipeline.ClassifierTimeout, "timeout for Classifier")
+	evaluatorTimeout := fs.Duration("evaluator-timeout", cfg.Pipeline.EvaluatorTimeout, "timeout for Evaluator")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -29,10 +29,10 @@ func Daemon(args []string) error {
 	cfg.PollInterval = *poll
 	cfg.StaleInterval = *stale
 	cfg.InterSessionDelay = *delay
-	cfg.Pipeline.HaikuMaxTurns = *haikuMaxTurns
-	cfg.Pipeline.SonnetMaxTurns = *sonnetMaxTurns
-	cfg.Pipeline.HaikuTimeout = *haikuTimeout
-	cfg.Pipeline.SonnetTimeout = *sonnetTimeout
+	cfg.Pipeline.ClassifierMaxTurns = *classifierMaxTurns
+	cfg.Pipeline.EvaluatorMaxTurns = *evaluatorMaxTurns
+	cfg.Pipeline.ClassifierTimeout = *classifierTimeout
+	cfg.Pipeline.EvaluatorTimeout = *evaluatorTimeout
 
 	d, err := daemon.New(cfg)
 	if err != nil {

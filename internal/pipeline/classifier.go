@@ -12,15 +12,15 @@ import (
 	"github.com/vladolaru/cabrero/internal/retrieval"
 )
 
-const haikuPromptFile = "haiku-classifier-v3.txt"
+const classifierPromptFile = "classifier-v3.txt"
 
-// RunHaiku constructs the prompt, invokes the Haiku classifier via the claude CLI,
+// RunClassifier constructs the prompt, invokes the Classifier via the claude CLI,
 // validates the output, and returns the parsed result.
 // The patterns parameter is optional cross-session aggregator output; pass nil if unavailable.
-func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput, cfg PipelineConfig) (*HaikuOutput, error) {
-	systemPrompt, err := readPromptTemplate(haikuPromptFile)
+func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput, cfg PipelineConfig) (*ClassifierOutput, error) {
+	systemPrompt, err := readPromptTemplate(classifierPromptFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading haiku prompt: %w", err)
+		return nil, fmt.Errorf("reading classifier prompt: %w", err)
 	}
 
 	digestJSON, err := json.MarshalIndent(digest, "", "  ")
@@ -29,7 +29,7 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 	}
 
 	// Inject turn budget into the prompt template.
-	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.HaikuMaxTurns))
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.ClassifierMaxTurns))
 
 	// System prompt goes via --system-prompt; data goes as the -p prompt.
 	data := "<session_digest>\n" + string(digestJSON) + "\n</session_digest>"
@@ -48,21 +48,21 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 		Agentic:      true,
 		Prompt:       data,
 		AllowedTools: "Read,Grep",
-		MaxTurns:     cfg.HaikuMaxTurns,
-		Timeout:      cfg.HaikuTimeout,
+		MaxTurns:     cfg.ClassifierMaxTurns,
+		Timeout:      cfg.ClassifierTimeout,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invoking haiku: %w", err)
+		return nil, fmt.Errorf("invoking classifier: %w", err)
 	}
 
 	// Parse JSON output (instructed via system prompt, cleaned defensively).
-	output, err := parseHaikuOutput(stdout)
+	output, err := parseClassifierOutput(stdout)
 	if err != nil {
-		return nil, fmt.Errorf("parsing haiku output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
+		return nil, fmt.Errorf("parsing classifier output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
 	}
 
 	output.SessionID = sessionID
-	output.PromptVersion = strings.TrimSuffix(haikuPromptFile, ".txt")
+	output.PromptVersion = strings.TrimSuffix(classifierPromptFile, ".txt")
 
 	// Default empty triage to "evaluate" for backward compatibility with v2 prompt.
 	if output.Triage == "" {
@@ -70,27 +70,27 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 	}
 
 	// Validate cited UUIDs.
-	if err := validateHaikuUUIDs(sessionID, output); err != nil {
+	if err := validateClassifierUUIDs(sessionID, output); err != nil {
 		return nil, err
 	}
 
 	return output, nil
 }
 
-func parseHaikuOutput(raw string) (*HaikuOutput, error) {
+func parseClassifierOutput(raw string) (*ClassifierOutput, error) {
 	cleaned := cleanLLMJSON(raw)
 
-	var output HaikuOutput
+	var output ClassifierOutput
 	if err := json.Unmarshal([]byte(cleaned), &output); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 	return &output, nil
 }
 
-// validateHaikuUUIDs checks that all cited UUIDs exist in the raw transcript.
+// validateClassifierUUIDs checks that all cited UUIDs exist in the raw transcript.
 // Drops entries with invalid UUIDs and fails if >50% are invalid.
-func validateHaikuUUIDs(sessionID string, output *HaikuOutput) error {
-	allUUIDs := collectHaikuUUIDs(output)
+func validateClassifierUUIDs(sessionID string, output *ClassifierOutput) error {
+	allUUIDs := collectClassifierUUIDs(output)
 	if len(allUUIDs) == 0 {
 		return nil
 	}
@@ -105,7 +105,7 @@ func validateHaikuUUIDs(sessionID string, output *HaikuOutput) error {
 		_, err := retrieval.GetEntry(sessionID, uuid)
 		if err != nil {
 			invalid++
-			fmt.Fprintf(os.Stderr, "  Warning: Haiku cited non-existent UUID: %s\n", uuid)
+			fmt.Fprintf(os.Stderr, "  Warning: Classifier cited non-existent UUID: %s\n", uuid)
 		} else {
 			valid[uuid] = true
 		}
@@ -113,16 +113,16 @@ func validateHaikuUUIDs(sessionID string, output *HaikuOutput) error {
 
 	totalUnique := len(valid) + invalid
 	if totalUnique > 0 && float64(invalid)/float64(totalUnique) > 0.5 {
-		return fmt.Errorf("critical: >50%% of Haiku-cited UUIDs are invalid (%d/%d)", invalid, totalUnique)
+		return fmt.Errorf("critical: >50%% of Classifier-cited UUIDs are invalid (%d/%d)", invalid, totalUnique)
 	}
 
 	// Prune invalid UUID references from the output.
-	pruneHaikuInvalidUUIDs(output, valid)
+	pruneClassifierInvalidUUIDs(output, valid)
 
 	return nil
 }
 
-func collectHaikuUUIDs(output *HaikuOutput) []string {
+func collectClassifierUUIDs(output *ClassifierOutput) []string {
 	seen := make(map[string]bool)
 	var uuids []string
 
@@ -149,7 +149,7 @@ func collectHaikuUUIDs(output *HaikuOutput) []string {
 	return uuids
 }
 
-func pruneHaikuInvalidUUIDs(output *HaikuOutput, valid map[string]bool) {
+func pruneClassifierInvalidUUIDs(output *ClassifierOutput, valid map[string]bool) {
 	// Prune error classifications with invalid UUIDs.
 	for i := range output.ErrorClassification {
 		var kept []string
@@ -162,7 +162,7 @@ func pruneHaikuInvalidUUIDs(output *HaikuOutput, valid map[string]bool) {
 	}
 
 	// Prune key turns with invalid UUIDs.
-	var keptTurns []HaikuKeyTurn
+	var keptTurns []ClassifierKeyTurn
 	for _, kt := range output.KeyTurns {
 		if valid[kt.UUID] {
 			keptTurns = append(keptTurns, kt)
@@ -171,7 +171,7 @@ func pruneHaikuInvalidUUIDs(output *HaikuOutput, valid map[string]bool) {
 	output.KeyTurns = keptTurns
 
 	// Prune skill signals with invalid UUIDs.
-	var keptSkills []HaikuSkillSignal
+	var keptSkills []ClassifierSkillSignal
 	for _, ss := range output.SkillSignals {
 		if ss.InvokedAtUUID == "" || valid[ss.InvokedAtUUID] {
 			keptSkills = append(keptSkills, ss)

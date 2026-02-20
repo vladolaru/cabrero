@@ -1,4 +1,4 @@
-// Package pipeline implements the analysis pipeline: pre-parser → Haiku → Sonnet.
+// Package pipeline implements the analysis pipeline: pre-parser → Classifier → Evaluator.
 package pipeline
 
 import (
@@ -10,31 +10,31 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
-// --- Haiku classifier output types ---
+// --- Classifier output types ---
 
-// HaikuOutput is the structured output from the Haiku classifier.
-type HaikuOutput struct {
+// ClassifierOutput is the structured output from the Classifier.
+type ClassifierOutput struct {
 	Version        int    `json:"version"`
 	SessionID      string `json:"sessionId"`
 	PromptVersion  string `json:"promptVersion"`
 	Triage         string `json:"triage"` // "evaluate" or "clean"
 
-	Goal                HaikuGoal                `json:"goal"`
-	ErrorClassification []HaikuErrorClass         `json:"errorClassification"`
-	KeyTurns            []HaikuKeyTurn            `json:"keyTurns"`
-	SkillSignals        []HaikuSkillSignal        `json:"skillSignals"`
-	ClaudeMdSignals     []HaikuClaudeMdSignal     `json:"claudeMdSignals"`
-	PatternAssessments  []HaikuPatternAssessment  `json:"patternAssessments,omitempty"`
+	Goal                ClassifierGoal                `json:"goal"`
+	ErrorClassification []ClassifierErrorClass         `json:"errorClassification"`
+	KeyTurns            []ClassifierKeyTurn            `json:"keyTurns"`
+	SkillSignals        []ClassifierSkillSignal        `json:"skillSignals"`
+	ClaudeMdSignals     []ClassifierClaudeMdSignal     `json:"claudeMdSignals"`
+	PatternAssessments  []ClassifierPatternAssessment  `json:"patternAssessments,omitempty"`
 }
 
-// HaikuGoal describes the user's intent in the session.
-type HaikuGoal struct {
+// ClassifierGoal describes the user's intent in the session.
+type ClassifierGoal struct {
 	Summary    string `json:"summary"`
 	Confidence string `json:"confidence"`
 }
 
-// HaikuErrorClass categorises an error observed in the session.
-type HaikuErrorClass struct {
+// ClassifierErrorClass categorises an error observed in the session.
+type ClassifierErrorClass struct {
 	Category     string   `json:"category"`
 	Description  string   `json:"description"`
 	RelatedUUIDs []string `json:"relatedUuids"`
@@ -42,15 +42,15 @@ type HaikuErrorClass struct {
 	Confidence   string   `json:"confidence"`
 }
 
-// HaikuKeyTurn identifies a significant turn in the session.
-type HaikuKeyTurn struct {
+// ClassifierKeyTurn identifies a significant turn in the session.
+type ClassifierKeyTurn struct {
 	UUID     string `json:"uuid"`
 	Reason   string `json:"reason"`
 	Category string `json:"category"`
 }
 
-// HaikuSkillSignal assesses a skill's impact in the session.
-type HaikuSkillSignal struct {
+// ClassifierSkillSignal assesses a skill's impact in the session.
+type ClassifierSkillSignal struct {
 	SkillName    string `json:"skillName"`
 	InvokedAtUUID string `json:"invokedAtUuid"`
 	Assessment   string `json:"assessment"`
@@ -58,16 +58,16 @@ type HaikuSkillSignal struct {
 	Confidence   string `json:"confidence"`
 }
 
-// HaikuClaudeMdSignal assesses a CLAUDE.md file's impact.
-type HaikuClaudeMdSignal struct {
+// ClassifierClaudeMdSignal assesses a CLAUDE.md file's impact.
+type ClassifierClaudeMdSignal struct {
 	Path       string `json:"path"`
 	Assessment string `json:"assessment"`
 	Evidence    string `json:"evidence"`
 	Confidence  string `json:"confidence"`
 }
 
-// HaikuPatternAssessment assesses a cross-session recurring pattern.
-type HaikuPatternAssessment struct {
+// ClassifierPatternAssessment assesses a cross-session recurring pattern.
+type ClassifierPatternAssessment struct {
 	PatternType string `json:"patternType"` // matches RecurringPattern.Type
 	ToolName    string `json:"toolName"`
 	Assessment  string `json:"assessment"`  // "confirmed" | "coincidental" | "resolved"
@@ -75,19 +75,19 @@ type HaikuPatternAssessment struct {
 	Confidence  string `json:"confidence"`
 }
 
-// --- Sonnet evaluator output types ---
+// --- Evaluator output types ---
 
-// SonnetOutput is the structured output from the Sonnet evaluator.
-type SonnetOutput struct {
-	Version            int        `json:"version"`
-	SessionID          string     `json:"sessionId"`
-	PromptVersion      string     `json:"promptVersion"`
-	HaikuPromptVersion string     `json:"haikuPromptVersion"`
-	Proposals          []Proposal `json:"proposals"`
-	NoProposalReason   *string    `json:"noProposalReason"`
+// EvaluatorOutput is the structured output from the Evaluator.
+type EvaluatorOutput struct {
+	Version                int        `json:"version"`
+	SessionID              string     `json:"sessionId"`
+	PromptVersion          string     `json:"promptVersion"`
+	ClassifierPromptVersion string    `json:"classifierPromptVersion"`
+	Proposals              []Proposal `json:"proposals"`
+	NoProposalReason       *string    `json:"noProposalReason"`
 }
 
-// Proposal describes a suggested improvement from the Sonnet evaluator.
+// Proposal describes a suggested improvement from the Evaluator.
 // Types: skill_improvement, claude_review, claude_addition, skill_scaffold.
 type Proposal struct {
 	ID                   string   `json:"id"`
@@ -107,40 +107,40 @@ type Proposal struct {
 
 // --- Persistence ---
 
-// WriteHaikuOutput writes the Haiku classifier result to disk.
-func WriteHaikuOutput(sessionID string, output *HaikuOutput) error {
-	return writeEvaluation(sessionID+"-haiku.json", output)
+// WriteClassifierOutput writes the Classifier result to disk.
+func WriteClassifierOutput(sessionID string, output *ClassifierOutput) error {
+	return writeEvaluation(sessionID+"-classifier.json", output)
 }
 
-// ReadHaikuOutput reads a previously saved Haiku classifier result.
-func ReadHaikuOutput(sessionID string) (*HaikuOutput, error) {
-	path := evaluationPath(sessionID + "-haiku.json")
+// ReadClassifierOutput reads a previously saved Classifier result.
+func ReadClassifierOutput(sessionID string) (*ClassifierOutput, error) {
+	path := evaluationPath(sessionID + "-classifier.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var out HaikuOutput
+	var out ClassifierOutput
 	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("parsing haiku output: %w", err)
+		return nil, fmt.Errorf("parsing classifier output: %w", err)
 	}
 	return &out, nil
 }
 
-// WriteSonnetOutput writes the Sonnet evaluator result to disk.
-func WriteSonnetOutput(sessionID string, output *SonnetOutput) error {
-	return writeEvaluation(sessionID+"-sonnet.json", output)
+// WriteEvaluatorOutput writes the Evaluator result to disk.
+func WriteEvaluatorOutput(sessionID string, output *EvaluatorOutput) error {
+	return writeEvaluation(sessionID+"-evaluator.json", output)
 }
 
-// ReadSonnetOutput reads a previously saved Sonnet evaluator result.
-func ReadSonnetOutput(sessionID string) (*SonnetOutput, error) {
-	path := evaluationPath(sessionID + "-sonnet.json")
+// ReadEvaluatorOutput reads a previously saved Evaluator result.
+func ReadEvaluatorOutput(sessionID string) (*EvaluatorOutput, error) {
+	path := evaluationPath(sessionID + "-evaluator.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var out SonnetOutput
+	var out EvaluatorOutput
 	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("parsing sonnet output: %w", err)
+		return nil, fmt.Errorf("parsing evaluator output: %w", err)
 	}
 	return &out, nil
 }
