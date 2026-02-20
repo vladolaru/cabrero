@@ -7,6 +7,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-02-20
+
 ### Added
 
 - `cabrero backfill` command to process existing sessions through the full
@@ -34,7 +36,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   checks capture trigger.
 - Setup wizard backfill step now uses `--enqueue` for non-blocking processing.
 - Doctor check updated: warns about sessions stuck in `queued` status >24h.
-
 - `cabrero import` now runs the pre-parser on each imported session to generate
   digests. `RunImport` function available for programmatic use (quiet mode).
 - Daemon batching logic refactored into `pipeline.BatchProcessor` (no behavior
@@ -130,5 +131,6 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.7.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.7.0
 [0.6.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.6.0
 [0.5.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.5.0
