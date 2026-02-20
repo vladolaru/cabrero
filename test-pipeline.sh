@@ -3,15 +3,21 @@
 # Cabrero pipeline integration test.
 # Runs the full pipeline and validates every output artifact.
 #
-# Usage: bash test-pipeline.sh
+# Usage: bash test-pipeline.sh [session_id]
 # Output: test-pipeline-output.log (for Claude to inspect)
 
 set -euo pipefail
 
-LOG="$(cd "$(dirname "$0")" && pwd)/test-pipeline-output.log"
-CABRERO_DIR="$HOME/.cabrero"
-SESSION="8f4f68e0-8987-436c-ae03-607553e66932"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG="$REPO_DIR/test-pipeline-output.log"
+CABRERO_DIR="$HOME/.cabrero"
+SESSION="${1:-8f4f68e0-8987-436c-ae03-607553e66932}"
+
+# Validate session exists.
+if [[ ! -d "$CABRERO_DIR/raw/$SESSION" ]]; then
+  echo "ERROR: session $SESSION not found in $CABRERO_DIR/raw/"
+  exit 1
+fi
 
 # Seconds since epoch for timing.
 timer_start() { date +%s; }
