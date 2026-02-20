@@ -216,8 +216,16 @@ func TestSources_ToggleApproach(t *testing.T) {
 		t.Fatal("confirm should be active")
 	}
 
-	// Confirm with 'y'.
+	// Confirm with 'y' — produces a cmd with ConfirmResult.
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+
+	if cmd == nil {
+		t.Fatal("expected cmd after pressing y")
+	}
+
+	// Feed the ConfirmResult message back.
+	confirmMsg := cmd()
+	m, cmd = m.Update(confirmMsg)
 
 	if m.confirm.Active {
 		t.Error("confirm should be inactive after confirming")
@@ -259,8 +267,14 @@ func TestSources_ToggleApproach_Decline(t *testing.T) {
 	// Press 't' to toggle.
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
 
-	// Decline with 'n'.
+	// Decline with 'n' — produces a cmd with ConfirmResult{Confirmed: false}.
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+
+	if cmd != nil {
+		// Feed the ConfirmResult back.
+		confirmMsg := cmd()
+		m, cmd = m.Update(confirmMsg)
+	}
 
 	if m.confirm.Active {
 		t.Error("confirm should be inactive after declining")
@@ -414,8 +428,15 @@ func TestSources_DetailAndRollback(t *testing.T) {
 		t.Fatalf("confirmState = %d, want ConfirmRollback", m.confirmState)
 	}
 
-	// Confirm.
+	// Confirm with 'y' — produces ConfirmResult.
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+
+	if cmd == nil {
+		t.Fatal("expected cmd after pressing y")
+	}
+	// Feed the ConfirmResult back.
+	confirmMsg := cmd()
+	m, cmd = m.Update(confirmMsg)
 
 	if cmd == nil {
 		t.Fatal("expected cmd after rollback confirmation")
@@ -526,8 +547,15 @@ func TestSources_OwnershipConfirm(t *testing.T) {
 		t.Fatal("confirm prompt should be active")
 	}
 
-	// Confirm.
+	// Confirm with 'y' — produces ConfirmResult.
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+
+	if cmd == nil {
+		t.Fatal("expected cmd after pressing y")
+	}
+	// Feed the ConfirmResult back.
+	confirmMsg := cmd()
+	m, cmd = m.Update(confirmMsg)
 
 	if cmd == nil {
 		t.Fatal("expected cmd after ownership confirmation")

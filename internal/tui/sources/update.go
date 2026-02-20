@@ -28,6 +28,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleRollbackFinished(msg)
 	}
 
+	// Handle ConfirmResult messages from the confirm component.
+	if result, ok := msg.(components.ConfirmResult); ok {
+		return m.handleConfirmResult(result)
+	}
+
 	// When a confirmation prompt is active, route input there.
 	if m.confirm.Active {
 		return m.updateConfirm(msg)
@@ -149,21 +154,11 @@ func (m Model) handleSetOwnership() (Model, tea.Cmd) {
 }
 
 // updateConfirm routes messages to the confirmation sub-component.
+// The ConfirmResult message is handled by Update() directly.
 func (m Model) updateConfirm(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.confirm, cmd = m.confirm.Update(msg)
-
-	// Check if ConfirmResult was emitted.
-	if cmd != nil {
-		resultMsg := cmd()
-		if result, ok := resultMsg.(components.ConfirmResult); ok {
-			return m.handleConfirmResult(result)
-		}
-		// Not a ConfirmResult, pass cmd through.
-		return m, cmd
-	}
-
-	return m, nil
+	return m, cmd
 }
 
 func (m Model) handleConfirmResult(result components.ConfirmResult) (Model, tea.Cmd) {
