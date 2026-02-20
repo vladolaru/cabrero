@@ -133,6 +133,7 @@ func ParseSession(sessionID string) (*Digest, error) {
 		recentToolCalls  []recentToolCall // sliding window for retry detection
 		lastToolName     *string
 		skillToolUseIDs  = make(map[string]*SkillEntry) // tool_use_id → skill entry
+		toolUseIDToName  = make(map[string]string)      // tool_use_id → tool name (for error attribution)
 		claudeMdSeen     = make(map[string]bool)        // path → already recorded
 	)
 
@@ -196,10 +197,10 @@ func ParseSession(sessionID string) (*Digest, error) {
 
 		switch entry.Type {
 		case "user":
-			d.processUser(&entry, modelsSet, agentResultIDs, skillToolUseIDs, claudeMdSeen)
+			d.processUser(&entry, modelsSet, agentResultIDs, skillToolUseIDs, toolUseIDToName, claudeMdSeen)
 
 		case "assistant":
-			d.processAssistant(&entry, modelsSet, agentSpawns, &recentToolCalls, &lastToolName, skillToolUseIDs, claudeMdSeen)
+			d.processAssistant(&entry, modelsSet, agentSpawns, &recentToolCalls, &lastToolName, skillToolUseIDs, toolUseIDToName, claudeMdSeen)
 
 		case "summary":
 			seg := CompactionSegment{
@@ -299,7 +300,7 @@ func ParseSession(sessionID string) (*Digest, error) {
 	return d, nil
 }
 
-func (d *Digest) processUser(entry *rawEntry, modelsSet map[string]bool, agentResultIDs map[string]bool, skillToolUseIDs map[string]*SkillEntry, claudeMdSeen map[string]bool) {
+func (d *Digest) processUser(entry *rawEntry, modelsSet map[string]bool, agentResultIDs map[string]bool, skillToolUseIDs map[string]*SkillEntry, toolUseIDToName map[string]string, claudeMdSeen map[string]bool) {
 	if len(entry.Message) == 0 {
 		return
 	}
@@ -374,17 +375,20 @@ func (d *Digest) processUser(entry *rawEntry, modelsSet map[string]bool, agentRe
 				errEntry.SourceAssistantUUID = entry.SourceToolAssistantUUID
 			}
 
-			d.Errors = append(d.Errors, errEntry)
-		}
+			// Attribute error to tool name and increment ErrorCount.
+			if tn, ok := toolUseIDToName[tr.ToolUseID]; ok {
+				errEntry.ToolName = &tn
+				detail := d.ToolCalls.Summary[tn]
+				detail.ErrorCount++
+				d.ToolCalls.Summary[tn] = detail
+			}
 
-		// Increment error count in tool call summary.
-		if tr.IsError && tr.ToolUseID != "" {
-			d.attributeError(tr.ToolUseID)
+			d.Errors = append(d.Errors, errEntry)
 		}
 	}
 }
 
-func (d *Digest) processAssistant(entry *rawEntry, modelsSet map[string]bool, agentSpawns map[string]*AgentInventoryItem, recentToolCalls *[]recentToolCall, lastToolName **string, skillToolUseIDs map[string]*SkillEntry, claudeMdSeen map[string]bool) {
+func (d *Digest) processAssistant(entry *rawEntry, modelsSet map[string]bool, agentSpawns map[string]*AgentInventoryItem, recentToolCalls *[]recentToolCall, lastToolName **string, skillToolUseIDs map[string]*SkillEntry, toolUseIDToName map[string]string, claudeMdSeen map[string]bool) {
 	if len(entry.Message) == 0 {
 		return
 	}
@@ -425,6 +429,11 @@ func (d *Digest) processAssistant(entry *rawEntry, modelsSet map[string]bool, ag
 
 	for _, tu := range toolUses {
 		toolName := tu.Name
+
+		// Record tool_use_id → tool_name mapping for error attribution.
+		if tu.ID != "" {
+			toolUseIDToName[tu.ID] = toolName
+		}
 
 		// Update tool call summary.
 		detail := d.ToolCalls.Summary[toolName]
@@ -528,19 +537,6 @@ func (d *Digest) processCompletionSignals(toolName string, tu contentBlock) {
 			}
 		}
 	}
-}
-
-// attributeError increments the error count for the tool that produced a given tool_use_id.
-// Since we track tool_use blocks by their content block ID and the tool summary is keyed by
-// tool name, we need a secondary mapping. For simplicity, we store a separate map during parsing.
-// This is called from processUser when is_error is found; the corresponding tool name
-// may not be known at this point (it's on a different entry). We handle this by scanning
-// the summary after all entries are processed — but since the plan says to count errors
-// per tool, and we already track tool_use IDs in the summary via uuid, we take a simpler
-// approach: errors are counted in a post-pass in finalizeErrors.
-func (d *Digest) attributeError(toolUseID string) {
-	// No-op: errors are already recorded in d.Errors with their toolUseID.
-	// The tool name attribution happens via the sourceToolAssistantUUID field.
 }
 
 // inferClaudeMdLoaded populates the ClaudeMd.Loaded list based on the session's cwd.
