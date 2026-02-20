@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -62,6 +63,13 @@ func Status(args []string) error {
 		fmt.Printf("Last capture:   %s (session %s)\n", display, shortID)
 	} else {
 		fmt.Printf("Last capture:   none\n")
+	}
+
+	// Daemon status.
+	if pid, alive := daemon.IsDaemonRunning(); alive {
+		fmt.Printf("Daemon:         running (PID %d)\n", pid)
+	} else {
+		fmt.Printf("Daemon:         not running\n")
 	}
 
 	// Hook status.

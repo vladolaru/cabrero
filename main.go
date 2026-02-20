@@ -27,6 +27,7 @@ var commands = []command{
 	{"replay", "Re-run pipeline with a different prompt", cmdNotImplemented},
 	{"prompts", "List prompt files with versions", cmdNotImplemented},
 	{"import", "Seed the store from existing CC session files", cmd.Import},
+	{"daemon", "Run background session processor (for launchd)", cmd.Daemon},
 }
 
 func main() {
