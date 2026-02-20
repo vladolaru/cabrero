@@ -7,7 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Agentic evaluators** — Haiku classifier and Sonnet evaluator now run in
+  agentic mode with Read/Grep tool access instead of single-shot `--print`.
+  Haiku can verify ambiguous signals by reading raw JSONL turns (scoped to
+  `~/.cabrero/raw/`). Sonnet can read current skill files and CLAUDE.md to
+  inform proposals (unrestricted filesystem access). Both have prompt-based
+  turn budgets and wall-clock timeouts.
+- **Triage gate** — Haiku now outputs a `triage` field (`"evaluate"` or
+  `"clean"`). Clean sessions skip the Sonnet evaluator entirely, reducing
+  cost for sessions with no actionable signals.
+- **Smart batching** — daemon groups pending sessions by project, runs Haiku
+  individually (cheap triage), then batches sessions flagged as "evaluate"
+  into a single Sonnet invocation per project. Gives Sonnet cross-session
+  context within one call while keeping Haiku independent.
+- **Prompt versions** — Haiku classifier upgraded to v3 (`haiku-classifier-v3.txt`),
+  Sonnet evaluator upgraded to v3 (`sonnet-evaluator-v3.txt`).
+
 ### Added
+
+- **CLI flags** — `--haiku-max-turns`, `--sonnet-max-turns`, `--haiku-timeout`,
+  `--sonnet-timeout` on both `cabrero daemon` and `cabrero run` for tuning
+  agentic evaluator limits.
 
 - **`cabrero uninstall`** — clean removal command that reverses setup: stops
   daemon, removes LaunchAgent, unregisters Claude Code hooks, deletes hook
