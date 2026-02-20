@@ -18,11 +18,12 @@ type HaikuOutput struct {
 	SessionID      string `json:"sessionId"`
 	PromptVersion  string `json:"promptVersion"`
 
-	Goal               HaikuGoal              `json:"goal"`
-	ErrorClassification []HaikuErrorClass      `json:"errorClassification"`
-	KeyTurns           []HaikuKeyTurn         `json:"keyTurns"`
-	SkillSignals       []HaikuSkillSignal     `json:"skillSignals"`
-	ClaudeMdSignals    []HaikuClaudeMdSignal  `json:"claudeMdSignals"`
+	Goal                HaikuGoal                `json:"goal"`
+	ErrorClassification []HaikuErrorClass         `json:"errorClassification"`
+	KeyTurns            []HaikuKeyTurn            `json:"keyTurns"`
+	SkillSignals        []HaikuSkillSignal        `json:"skillSignals"`
+	ClaudeMdSignals     []HaikuClaudeMdSignal     `json:"claudeMdSignals"`
+	PatternAssessments  []HaikuPatternAssessment  `json:"patternAssessments,omitempty"`
 }
 
 // HaikuGoal describes the user's intent in the session.
@@ -64,6 +65,15 @@ type HaikuClaudeMdSignal struct {
 	Confidence  string `json:"confidence"`
 }
 
+// HaikuPatternAssessment assesses a cross-session recurring pattern.
+type HaikuPatternAssessment struct {
+	PatternType string `json:"patternType"` // matches RecurringPattern.Type
+	ToolName    string `json:"toolName"`
+	Assessment  string `json:"assessment"`  // "confirmed" | "coincidental" | "resolved"
+	Evidence    string `json:"evidence"`
+	Confidence  string `json:"confidence"`
+}
+
 // --- Sonnet evaluator output types ---
 
 // SonnetOutput is the structured output from the Sonnet evaluator.
@@ -76,19 +86,22 @@ type SonnetOutput struct {
 	NoProposalReason   *string    `json:"noProposalReason"`
 }
 
-// Proposal describes a suggested improvement from the Opus evaluator.
+// Proposal describes a suggested improvement from the Sonnet evaluator.
+// Types: skill_improvement, claude_review, claude_addition, skill_scaffold.
 type Proposal struct {
-	ID                  string   `json:"id"`
-	Type                string   `json:"type"`
-	Confidence          string   `json:"confidence"`
-	Target              string   `json:"target"`
-	Change              *string  `json:"change"`
-	FlaggedEntry        *string  `json:"flaggedEntry"`
-	AssessmentSummary   *string  `json:"assessmentSummary"`
-	Rationale           string   `json:"rationale"`
-	CitedUUIDs          []string `json:"citedUuids"`
-	CitedSkillSignals   []string `json:"citedSkillSignals"`
+	ID                   string   `json:"id"`
+	Type                 string   `json:"type"`
+	Confidence           string   `json:"confidence"`
+	Target               string   `json:"target"`
+	Change               *string  `json:"change"`
+	FlaggedEntry         *string  `json:"flaggedEntry"`
+	AssessmentSummary    *string  `json:"assessmentSummary"`
+	Rationale            string   `json:"rationale"`
+	CitedUUIDs           []string `json:"citedUuids"`
+	CitedSkillSignals    []string `json:"citedSkillSignals"`
 	CitedClaudeMdSignals []string `json:"citedClaudeMdSignals"`
+	ScaffoldSkillName    *string  `json:"scaffoldSkillName,omitempty"`
+	ScaffoldTrigger      *string  `json:"scaffoldTrigger,omitempty"`
 }
 
 // --- Persistence ---
