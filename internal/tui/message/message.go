@@ -9,6 +9,9 @@ type ViewState int
 const (
 	ViewDashboard ViewState = iota
 	ViewProposalDetail
+	ViewFitnessDetail
+	ViewSourceManager
+	ViewSourceDetail
 )
 
 // Navigation messages.
@@ -119,3 +122,42 @@ type StatusMessage struct {
 
 // StatusMessageExpired signals that the timed status message should be cleared.
 type StatusMessageExpired struct{}
+
+// Fitness report messages.
+
+// DismissFinished carries the result of dismissing a fitness report.
+type DismissFinished struct {
+	ReportID string
+	Err      error
+}
+
+// JumpToSources navigates to the source manager with a source pre-selected.
+type JumpToSources struct{ SourceName string }
+
+// Source manager messages.
+
+// ToggleApproachFinished carries the result of toggling a source's approach.
+type ToggleApproachFinished struct {
+	SourceName  string
+	NewApproach string
+	Err         error
+}
+
+// SetOwnershipFinished carries the result of changing a source's ownership.
+type SetOwnershipFinished struct {
+	SourceName   string
+	NewOwnership string
+	Err          error
+}
+
+// ClassifyFinished carries the result of classifying a source.
+type ClassifyFinished struct {
+	SourceName string
+	Err        error
+}
+
+// RollbackFinished carries the result of rolling back a change.
+type RollbackFinished struct {
+	ChangeID string
+	Err      error
+}
