@@ -13,7 +13,7 @@ import (
 func Sessions(args []string) error {
 	fs := flag.NewFlagSet("sessions", flag.ExitOnError)
 	limit := fs.Int("limit", 20, "maximum number of sessions to show")
-	statusFilter := fs.String("status", "all", "filter by status: pending, processed, all")
+	statusFilter := fs.String("status", "all", "filter by status: queued, imported, processed, error, all")
 	projectFilter := fs.String("project", "", "filter by project (substring match on slug or display name)")
 	if err := fs.Parse(args); err != nil {
 		return err

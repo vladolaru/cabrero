@@ -35,6 +35,41 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   adapts daemon header density, activity stats format, sparkline visibility,
   run row detail level, and prompt section visibility to terminal width.
 
+## [0.7.0] - 2026-02-20
+
+### Added
+
+- `cabrero backfill` command to process existing sessions through the full
+  pipeline with `--since`, `--until`, `--project`, `--retry-errors` filtering,
+  preview with confirmation, and smart batching via `pipeline.BatchProcessor`.
+- Setup wizard Step 8: offers to import and enqueue existing CC sessions after
+  installation (imports in quiet mode, counts imported, offers to enqueue for
+  background processing with configurable lookback — default 1 month, skippable).
+- `store.QuerySessions` for filtered session queries by date range, project
+  substring, and status. Returns oldest-first.
+- `pipeline.BatchProcessor` as shared smart batching infrastructure with
+  configurable max batch size (default 10) and progress callbacks. Used by
+  both daemon and backfill command.
+- `backfill --enqueue` flag to mark sessions as queued for background daemon
+  processing instead of running the pipeline synchronously.
+- `store.MarkQueued()` function for transitioning sessions to queued status.
+- Daemon notification when queue processing completes.
+
+### Changed
+
+- Renamed session status `pending` to `queued` for hook-captured sessions.
+- Imported sessions now use `imported` status (not automatically processed
+  by daemon).
+- Daemon scanner simplified: filters on `queued` status only, no longer
+  checks capture trigger.
+- Setup wizard backfill step now uses `--enqueue` for non-blocking processing.
+- Doctor check updated: warns about sessions stuck in `queued` status >24h.
+- `cabrero import` now runs the pre-parser on each imported session to generate
+  digests. `RunImport` function available for programmatic use (quiet mode).
+- Daemon batching logic refactored into `pipeline.BatchProcessor` (no behavior
+  change).
+- `store.MarkProcessed` and `store.MarkError` extracted as public helpers.
+
 ## [0.6.0] - 2026-02-20
 
 ### Changed
@@ -157,5 +192,6 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.7.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.7.0
 [0.6.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.6.0
 [0.5.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.5.0

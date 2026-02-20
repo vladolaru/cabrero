@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/store"
@@ -68,6 +69,7 @@ func (s *setupRunner) run() error {
 		{"Install LaunchAgent", s.stepInstallLaunchAgent},
 		{"Start daemon", s.stepStartDaemon},
 		{"PATH check", s.stepPathCheck},
+		{"Process existing sessions", s.stepBackfillOffer},
 	}
 
 	total := len(steps)
@@ -478,6 +480,70 @@ func (s *setupRunner) stepPathCheck(step, total int) error {
 	}
 
 	return nil
+}
+
+// Step 8: Offer to import and process existing sessions.
+func (s *setupRunner) stepBackfillOffer(step, total int) error {
+	if s.dryRun {
+		fmt.Println("  → Would offer to import and process existing sessions (dry-run)")
+		return nil
+	}
+
+	// Import existing CC sessions (quiet mode — summary only).
+	fmt.Println("  Scanning for existing CC sessions...")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("  Warning: cannot determine home directory: %v\n", err)
+		return nil
+	}
+	from := filepath.Join(home, ".claude", "projects")
+	result, importErr := RunImport(from, false, true)
+	if importErr != nil {
+		fmt.Printf("  Warning: import scan failed: %v\n", importErr)
+	} else if result.Imported > 0 {
+		fmt.Printf("  Imported %d session(s) (%d already present)\n", result.Imported, result.Skipped)
+	}
+
+	// Count pending sessions.
+	sessions, err := store.QuerySessions(store.SessionFilter{
+		Statuses: []string{"imported"},
+	})
+	if err != nil || len(sessions) == 0 {
+		fmt.Println("  No existing sessions to process.")
+		return nil
+	}
+
+	fmt.Printf("  Found %d session(s) ready for processing\n", len(sessions))
+
+	if !s.confirm("Enqueue recent sessions for background processing?") {
+		fmt.Println("  — Skipped. Run 'cabrero backfill --enqueue' later to process.")
+		return nil
+	}
+
+	// Ask how far back.
+	sinceDate := time.Now().AddDate(0, -1, 0)
+	if !s.autoYes {
+		fmt.Printf("  How far back? (default: 1 month, or enter YYYY-MM-DD) ")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input != "" {
+			t, err := time.Parse("2006-01-02", input)
+			if err != nil {
+				fmt.Printf("  Could not parse date %q, using default (1 month)\n", input)
+			} else {
+				sinceDate = t
+			}
+		}
+	}
+
+	fmt.Printf("  Processing sessions since %s...\n\n", sinceDate.Format("2006-01-02"))
+
+	return Backfill([]string{
+		"--since", sinceDate.Format("2006-01-02"),
+		"--enqueue",
+		"--yes",
+	})
 }
 
 // confirm prompts the user for Y/n. Returns true on Y or empty input.
