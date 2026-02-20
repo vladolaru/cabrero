@@ -92,36 +92,184 @@ func (d *Daemon) Run(ctx context.Context) error {
 }
 
 func (d *Daemon) processPending(ctx context.Context) {
-	sessions, err := ScanPending()
+	pending, err := ScanPending()
 	if err != nil {
 		d.log.Error("scanning pending sessions: %v", err)
 		return
 	}
-	if len(sessions) == 0 {
+	if len(pending) == 0 {
 		return
 	}
 
-	d.log.Info("found %d pending session(s)", len(sessions))
+	d.log.Info("found %d pending session(s)", len(pending))
 
-	for i, sid := range sessions {
-		// Check for shutdown between sessions.
+	// Group by project for smart batching.
+	byProject := make(map[string][]PendingSession)
+	var projectOrder []string
+	for _, p := range pending {
+		key := p.Project
+		if _, seen := byProject[key]; !seen {
+			projectOrder = append(projectOrder, key)
+		}
+		byProject[key] = append(byProject[key], p)
+	}
+
+	first := true
+	for _, project := range projectOrder {
+		sessions := byProject[project]
+
 		select {
 		case <-ctx.Done():
-			d.log.Info("shutdown requested, stopping after %d/%d sessions", i, len(sessions))
 			return
 		default:
 		}
 
-		d.processOne(sid)
-
-		// Rate limit between sessions (skip delay after the last one).
-		if i < len(sessions)-1 && d.config.InterSessionDelay > 0 {
+		// Rate limit between groups (skip delay before the first one).
+		if !first && d.config.InterSessionDelay > 0 {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(d.config.InterSessionDelay):
 			}
 		}
+		first = false
+
+		if project == "" || len(sessions) == 1 {
+			// No project metadata or solo session — process individually.
+			for i, s := range sessions {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				d.processOne(s.SessionID)
+
+				// Rate limit between sessions within the group.
+				if i < len(sessions)-1 && d.config.InterSessionDelay > 0 {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(d.config.InterSessionDelay):
+					}
+				}
+			}
+			continue
+		}
+
+		d.processProjectBatch(ctx, project, sessions)
+	}
+}
+
+// processProjectBatch runs Haiku individually on each session in a project,
+// then batches sessions flagged as "evaluate" into a single Sonnet invocation.
+func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessions []PendingSession) {
+	d.log.Info("batch: %d session(s) for project %s", len(sessions), store.ProjectDisplayName(project))
+
+	// Phase 1: Run Haiku individually on each session.
+	var toEvaluate []pipeline.BatchSession
+	for _, s := range sessions {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		result, err := pipeline.RunThroughHaiku(s.SessionID, d.config.Pipeline)
+		if err != nil {
+			d.log.Error("haiku failed for %s: %v", s.SessionID, err)
+			d.markError(s.SessionID)
+			continue
+		}
+
+		if result.HaikuOutput.Triage == "clean" {
+			d.log.Info("session %s triaged as clean", shortID(s.SessionID))
+			d.markProcessed(s.SessionID)
+			continue
+		}
+
+		toEvaluate = append(toEvaluate, pipeline.BatchSession{
+			SessionID:   s.SessionID,
+			Digest:      result.Digest,
+			HaikuOutput: result.HaikuOutput,
+		})
+	}
+
+	if len(toEvaluate) == 0 {
+		return
+	}
+
+	// Phase 2: Run Sonnet — batch if 2+, individual if 1.
+	if len(toEvaluate) == 1 {
+		s := toEvaluate[0]
+		d.runSonnetSingle(s)
+	} else {
+		d.runSonnetBatch(toEvaluate)
+	}
+}
+
+func (d *Daemon) runSonnetSingle(s pipeline.BatchSession) {
+	d.log.Info("running Sonnet on session %s", shortID(s.SessionID))
+	sonnetOutput, err := pipeline.RunSonnet(s.SessionID, s.Digest, s.HaikuOutput, d.config.Pipeline)
+	if err != nil {
+		d.log.Error("sonnet failed for %s: %v", s.SessionID, err)
+		d.markError(s.SessionID)
+		return
+	}
+
+	d.persistSonnetOutput(s.SessionID, sonnetOutput)
+}
+
+func (d *Daemon) runSonnetBatch(sessions []pipeline.BatchSession) {
+	d.log.Info("running batched Sonnet on %d sessions", len(sessions))
+	sonnetOutput, err := pipeline.RunSonnetBatch(sessions, d.config.Pipeline)
+	if err != nil {
+		d.log.Error("sonnet batch failed: %v", err)
+		for _, s := range sessions {
+			d.markError(s.SessionID)
+		}
+		return
+	}
+
+	// Persist output and proposals for each session in the batch.
+	for _, s := range sessions {
+		d.persistSonnetOutput(s.SessionID, sonnetOutput)
+	}
+}
+
+func (d *Daemon) persistSonnetOutput(sessionID string, output *pipeline.SonnetOutput) {
+	if err := pipeline.WriteSonnetOutput(sessionID, output); err != nil {
+		d.log.Error("writing sonnet output for %s: %v", sessionID, err)
+	}
+
+	proposalCount := 0
+	for i := range output.Proposals {
+		p := &output.Proposals[i]
+		if err := pipeline.WriteProposal(p, sessionID); err != nil {
+			d.log.Error("writing proposal %s: %v", p.ID, err)
+		}
+		proposalCount++
+	}
+
+	d.markProcessed(sessionID)
+
+	if proposalCount > 0 {
+		msg := fmt.Sprintf("%d new proposal(s) from session %s", proposalCount, shortID(sessionID))
+		if err := Notify("Cabrero", msg); err != nil {
+			d.log.Error("notification failed: %v", err)
+		}
+	}
+}
+
+func (d *Daemon) markProcessed(sessionID string) {
+	meta, err := store.ReadMetadata(sessionID)
+	if err != nil {
+		d.log.Error("reading metadata for %s to mark processed: %v", sessionID, err)
+		return
+	}
+	meta.Status = "processed"
+	if err := store.WriteMetadata(store.RawDir(sessionID), meta); err != nil {
+		d.log.Error("writing processed status for %s: %v", sessionID, err)
 	}
 }
 

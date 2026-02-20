@@ -38,37 +38,37 @@ type RunResult struct {
 	DryRun       bool
 }
 
-// Run executes the full analysis pipeline for a session.
-// If dryRun is true, only the pre-parser runs (no LLM invocations).
-func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) {
-	// Verify session exists.
+// HaikuResult holds the output of the pre-parser through Haiku stages.
+// Used by RunThroughHaiku to return enough data for batch processing.
+type HaikuResult struct {
+	Digest           *parser.Digest
+	AggregatorOutput *patterns.AggregatorOutput
+	HaikuOutput      *HaikuOutput
+}
+
+// RunThroughHaiku runs pre-parser, aggregator, and Haiku classifier.
+// Returns enough data for batching. Does not invoke Sonnet.
+func RunThroughHaiku(sessionID string, cfg PipelineConfig) (*HaikuResult, error) {
 	if !store.SessionExists(sessionID) {
 		return nil, fmt.Errorf("session %s not found in store", sessionID)
 	}
-
-	// Ensure prompt files exist (cheap file write, always safe to run).
 	if err := EnsurePrompts(); err != nil {
 		return nil, fmt.Errorf("ensuring prompt files: %w", err)
 	}
 
-	result := &RunResult{DryRun: dryRun}
-
-	// Step 1: Pre-parse.
+	// Pre-parse.
 	fmt.Printf("  Parsing session %s...\n", sessionID)
 	digest, err := parser.ParseSession(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("pre-parser failed: %w", err)
 	}
-	result.Digest = digest
-
-	// Write digest to disk.
 	if err := parser.WriteDigest(digest); err != nil {
 		return nil, fmt.Errorf("writing digest: %w", err)
 	}
 	fmt.Printf("  Digest written: %d entries, %d turns, %d errors, %d friction signals\n",
 		digest.Shape.EntryCount, digest.Shape.TurnCount, len(digest.Errors), len(digest.ToolCalls.FrictionSignals))
 
-	// Step 1b: Cross-session pattern aggregation (pure code, no LLM cost).
+	// Pattern aggregation.
 	var aggregatorOutput *patterns.AggregatorOutput
 	meta, metaErr := store.ReadMetadata(sessionID)
 	if metaErr == nil && meta.Project != "" {
@@ -81,33 +81,88 @@ func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) 
 			fmt.Printf("  Found %d recurring pattern(s) across %d sessions\n",
 				len(aggregatorOutput.Patterns), aggregatorOutput.SessionsScanned)
 		}
-		result.AggregatorOutput = aggregatorOutput
 	}
 
-	if dryRun {
-		fmt.Println("  Dry run — stopping after pre-parser.")
-		return result, nil
-	}
-
-	// Step 2: Haiku classifier.
+	// Haiku classifier.
 	fmt.Println("  Running Haiku classifier...")
 	haikuOutput, err := RunHaiku(sessionID, digest, aggregatorOutput, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("haiku classifier failed: %w", err)
 	}
-	result.HaikuOutput = haikuOutput
-
 	if err := WriteHaikuOutput(sessionID, haikuOutput); err != nil {
 		return nil, fmt.Errorf("writing haiku output: %w", err)
 	}
-	fmt.Printf("  Haiku: goal=%q, %d errors, %d key turns, %d skill signals\n",
+	fmt.Printf("  Haiku: goal=%q, %d errors, %d key turns, %d skill signals, triage=%s\n",
 		haikuOutput.Goal.Summary,
 		len(haikuOutput.ErrorClassification),
 		len(haikuOutput.KeyTurns),
-		len(haikuOutput.SkillSignals))
+		len(haikuOutput.SkillSignals),
+		haikuOutput.Triage)
 
-	// Triage gate: skip Sonnet if Haiku classified session as clean.
-	if haikuOutput.Triage == "clean" {
+	return &HaikuResult{
+		Digest:           digest,
+		AggregatorOutput: aggregatorOutput,
+		HaikuOutput:      haikuOutput,
+	}, nil
+}
+
+// Run executes the full analysis pipeline for a session.
+// If dryRun is true, only the pre-parser runs (no LLM invocations).
+func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) {
+	if !store.SessionExists(sessionID) {
+		return nil, fmt.Errorf("session %s not found in store", sessionID)
+	}
+	if err := EnsurePrompts(); err != nil {
+		return nil, fmt.Errorf("ensuring prompt files: %w", err)
+	}
+
+	result := &RunResult{DryRun: dryRun}
+
+	if dryRun {
+		// Dry run: only pre-parse, no LLM invocations.
+		fmt.Printf("  Parsing session %s...\n", sessionID)
+		digest, err := parser.ParseSession(sessionID)
+		if err != nil {
+			return nil, fmt.Errorf("pre-parser failed: %w", err)
+		}
+		result.Digest = digest
+
+		if err := parser.WriteDigest(digest); err != nil {
+			return nil, fmt.Errorf("writing digest: %w", err)
+		}
+		fmt.Printf("  Digest written: %d entries, %d turns, %d errors, %d friction signals\n",
+			digest.Shape.EntryCount, digest.Shape.TurnCount, len(digest.Errors), len(digest.ToolCalls.FrictionSignals))
+
+		// Pattern aggregation (no LLM cost).
+		meta, metaErr := store.ReadMetadata(sessionID)
+		if metaErr == nil && meta.Project != "" {
+			fmt.Println("  Aggregating cross-session patterns...")
+			aggregatorOutput, err := patterns.Aggregate(sessionID, meta.Project)
+			if err != nil {
+				fmt.Printf("  Warning: pattern aggregation failed: %v\n", err)
+			} else if aggregatorOutput != nil {
+				fmt.Printf("  Found %d recurring pattern(s) across %d sessions\n",
+					len(aggregatorOutput.Patterns), aggregatorOutput.SessionsScanned)
+			}
+			result.AggregatorOutput = aggregatorOutput
+		}
+
+		fmt.Println("  Dry run — stopping after pre-parser.")
+		return result, nil
+	}
+
+	// Full run: delegate to RunThroughHaiku then continue to Sonnet.
+	haikuResult, err := RunThroughHaiku(sessionID, cfg)
+	if err != nil {
+		return nil, err
+	}
+	result.Digest = haikuResult.Digest
+	result.AggregatorOutput = haikuResult.AggregatorOutput
+	result.HaikuOutput = haikuResult.HaikuOutput
+
+	// Triage gate: skip Sonnet for clean sessions.
+	meta, metaErr := store.ReadMetadata(sessionID)
+	if haikuResult.HaikuOutput.Triage == "clean" {
 		fmt.Println("  Haiku triage: clean session — skipping Sonnet evaluator")
 		if metaErr == nil {
 			meta.Status = "processed"
@@ -119,9 +174,9 @@ func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) 
 	}
 	fmt.Println("  Haiku triage: session worth evaluating")
 
-	// Step 3: Sonnet evaluator.
+	// Sonnet evaluator.
 	fmt.Println("  Running Sonnet evaluator...")
-	sonnetOutput, err := RunSonnet(sessionID, digest, haikuOutput, cfg)
+	sonnetOutput, err := RunSonnet(sessionID, haikuResult.Digest, haikuResult.HaikuOutput, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("sonnet evaluator failed: %w", err)
 	}
@@ -131,7 +186,7 @@ func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) 
 		return nil, fmt.Errorf("writing sonnet output: %w", err)
 	}
 
-	// Step 4: Persist proposals.
+	// Persist proposals.
 	for i := range sonnetOutput.Proposals {
 		p := &sonnetOutput.Proposals[i]
 		if err := WriteProposal(p, sessionID); err != nil {
