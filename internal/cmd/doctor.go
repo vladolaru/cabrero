@@ -231,7 +231,7 @@ func (d *doctorRunner) outputHuman(results []checkResult, categories []struct {
 	// Fix flow.
 	fixed := 0
 	if len(fixable) > 0 {
-		fmt.Println("\nFixable issues:\n")
+		fmt.Println("\nFixable issues:")
 		for i, r := range fixable {
 			fmt.Printf("  %d. %s\n", i+1, r.name)
 			if r.message != "" {
