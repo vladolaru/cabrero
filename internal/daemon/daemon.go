@@ -237,10 +237,17 @@ func (d *Daemon) runSonnetBatch(sessions []pipeline.BatchSession) {
 
 	// Partition proposals by session: proposal IDs encode their session
 	// via the format "prop-{first 6 chars of sessionId}-{index}".
+	totalMatched := 0
 	for _, s := range sessions {
 		prefix := "prop-" + shortID6(s.SessionID) + "-"
 		filtered := filterProposals(sonnetOutput, prefix)
+		filtered.SessionID = s.SessionID
+		totalMatched += len(filtered.Proposals)
 		d.persistSonnetOutput(s.SessionID, filtered)
+	}
+	if totalMatched != len(sonnetOutput.Proposals) {
+		d.log.Error("batch: %d of %d proposals unmatched after partitioning",
+			len(sonnetOutput.Proposals)-totalMatched, len(sonnetOutput.Proposals))
 	}
 }
 

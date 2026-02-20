@@ -44,7 +44,7 @@ func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput
 		"\n\n<session_digest>\n" + string(digestJSON) + "\n</session_digest>"
 
 	// Inject turn budget into the prompt template.
-	systemPrompt = strings.Replace(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.SonnetMaxTurns), 1)
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.SonnetMaxTurns))
 
 	stdout, err := invokeClaude(claudeConfig{
 		Model:        "claude-sonnet-4-6",

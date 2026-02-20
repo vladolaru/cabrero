@@ -29,7 +29,7 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 	}
 
 	// Inject turn budget into the prompt template.
-	systemPrompt = strings.Replace(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.HaikuMaxTurns), 1)
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.HaikuMaxTurns))
 
 	// System prompt goes via --system-prompt; data goes as the -p prompt.
 	data := "<session_digest>\n" + string(digestJSON) + "\n</session_digest>"
