@@ -380,7 +380,7 @@ func TestPipelineRuns() []pipeline.PipelineRun {
 			r.SessionID = "7e0b1234"
 			r.Project = "woo-payments"
 			r.Timestamp = time.Now().Add(-24 * time.Hour)
-			r.Status = "pending"
+			r.Status = "queued"
 			r.HasDigest = false
 			r.HasClassifier = false
 			r.HasEvaluator = false
@@ -397,7 +397,7 @@ func TestPipelineStats() pipeline.PipelineStats {
 	return pipeline.PipelineStats{
 		SessionsCaptured:   18,
 		SessionsProcessed:  16,
-		SessionsPending:    1,
+		SessionsQueued:     1,
 		SessionsErrored:    1,
 		ProposalsGenerated: 5,
 		ProposalsApproved:  3,

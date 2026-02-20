@@ -25,7 +25,7 @@ type PipelineRun struct {
     SessionID string
     Project   string
     Timestamp time.Time
-    Status    string // "pending", "processed", "error"
+    Status    string // "queued", "processed", "error"
 
     // Per-stage completion
     HasDigest bool
@@ -108,7 +108,7 @@ No fsnotify dependency. Manual refresh also available via `r` key.
 │  ────────────────────────────────                                         │
 │  Sessions captured:  18          Proposals generated:  5                  │
 │  Sessions processed: 16          Proposals approved:   3                  │
-│  Sessions pending:    1          Proposals rejected:   1                  │
+│  Sessions queued:     1          Proposals rejected:   1                  │
 │  Sessions errored:    1          Proposals pending:    1                  │
 │                                                                           │
 │  ▁▂▃▅▂▁▃▄▂▁▅▇▃▂   sessions/day                                          │
@@ -118,7 +118,7 @@ No fsnotify dependency. Manual refresh also available via `r` key.
 │  > ✓ e7f2a103  12m ago   woo-payments    1.2s parse  8.4s cls  12s eval  │
 │    ✓ 3bc891ff  2h ago    cabrero         0.8s parse  6.1s cls  9s eval   │
 │    ✗ 91cd02ab  8h ago    woo-payments    0.4s parse  ✗ cls failed        │
-│    ○ 7e0b1234  1d ago    woo-payments    (pending)                       │
+│    ○ 7e0b1234  1d ago    woo-payments    (queued)                       │
 │                                                                           │
 │  PROMPTS                                                                  │
 │  ───────                                                                  │
@@ -191,7 +191,7 @@ at 5MB with rotation (3 files), so reading the whole file into memory is safe.
 │  2026-02-20T10:15:04Z INFO  pre-parser: 142 entries, 0.8s               │
 │  2026-02-20T10:15:12Z INFO  classifier: classified, triage=evaluate      │
 │  2026-02-20T10:15:24Z INFO  evaluator: 1 proposal generated             │
-│  2026-02-20T10:17:05Z INFO  poll: 0 pending sessions                    │
+│  2026-02-20T10:17:05Z INFO  poll: 0 queued sessions                    │
 │  ...                                                                     │
 │                                                                           │
 ├───────────────────────────────────────────────────────────────────────────┤
@@ -290,7 +290,7 @@ Add `PipelineShortHelp()` and `LogViewShortHelp()` to KeyMap.
 ```go
 // Add to testdata/fixtures.go
 TestPipelineRun(overrides...)    PipelineRun
-TestPipelineRuns()               []PipelineRun   // 4 runs: success, success, error, pending
+TestPipelineRuns()               []PipelineRun   // 4 runs: success, success, error, queued
 TestPipelineStats()              PipelineStats
 TestPromptVersions()             []PromptVersion  // 3 prompts
 ```

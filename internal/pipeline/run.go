@@ -14,7 +14,7 @@ type PipelineRun struct {
 	SessionID string
 	Project   string
 	Timestamp time.Time
-	Status    string // "pending", "processed", "error"
+	Status    string // "queued", "processed", "error"
 
 	// Per-stage completion.
 	HasDigest     bool
@@ -35,7 +35,7 @@ type PipelineRun struct {
 type PipelineStats struct {
 	SessionsCaptured   int
 	SessionsProcessed  int
-	SessionsPending    int
+	SessionsQueued     int
 	SessionsErrored    int
 	ProposalsGenerated int
 	ProposalsApproved  int
@@ -168,8 +168,8 @@ func GatherPipelineStatsFromSessions(sessions []store.Metadata, runs []PipelineR
 		switch meta.Status {
 		case "processed":
 			stats.SessionsProcessed++
-		case "pending":
-			stats.SessionsPending++
+		case "queued":
+			stats.SessionsQueued++
 		case "error":
 			stats.SessionsErrored++
 		}
