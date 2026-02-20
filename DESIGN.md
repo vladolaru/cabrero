@@ -196,12 +196,25 @@ a complete write.
 
 - **`store.QuerySessions(filter SessionFilter)`** — returns sessions matching the
   filter, sorted oldest-first. `SessionFilter` fields: `Since`/`Until` (time range),
-  `Project` (substring match), `Statuses` (e.g. `["pending"]` or `["pending", "error"]`).
+  `Project` (substring match), `Statuses` (e.g. `["imported"]` or `["imported", "error"]`).
   Used by `cabrero backfill` and setup wizard.
+- **`store.MarkQueued(sessionID)`** — sets a session's status to `"queued"` (ready for daemon).
 - **`store.MarkProcessed(sessionID)`** — sets a session's status to `"processed"`.
 - **`store.MarkError(sessionID)`** — sets a session's status to `"error"`.
 
-Both helpers read the current metadata, update the status field, and write atomically.
+All helpers read the current metadata, update the status field, and write atomically.
+
+### Session Status Model
+
+Sessions flow through these statuses:
+
+- **`imported`** — bulk-imported sessions, not yet selected for processing. Created by
+  `cabrero import` and `store.WriteSession()` default. Won't be processed by the daemon
+  until explicitly enqueued via `cabrero backfill --enqueue`.
+- **`queued`** — sessions ready for daemon processing. Set by hook scripts (session-end,
+  pre-compact), stale recovery, and `cabrero backfill --enqueue`.
+- **`processed`** — pipeline completed successfully.
+- **`error`** — pipeline failed. Retry with `cabrero run <session_id>`.
 
 ### JSONL Structure (key facts)
 
@@ -214,7 +227,7 @@ Compaction appends `compact_boundary` markers inline — prior entries remain in
 ```
 SessionEnd hook fires → transcript + metadata written to store
         ↓
-Daemon picks up pending session (status: "pending", trigger contains "session-end")
+Daemon picks up queued session (status: "queued")
         ↓
 Pre-parser (pure code, fast) → structured digest with citations + friction signals
         ↓
@@ -241,9 +254,10 @@ auth is reused throughout. Classifier and Evaluator run as agentic tool-using se
 constrained tool access (Read, Grep). Apply stage uses `--print` (non-agentic). The
 daemon sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
 
-**Trigger:** session-end, not every file write. The daemon only processes sessions where
-`capture_trigger` contains `"session-end"` (session is complete). PreCompact-only sessions
-wait until session-end fires.
+**Trigger:** The daemon only processes sessions with status `"queued"`. Hook-captured
+sessions (session-end, pre-compact) are written with `"queued"` status and processed
+automatically. Bulk-imported sessions get `"imported"` status and must be explicitly
+enqueued via `cabrero backfill --enqueue`.
 
 ### Pre-Parser (pure code, no LLM)
 
@@ -382,7 +396,7 @@ Classifier's higher per-session cost is offset by eliminating 60% of Evaluator i
 
 ### Smart Batching — `pipeline.BatchProcessor`
 
-When multiple pending sessions belong to the same project, they are batched
+When multiple queued sessions belong to the same project, they are batched
 to reduce Evaluator invocations and improve cross-session reasoning.
 
 `pipeline.BatchProcessor` is the shared infrastructure for batching, used by both
@@ -407,7 +421,7 @@ max turns and timeout scale linearly with batch size (capped at reasonable
 maximums). Sessions without project metadata fall back to individual processing.
 
 `cabrero run <session_id>` always processes one session individually — batching
-only happens in the daemon and backfill when multiple sessions are pending.
+only happens in the daemon and backfill when multiple sessions are queued.
 
 ### Human Approval Gate
 
@@ -419,7 +433,7 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 
 `cabrero daemon` is a long-running process managed by launchd:
 
-- **Polling** — checks for pending sessions every 2 minutes (configurable via `--poll`)
+- **Polling** — checks for queued sessions every 2 minutes (configurable via `--poll`)
 - **Stale recovery** — scans `~/.claude/projects/` every 30 minutes for sessions where
   hooks never fired (crashes). Imports sessions idle >24h with trigger `"stale-recovery"`
 - **Single instance** — PID file at `~/.cabrero/daemon.pid` prevents concurrent daemons
@@ -427,10 +441,11 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Error isolation** — failed sessions marked `status: "error"` to prevent infinite retry;
   use `cabrero run <id>` to retry manually
 - **Notifications** — macOS notification via `osascript` when new proposals are generated
+  and when queue processing completes
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (5 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
-- **Smart batching** — uses `pipeline.BatchProcessor` to group pending sessions by project,
+- **Smart batching** — uses `pipeline.BatchProcessor` to group queued sessions by project,
   run Classifier individually (cheap triage), then batch "evaluate" sessions into a single
   Evaluator call per project
 - **Evaluator tuning** — turn budgets and timeouts configurable via CLI flags
@@ -881,7 +896,7 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 
 **Phase 3 — Background daemon** ✓
 
-- `cabrero daemon` — polls for pending sessions, runs pipeline, macOS notifications
+- `cabrero daemon` — polls for queued sessions, runs pipeline, macOS notifications
 - Stale session recovery (crash scenarios where hooks never fired)
 - PID-based single instance, graceful shutdown, file logging with rotation
 - LaunchAgent plist template for auto-start on login
@@ -894,8 +909,8 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - `cabrero setup` — interactive wizard: prerequisite checks, store init,
   hook installation, CC registration, LaunchAgent, daemon start, PATH check,
   process existing sessions (Step 8: imports CC sessions in quiet mode, counts
-  pending, offers to backfill recent sessions with configurable lookback —
-  default 1 month, skippable)
+  imported, offers to enqueue recent sessions for background processing with
+  configurable lookback — default 1 month, skippable)
 - `cabrero update` — self-update from GitHub Releases with checksum verification
 - Hook scripts embedded in binary via `//go:embed`
 - `--yes` flag for scripted installs, `--dry-run` for preview

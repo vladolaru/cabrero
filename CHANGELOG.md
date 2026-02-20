@@ -12,16 +12,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `cabrero backfill` command to process existing sessions through the full
   pipeline with `--since`, `--until`, `--project`, `--retry-errors` filtering,
   preview with confirmation, and smart batching via `pipeline.BatchProcessor`.
-- Setup wizard Step 8: offers to import and process existing CC sessions after
-  installation (imports in quiet mode, counts pending, offers backfill with
-  configurable lookback — default 1 month, skippable).
+- Setup wizard Step 8: offers to import and enqueue existing CC sessions after
+  installation (imports in quiet mode, counts imported, offers to enqueue for
+  background processing with configurable lookback — default 1 month, skippable).
 - `store.QuerySessions` for filtered session queries by date range, project
   substring, and status. Returns oldest-first.
 - `pipeline.BatchProcessor` as shared smart batching infrastructure with
   configurable max batch size (default 10) and progress callbacks. Used by
   both daemon and backfill command.
+- `backfill --enqueue` flag to mark sessions as queued for background daemon
+  processing instead of running the pipeline synchronously.
+- `store.MarkQueued()` function for transitioning sessions to queued status.
+- Daemon notification when queue processing completes.
 
 ### Changed
+
+- Renamed session status `pending` to `queued` for hook-captured sessions.
+- Imported sessions now use `imported` status (not automatically processed
+  by daemon).
+- Daemon scanner simplified: filters on `queued` status only, no longer
+  checks capture trigger.
+- Setup wizard backfill step now uses `--enqueue` for non-blocking processing.
+- Doctor check updated: warns about sessions stuck in `queued` status >24h.
 
 - `cabrero import` now runs the pre-parser on each imported session to generate
   digests. `RunImport` function available for programmatic use (quiet mode).
