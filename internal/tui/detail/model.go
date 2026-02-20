@@ -101,3 +101,8 @@ func (m Model) SelectedCitationIndex() int {
 func (m Model) HasRevision() bool {
 	return m.revision != nil
 }
+
+// HasChatFocus returns true if the chat pane has focus.
+func (m Model) HasChatFocus() bool {
+	return m.focus == FocusChat
+}

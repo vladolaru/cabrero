@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/chat"
@@ -106,6 +107,17 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case message.ChatStreamToken, message.ChatStreamDone, message.ChatStreamError:
+		// Forward chat messages to the chat model.
+		if m.state == message.ViewProposalDetail {
+			var cmd tea.Cmd
+			m.chat, cmd = m.chat.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+		return m, tea.Batch(cmds...)
+
 	case message.RejectFinished, message.DeferFinished:
 		// Return to dashboard after action.
 		m.statusMsg = actionStatusText(msg)
@@ -152,6 +164,14 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
+		// Also forward to chat when it has focus.
+		if m.detail.HasChatFocus() {
+			var chatCmd tea.Cmd
+			m.chat, chatCmd = m.chat.Update(msg)
+			if chatCmd != nil {
+				cmds = append(cmds, chatCmd)
+			}
+		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -165,7 +185,14 @@ func (m reviewModel) View() string {
 	case message.ViewDashboard:
 		content = m.dashboard.View()
 	case message.ViewProposalDetail:
-		content = m.detail.View()
+		if m.width >= 120 && m.config.Detail.ChatPanelOpen {
+			// Wide mode: detail and chat side by side.
+			detailView := m.detail.View()
+			chatView := m.chat.View()
+			content = lipgloss.JoinHorizontal(lipgloss.Top, detailView, chatView)
+		} else {
+			content = m.detail.View()
+		}
 	}
 
 	// Help overlay.
