@@ -89,8 +89,8 @@ func TestRunImport(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if meta.Status != "pending" {
-			t.Errorf("Status = %q, want 'pending'", meta.Status)
+		if meta.Status != "imported" {
+			t.Errorf("Status = %q, want 'imported'", meta.Status)
 		}
 		if meta.CaptureTrigger != "imported" {
 			t.Errorf("CaptureTrigger = %q, want 'imported'", meta.CaptureTrigger)

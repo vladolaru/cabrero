@@ -53,13 +53,13 @@ func TestBuildBackfillFilter(t *testing.T) {
 		}
 	})
 
-	t.Run("default statuses is pending only", func(t *testing.T) {
+	t.Run("default statuses is imported only", func(t *testing.T) {
 		filter, err := buildBackfillFilter("", "", "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(filter.Statuses) != 1 || filter.Statuses[0] != "pending" {
-			t.Errorf("Statuses = %v, want [pending]", filter.Statuses)
+		if len(filter.Statuses) != 1 || filter.Statuses[0] != "imported" {
+			t.Errorf("Statuses = %v, want [imported]", filter.Statuses)
 		}
 	})
 
@@ -71,8 +71,8 @@ func TestBuildBackfillFilter(t *testing.T) {
 		if len(filter.Statuses) != 2 {
 			t.Fatalf("Statuses len = %d, want 2", len(filter.Statuses))
 		}
-		if filter.Statuses[0] != "pending" || filter.Statuses[1] != "error" {
-			t.Errorf("Statuses = %v, want [pending, error]", filter.Statuses)
+		if filter.Statuses[0] != "imported" || filter.Statuses[1] != "error" {
+			t.Errorf("Statuses = %v, want [imported, error]", filter.Statuses)
 		}
 	})
 

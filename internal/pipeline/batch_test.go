@@ -132,7 +132,7 @@ func createBatchSession(t *testing.T, sessionID string) BatchSession {
 		SessionID:      sessionID,
 		Timestamp:      time.Now().UTC().Format(time.RFC3339),
 		CaptureTrigger: "imported",
-		Status:         "pending",
+		Status:         "queued",
 	}
 	if err := store.WriteMetadata(rawDir, meta); err != nil {
 		t.Fatal(err)
