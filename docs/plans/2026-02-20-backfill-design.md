@@ -39,13 +39,13 @@ cabrero backfill [--since <date>] [--until <date>] [--project <slug>]
 | `--project` | all | Filter by project slug substring |
 | `--dry-run` | false | Show preview only |
 | `--yes` | false | Skip confirmation prompt |
-| `--reprocess` | false | Include sessions with status "error" (not just "pending") |
+| `--retry-errors` | false | Include sessions with status "error" (not just "pending") |
 | Pipeline flags | same as `cabrero run` | Override Classifier/Evaluator budgets |
 
 ### Session selection
 
 Backfill selects sessions from the store where:
-1. `status == "pending"` (always) OR `status == "error"` (if `--reprocess`)
+1. `status == "pending"` (always) OR `status == "error"` (if `--retry-errors`)
 2. `timestamp` within `[--since, --until]`
 3. `project` contains `--project` substring (if provided)
 
@@ -64,8 +64,9 @@ Shows number of matching sessions, project breakdown, estimated pipeline calls. 
    - Run Classifier individually on each session (Haiku, cheap)
    - `"clean"` sessions → mark `status: "processed"`, done
    - `"evaluate"` sessions → collect for batch Evaluator
-3. Run Evaluator batch per project (Sonnet, one invocation per project group)
-4. Persist results: evaluator output, proposals, update metadata status
+3. Chunk sessions needing evaluation into sub-batches of up to 10 sessions each (avoids hitting the Evaluator's 60-turn / 15-minute caps with large backlogs)
+4. Run Evaluator batch per chunk (Sonnet)
+5. Persist results: evaluator output, proposals, update metadata status
 
 Progress output shows per-session Classifier results and per-project Evaluator summaries. Final summary reports totals: processed, clean, evaluated, proposals generated, errors.
 
@@ -74,7 +75,7 @@ Progress output shows per-session Classifier results and per-project Evaluator s
 - Session fails at Classifier: mark `status: "error"`, log warning, continue
 - Evaluator batch fails: mark all sessions in batch as `"error"`, continue to next project
 - Final summary reports error count and session IDs
-- Failed sessions retried via `cabrero backfill --reprocess`
+- Failed sessions retried via `cabrero backfill --retry-errors`
 
 ### Daemon interaction
 
@@ -84,7 +85,7 @@ No conflict. Backfill marks sessions atomically. Daemon's next poll sees updated
 
 New Step 8 at end of `cabrero setup`:
 
-1. Run import inline (scan `~/.claude/projects/`, copy + pre-parse)
+1. Run import inline (scan `~/.claude/projects/`, copy + pre-parse) — suppress per-session output, show summary count only
 2. Count pending sessions in store
 3. If any found: ask "Process recent sessions? [Y/n]" and "How far back? (default: 1 month)"
 4. Run backfill inline with chosen date range
@@ -120,12 +121,13 @@ With `--yes`: defaults to 1 month, no prompts. With `--dry-run`: shows what woul
 // internal/pipeline/batch.go
 
 type BatchProcessor struct {
-    Config    PipelineConfig
-    OnStatus  func(sessionID string, event BatchEvent)
+    Config        PipelineConfig
+    MaxBatchSize  int  // max sessions per Evaluator invocation (default 10)
+    OnStatus      func(sessionID string, event BatchEvent)
 }
 
 type BatchEvent struct {
-    Type    string  // "classifier_done", "classifier_skip", "evaluator_done", "error"
+    Type    string  // "classifier_done", "evaluator_done", "error"
     Triage  string  // "clean" or "evaluate"
     Error   error
 }
@@ -166,5 +168,6 @@ func QuerySessions(filter SessionFilter) ([]Metadata, error)
 - **All processed**: "0 sessions to process." Exit 0 without prompting.
 - **Large backlog (100+)**: Preview shows count. User confirms. Progress keeps them informed.
 - **Ctrl+C**: Completed sessions keep results. Interrupted session stays pending/error. Re-run picks up where it left off.
-- **`--reprocess` + date filters**: Compose with AND. Error sessions outside date range excluded.
+- **`--retry-errors` + date filters**: Compose with AND. Error sessions outside date range excluded.
+- **Large project groups (20+ evaluate sessions)**: Chunked into sub-batches of 10 to stay within Evaluator caps.
 - **Import pre-parser failure**: Session imported to store, warning printed. Backfill's Classifier handles it or marks error.
