@@ -15,8 +15,9 @@ import (
 func newTestRoot() reviewModel {
 	proposals := testdata.TestProposals()
 	stats := testdata.TestDashboardStats()
+	sourceGroups := testdata.TestSourceGroups()
 	cfg := testdata.TestConfig()
-	return newReviewModel(proposals, stats, cfg)
+	return newReviewModel(proposals, stats, sourceGroups, cfg)
 }
 
 // update is a helper that calls Update and returns the concrete reviewModel.

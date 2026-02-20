@@ -9,13 +9,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/chat"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/dashboard"
 	"github.com/vladolaru/cabrero/internal/tui/detail"
+	fitness_tui "github.com/vladolaru/cabrero/internal/tui/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
+	"github.com/vladolaru/cabrero/internal/tui/sources"
 )
 
 // reviewModel is the root Bubble Tea model for the review TUI.
@@ -33,6 +36,11 @@ type reviewModel struct {
 	dashboard dashboard.Model
 	detail    detail.Model
 	chat      chat.Model
+	fitness   fitness_tui.Model
+	sources   sources.Model
+
+	// Source groups for re-use when pushing ViewSourceManager.
+	sourceGroups []fitness.SourceGroup
 
 	// Shared
 	help     help.Model
@@ -47,18 +55,19 @@ type reviewModel struct {
 }
 
 // newReviewModel creates the root model with loaded data.
-func newReviewModel(proposals []pipeline.ProposalWithSession, stats message.DashboardStats, cfg *shared.Config) reviewModel {
+func newReviewModel(proposals []pipeline.ProposalWithSession, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, cfg *shared.Config) reviewModel {
 	keys := shared.NewKeyMap(cfg.Navigation)
 	styles := shared.ThemeFromConfig(cfg)
 
 	m := reviewModel{
-		state:     message.ViewDashboard,
-		config:    cfg,
-		styles:    styles,
-		keys:      keys,
-		proposals: proposals,
-		help:      help.New(),
-		dashboard: dashboard.New(proposals, stats, &keys, cfg),
+		state:        message.ViewDashboard,
+		config:       cfg,
+		styles:       styles,
+		keys:         keys,
+		proposals:    proposals,
+		sourceGroups: sourceGroups,
+		help:         help.New(),
+		dashboard:    dashboard.New(proposals, stats, &keys, cfg),
 	}
 
 	return m
@@ -137,6 +146,46 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return message.StatusMessageExpired{}
 		}))
 		return m, tea.Batch(cmds...)
+
+	case message.DismissFinished:
+		if msg.Err != nil {
+			m.statusMsg = "Dismiss failed: " + msg.Err.Error()
+		} else {
+			m.statusMsg = "Report dismissed."
+		}
+		m.statusExpiry = time.Now().Add(3 * time.Second)
+		if m.state != message.ViewDashboard {
+			m2, cmd := m.popView()
+			cmds = append(cmds, cmd)
+			m = m2.(reviewModel)
+		}
+		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
+			return message.StatusMessageExpired{}
+		}))
+		return m, tea.Batch(cmds...)
+
+	case message.JumpToSources:
+		// Push the source manager view with a pre-selected source.
+		m.viewStack = append(m.viewStack, m.state)
+		m.state = message.ViewSourceManager
+		m.sources = sources.New(m.sourceGroups, &m.keys, m.config)
+		m.sources.SetSize(m.width, m.height)
+		if msg.SourceName != "" {
+			m.sources = m.sources.PreSelectSource(msg.SourceName)
+		}
+		return m, nil
+
+	case message.RollbackFinished:
+		if msg.Err != nil {
+			m.statusMsg = "Rollback failed: " + msg.Err.Error()
+		} else {
+			m.statusMsg = "Rollback complete."
+		}
+		m.statusExpiry = time.Now().Add(3 * time.Second)
+		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
+			return message.StatusMessageExpired{}
+		}))
+		return m, tea.Batch(cmds...)
 	}
 
 	// Route to active child.
@@ -159,6 +208,18 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if chatCmd != nil {
 			cmds = append(cmds, chatCmd)
 		}
+	case message.ViewFitnessDetail:
+		var cmd tea.Cmd
+		m.fitness, cmd = m.fitness.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case message.ViewSourceManager, message.ViewSourceDetail:
+		var cmd tea.Cmd
+		m.sources, cmd = m.sources.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -180,6 +241,10 @@ func (m reviewModel) View() string {
 		} else {
 			content = m.detail.View()
 		}
+	case message.ViewFitnessDetail:
+		content = m.fitness.View()
+	case message.ViewSourceManager, message.ViewSourceDetail:
+		content = m.sources.View()
 	}
 
 	// Help overlay.
@@ -260,6 +325,21 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 					cmds = append(cmds, cmd)
 				}
 			}
+		}
+
+	case message.ViewFitnessDetail:
+		// Initialize fitness detail from the selected report.
+		// For now, ViewFitnessDetail is not reachable from the dashboard
+		// (that wiring comes in Task 9). Create with nil report as placeholder.
+		m.fitness = fitness_tui.New(nil, &m.keys, m.config)
+		m.fitness.SetSize(m.width, m.height)
+
+	case message.ViewSourceManager:
+		// Initialize source manager with current source groups.
+		m.sources = sources.New(m.sourceGroups, &m.keys, m.config)
+		m.sources.SetSize(m.width, m.height)
+		if action != "" {
+			m.sources = m.sources.PreSelectSource(action)
 		}
 	}
 

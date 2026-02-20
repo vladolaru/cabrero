@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/vladolaru/cabrero/internal/daemon"
+	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
@@ -33,7 +34,10 @@ func Run() error {
 
 	stats := gatherStats()
 
-	m := newReviewModel(proposals, stats, cfg)
+	// Future: sourceGroups := fitness.ListSourceGroups(sources)
+	sourceGroups := []fitness.SourceGroup{}
+
+	m := newReviewModel(proposals, stats, sourceGroups, cfg)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
