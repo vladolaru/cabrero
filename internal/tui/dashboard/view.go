@@ -8,20 +8,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/vladolaru/cabrero/internal/tui/components"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 var (
-	headerStyle = lipgloss.NewStyle().Bold(true)
-	mutedStyle  = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"})
-	accentStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#6A1B9A", Dark: "#CE93D8"})
-	successStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#2E7D32", Dark: "#66BB6A"})
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#C62828", Dark: "#EF5350"})
-	selectedStyle = lipgloss.NewStyle().Bold(true).
-			Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"})
+	headerStyle   = lipgloss.NewStyle().Bold(true)
+	mutedStyle    = lipgloss.NewStyle().Foreground(shared.ColorMuted)
+	accentStyle   = lipgloss.NewStyle().Foreground(shared.ColorAccent)
+	successStyle  = lipgloss.NewStyle().Foreground(shared.ColorSuccess)
+	errorStyle    = lipgloss.NewStyle().Foreground(shared.ColorError)
+	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
 )
 
 // Type indicator characters.

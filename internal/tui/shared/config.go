@@ -8,12 +8,13 @@ import "encoding/json"
 // Config holds all TUI configuration. Stored at ~/.cabrero/config.json.
 // Missing fields get defaults. Unknown fields are preserved on roundtrip.
 type Config struct {
-	Navigation    string            `json:"navigation"`
-	Theme         string            `json:"theme"`
-	Dashboard     DashboardConfig   `json:"dashboard"`
-	Detail        DetailConfig      `json:"detail"`
-	Personality   PersonalityConfig `json:"personality"`
-	Confirmations ConfirmConfig     `json:"confirmations"`
+	Navigation    string              `json:"navigation"`
+	Theme         string              `json:"theme"`
+	Dashboard     DashboardConfig     `json:"dashboard"`
+	Detail        DetailConfig        `json:"detail"`
+	Personality   PersonalityConfig   `json:"personality"`
+	Confirmations ConfirmConfig       `json:"confirmations"`
+	SourceManager SourceManagerConfig `json:"sourceManager"`
 
 	// Extra preserves unknown JSON fields for forward compatibility.
 	Extra map[string]json.RawMessage `json:"-"`
@@ -37,6 +38,11 @@ type DetailConfig struct {
 type PersonalityConfig struct {
 	FlavorText bool `json:"flavorText"`
 	EasterEggs bool `json:"easterEggs"`
+}
+
+// SourceManagerConfig holds source manager view settings.
+type SourceManagerConfig struct {
+	GroupCollapsedDefault bool `json:"groupCollapsedDefault"`
 }
 
 // ConfirmConfig controls which actions require confirmation.
@@ -73,6 +79,9 @@ func DefaultConfig() *Config {
 			DeferRequiresConfirm:    false,
 			RetryRequiresConfirm:    true,
 			RollbackRequiresConfirm: true,
+		},
+		SourceManager: SourceManagerConfig{
+			GroupCollapsedDefault: false,
 		},
 	}
 }

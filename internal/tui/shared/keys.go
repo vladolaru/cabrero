@@ -40,6 +40,14 @@ type KeyMap struct {
 	Chip3       key.Binding
 	Chip4       key.Binding
 
+	// Fitness Report
+	Dismiss key.Binding
+
+	// Source Manager
+	ToggleApproach key.Binding
+	SetOwnership   key.Binding
+	Rollback       key.Binding
+
 	// Future views
 	Sources  key.Binding
 	Pipeline key.Binding
@@ -73,6 +81,14 @@ func NewKeyMap(nav string) KeyMap {
 		Chip2:       key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "chip 2")),
 		Chip3:       key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "chip 3")),
 		Chip4:       key.NewBinding(key.WithKeys("4"), key.WithHelp("4", "chip 4")),
+
+		// Fitness Report.
+		Dismiss: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "dismiss")),
+
+		// Source Manager.
+		ToggleApproach: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle mode")),
+		SetOwnership:   key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "ownership")),
+		Rollback:       key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "rollback")),
 
 		// Future views.
 		Sources:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sources")),
@@ -124,4 +140,14 @@ func (k KeyMap) DetailShortHelp() []key.Binding {
 	return []key.Binding{
 		k.Back, k.Approve, k.Reject, k.Defer, k.TabForward, k.Help,
 	}
+}
+
+// FitnessShortHelp returns help bindings for the fitness detail view.
+func (k KeyMap) FitnessShortHelp() []key.Binding {
+	return []key.Binding{k.Back, k.Dismiss, k.Sources, k.Chat, k.Help}
+}
+
+// SourcesShortHelp returns help bindings for the source manager view.
+func (k KeyMap) SourcesShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Open, k.ToggleApproach, k.SetOwnership, k.Help}
 }
