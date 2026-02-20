@@ -14,7 +14,7 @@ const sonnetPromptFile = "sonnet-evaluator-v2.txt"
 
 // RunSonnet constructs the prompt, invokes the Sonnet evaluator via the claude CLI,
 // validates the output, and returns the parsed result.
-func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput) (*SonnetOutput, error) {
+func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput, cfg PipelineConfig) (*SonnetOutput, error) {
 	systemPrompt, err := readPromptTemplate(sonnetPromptFile)
 	if err != nil {
 		return nil, fmt.Errorf("reading sonnet prompt: %w", err)

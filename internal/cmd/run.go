@@ -22,7 +22,7 @@ func Run(args []string) error {
 	sessionID := fs.Arg(0)
 	fmt.Printf("Running pipeline on session %s\n", sessionID)
 
-	result, err := pipeline.Run(sessionID, *dryRun)
+	result, err := pipeline.Run(sessionID, *dryRun, pipeline.DefaultPipelineConfig())
 	if err != nil {
 		return err
 	}

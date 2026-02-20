@@ -16,7 +16,7 @@ const haikuPromptFile = "haiku-classifier-v2.txt"
 // RunHaiku constructs the prompt, invokes the Haiku classifier via the claude CLI,
 // validates the output, and returns the parsed result.
 // The patterns parameter is optional cross-session aggregator output; pass nil if unavailable.
-func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput) (*HaikuOutput, error) {
+func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput, cfg PipelineConfig) (*HaikuOutput, error) {
 	systemPrompt, err := readPromptTemplate(haikuPromptFile)
 	if err != nil {
 		return nil, fmt.Errorf("reading haiku prompt: %w", err)

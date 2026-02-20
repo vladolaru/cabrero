@@ -15,11 +15,12 @@ import (
 
 // Config controls daemon timing and logging.
 type Config struct {
-	PollInterval      time.Duration // how often to check for pending sessions (default 2m)
-	StaleInterval     time.Duration // how often to scan for stale sessions (default 30m)
-	InterSessionDelay time.Duration // pause between processing sessions (default 30s)
-	LogPath           string        // path to daemon log file
-	LogMaxSize        int64         // max log file size before rotation (default 5MB)
+	PollInterval      time.Duration           // how often to check for pending sessions (default 2m)
+	StaleInterval     time.Duration           // how often to scan for stale sessions (default 30m)
+	InterSessionDelay time.Duration           // pause between processing sessions (default 30s)
+	LogPath           string                  // path to daemon log file
+	LogMaxSize        int64                   // max log file size before rotation (default 5MB)
+	Pipeline          pipeline.PipelineConfig // LLM invocation parameters
 }
 
 // DefaultConfig returns a Config with production defaults.
@@ -30,6 +31,7 @@ func DefaultConfig() Config {
 		InterSessionDelay: 30 * time.Second,
 		LogPath:           filepath.Join(store.Root(), "daemon.log"),
 		LogMaxSize:        0, // use logger default (5 MB)
+		Pipeline:          pipeline.DefaultPipelineConfig(),
 	}
 }
 
@@ -126,7 +128,7 @@ func (d *Daemon) processPending(ctx context.Context) {
 func (d *Daemon) processOne(sessionID string) {
 	d.log.Info("processing session %s", sessionID)
 
-	result, err := pipeline.Run(sessionID, false)
+	result, err := pipeline.Run(sessionID, false, d.config.Pipeline)
 	if err != nil {
 		d.log.Error("pipeline failed for %s: %v", sessionID, err)
 		d.markError(sessionID)

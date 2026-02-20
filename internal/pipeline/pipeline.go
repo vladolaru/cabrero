@@ -2,11 +2,30 @@ package pipeline
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/patterns"
 	"github.com/vladolaru/cabrero/internal/store"
 )
+
+// PipelineConfig controls LLM invocation parameters.
+type PipelineConfig struct {
+	HaikuMaxTurns  int
+	SonnetMaxTurns int
+	HaikuTimeout   time.Duration
+	SonnetTimeout  time.Duration
+}
+
+// DefaultPipelineConfig returns production defaults.
+func DefaultPipelineConfig() PipelineConfig {
+	return PipelineConfig{
+		HaikuMaxTurns:  15,
+		SonnetMaxTurns: 20,
+		HaikuTimeout:   2 * time.Minute,
+		SonnetTimeout:  5 * time.Minute,
+	}
+}
 
 // RunResult holds the outcome of a pipeline run.
 type RunResult struct {
@@ -19,7 +38,7 @@ type RunResult struct {
 
 // Run executes the full analysis pipeline for a session.
 // If dryRun is true, only the pre-parser runs (no LLM invocations).
-func Run(sessionID string, dryRun bool) (*RunResult, error) {
+func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) {
 	// Verify session exists.
 	if !store.SessionExists(sessionID) {
 		return nil, fmt.Errorf("session %s not found in store", sessionID)
@@ -70,7 +89,7 @@ func Run(sessionID string, dryRun bool) (*RunResult, error) {
 
 	// Step 2: Haiku classifier.
 	fmt.Println("  Running Haiku classifier...")
-	haikuOutput, err := RunHaiku(sessionID, digest, aggregatorOutput)
+	haikuOutput, err := RunHaiku(sessionID, digest, aggregatorOutput, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("haiku classifier failed: %w", err)
 	}
@@ -87,7 +106,7 @@ func Run(sessionID string, dryRun bool) (*RunResult, error) {
 
 	// Step 3: Sonnet evaluator.
 	fmt.Println("  Running Sonnet evaluator...")
-	sonnetOutput, err := RunSonnet(sessionID, digest, haikuOutput)
+	sonnetOutput, err := RunSonnet(sessionID, digest, haikuOutput, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("sonnet evaluator failed: %w", err)
 	}
