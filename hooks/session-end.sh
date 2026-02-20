@@ -59,7 +59,7 @@ cat > "${SESSION_DIR}/metadata.json" << METAEOF
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "capture_trigger": "${CAPTURE_TRIGGER}",
   "cc_version": "${CC_VERSION}",
-  "status": "pending"
+  "status": "queued"
 }
 METAEOF
 
