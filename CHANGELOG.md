@@ -7,6 +7,34 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Pipeline monitor view** — daemon health, recent runs with per-stage timing
+  breakdown (parse/classifier/evaluator), sparkline activity chart, prompt
+  version listing, inline run detail expansion, and retry flow with
+  configurable confirmation gate.
+- **Pipeline monitor daemon header** — uptime, poll/stale/delay intervals, store
+  metrics (path, session count, disk usage), and two-column layout at width >= 120.
+- **Log viewer view** — full-screen scrollable daemon log with incremental
+  search, match navigation (n/N), follow mode toggle, and auto-refresh via
+  polling.
+- **Log viewer search highlighting** — search matches highlighted with accent
+  color in the viewport using termenv styling.
+- **Log viewer two-stage Esc** — first Esc clears active search matches and
+  highlighting, second Esc navigates back to the pipeline monitor.
+- **PipelineRun data layer** — reconstructs pipeline run history from store
+  artifacts (session metadata, classifier/evaluator output files, timestamps)
+  without requiring a dedicated database.
+- **Sparkline component** — Unicode block-character sparkline renderer for
+  visualizing sessions-per-day activity in the pipeline monitor.
+- **Polling auto-refresh** — pipeline monitor refreshes every 5 seconds, log
+  viewer refreshes every 1 second when follow mode is active.
+- **PipelineConfig settings** — configurable sparkline days, recent runs limit,
+  and log follow mode default via `shared.Config`.
+- **Pipeline monitor responsive layout** — three-tier layout (wide/standard/narrow)
+  adapts daemon header density, activity stats format, sparkline visibility,
+  run row detail level, and prompt section visibility to terminal width.
+
 ## [0.7.0] - 2026-02-20
 
 ### Added
@@ -69,6 +97,39 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `*-classifier.json`, `*-sonnet.json` → `*-evaluator.json`.
 
 ### Added
+
+- **`cabrero review`** — interactive Bubble Tea TUI for reviewing proposals.
+  Dashboard shows proposal list with type indicators, confidence, and sort/filter.
+  Detail view renders colored unified diffs, rationale, and citation chains.
+  Stack-based navigation with configurable arrow or vim keybinding modes.
+
+- **AI chat panel** — streaming Evaluator integration via `claude` CLI for
+  interrogating proposals before deciding. Question chips for common queries,
+  revision detection via ` ```revision ` fenced blocks.
+
+- **`cabrero approve`** — non-interactive CLI command that reads a proposal,
+  invokes Claude to blend the change into the target file, shows a before/after
+  diff, and writes the file on confirmation.
+
+- **`cabrero reject`** — non-interactive CLI command that archives a proposal
+  with an optional rejection reason (`--reason "text"`).
+
+- **Fitness Report Detail view** — assessment bars showing three-bucket health
+  breakdown (followed/worked around/confused), expandable session evidence grouped
+  by category, dismiss and jump-to-sources actions. Fitness reports appear in the
+  dashboard with `◎` indicator alongside proposals.
+
+- **Source Manager** — grouped source list organized by origin (user, project,
+  plugin) with collapsible sections. Ownership classification, iterate/evaluate
+  approach toggles with confirmation gates, change history detail with rollback
+  support. Adaptive column layout for different terminal widths.
+
+- **Dashboard mixed item list** — unified list showing both proposals and fitness
+  reports. `s` keyboard shortcut opens Source Manager from dashboard.
+
+- **TUI configuration** — `~/.cabrero/config.json` with navigation mode,
+  theme, dashboard sort order, chat panel width, personality flavor text,
+  and per-action confirmation toggles. Partial configs merge with defaults.
 
 - **CLI flags** — `--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`,
   `--evaluator-timeout` on both `cabrero daemon` and `cabrero run` for tuning

@@ -1,0 +1,2 @@
+# Protect golden files from line-ending conversion.
+*.golden -text

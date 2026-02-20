@@ -33,9 +33,9 @@ Session ends  →  Capture  →  Parse  →  Classify  →  Evaluate  →  You a
 
 1. **Capture** — Hook scripts preserve your CC transcripts before compaction erases them. This is the foundation — if the raw data is gone, everything downstream is impossible.
 2. **Parse** — A fast code-only pass extracts structural signals: tool retries, error patterns, friction indicators, skill usage timing. No LLM calls here, just deterministic extraction.
-3. **Classify** — A lightweight model infers session goals and flags signals worth investigating, including patterns that recur across sessions.
-4. **Evaluate** — A capable model assesses skill performance and generates proposed improvements with full citation chains.
-5. **Approve** — You review every proposal, trace it back to the raw evidence, and decide.
+3. **Classify** — An agentic classifier (with Read/Grep access to raw session data) infers session goals, verifies ambiguous signals by reading raw turns, and triages sessions. Clean sessions skip the evaluator entirely — no wasted compute.
+4. **Evaluate** — An agentic evaluator (with unrestricted filesystem access) assesses skill performance against current file state and generates proposed improvements with full citation chains. Supports cross-session batching for richer context.
+5. **Approve** — You review every proposal in the interactive TUI, trace it back to the raw evidence, chat with an AI about it if needed, and decide.
 6. **Apply** — Approved changes are blended into your skill files naturally, preserving tone and structure.
 
 All AI calls go through the `claude` CLI — no separate API keys, no extra accounts. CC's existing auth is reused throughout.
@@ -58,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/vladolaru/cabrero/main/install.sh |
 cabrero setup
 ```
 
-The install script downloads a pre-built binary for your Mac (Apple Silicon or Intel). The setup wizard walks you through connecting everything — hooks, background daemon, PATH configuration. It shows what it'll do at each step and asks before making changes.
+The install script downloads a pre-built binary for your Mac (Apple Silicon or Intel). The setup wizard walks you through connecting everything — hooks, background daemon, PATH configuration. It shows what it'll do at each step and asks before making changes. Step 8 even imports your existing CC sessions and offers to queue recent ones for background processing.
 
 Or build from source if that's more your speed:
 
@@ -85,15 +85,57 @@ cabrero sessions    Browse captured sessions
 cabrero run         Run the analysis pipeline on a specific session
 cabrero proposals   See what Cabrero is suggesting
 cabrero inspect     Drill into a proposal with full evidence chain
+cabrero review      Interactive TUI for reviewing proposals (the good stuff)
+cabrero approve     Approve and apply a proposal (non-interactive)
+cabrero reject      Reject a proposal with optional reason
+cabrero backfill    Process existing sessions through the full pipeline
+cabrero doctor      Diagnose issues and auto-fix problems
 cabrero update      Self-update to the latest release
+cabrero uninstall   Clean removal of Cabrero from your system
 cabrero daemon      Background processor (managed by launchd)
 ```
 
-Run `cabrero help` for the full list.
+Run `cabrero help` for the full list with flags and options.
+
+## The Review TUI
+
+This is where most of the interaction happens. `cabrero review` launches an interactive terminal interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) that brings together everything the pipeline produces.
+
+### Dashboard
+
+The home screen. Shows pending proposals and fitness reports in a unified list with type indicators, confidence scores, and sort/filter controls. Keyboard-driven — arrow keys or vim bindings (configurable). Status bar shows daemon health, hook status, and store metrics at a glance.
+
+### Proposal detail
+
+Drill into any proposal to see the full picture: colored unified diffs of the proposed change, evaluator rationale, and the citation chain all the way back to raw session turns. From here you can approve, reject, or defer — or open the AI chat panel to ask questions first.
+
+### AI chat panel
+
+The detail view includes a streaming chat panel for interrogating proposals before you decide. This is scoped entirely to the current proposal — not a general-purpose chatbot. Question chips provide quick starting points ("Why was this flagged?", "Show me the turns where this broke down", "Make a more conservative version"). The chat can produce revised diffs via ` ```revision ``` ` blocks, which you can approve instead of the original.
+
+### Fitness reports
+
+For third-party plugins (evaluation mode), the TUI shows assessment bars with a three-bucket health breakdown: followed correctly, worked around, appeared to cause confusion. Session evidence is expandable by category. You can dismiss reports or jump directly to the Source Manager.
+
+### Source Manager
+
+Lists all discovered artifact sources grouped by origin (user-level, project, plugin) with collapsible sections. Toggle ownership classification and iterate/evaluate approach per source. Change history with rollback support — every change Cabrero has applied can be undone.
+
+### Pipeline monitor
+
+Daemon health at a glance: uptime, poll/stale/delay intervals, store metrics. Recent pipeline runs with per-stage timing breakdowns (parse → classify → evaluate). Sparkline activity chart shows sessions-per-day. Prompt version listing. Retry failed runs inline. Auto-refreshes every 5 seconds. Responsive layout adapts to terminal width — wide, standard, and narrow tiers.
+
+### Log viewer
+
+Full-screen scrollable view of the daemon log with incremental search, match highlighting, `n`/`N` navigation between matches, and follow mode that tails the log in real time. Two-stage Esc — first clears search, second navigates back.
+
+### Configuration
+
+All TUI settings live in `~/.cabrero/config.json`: navigation mode (arrows/vim), theme, dashboard sort order, chat panel width, personality flavor text, sparkline days, per-action confirmation toggles. Partial configs merge with defaults — set only what you want to change.
 
 ## Project status
 
-Active development. The capture layer, analysis pipeline, background daemon, and self-packaging are functional. The interactive review interface (approve/reject with TUI) and prompt iteration tooling are next.
+Active development. The capture layer, analysis pipeline, background daemon, self-packaging, and the full interactive review TUI are functional. The iteration tooling (prompt replay against past sessions, calibration sets) is next.
 
 If you are in a hurry, the [design document](DESIGN.md) has the full architecture and roadmap — all the layers, the LLM stack, cross-session pattern detection, the planned macOS menu bar app, and the prompt iteration system.
 
@@ -104,6 +146,7 @@ Cabrero builds on ideas and tools from across the ecosystem. Without wanting to 
 - **[Compound Engineering](https://every.to/source-code/compound-engineering-the-definitive-guide)** by Kieran Klaassen and the team at [Every](https://every.to/) — this is the big one. Their thesis: *each unit of engineering work should make subsequent units easier, not harder.* Where most codebases accumulate complexity over time, compound engineering flips the dynamic — features teach the system new capabilities, bug fixes eliminate entire categories of future bugs, patterns become tools. Every proved this works at scale, running multiple products with single-person engineering teams. Cabrero applies the same principle to the AI layer: every Claude Code session feeds lessons back into the skills that guide the next one. Their [compound engineering plugin](https://github.com/EveryInc/compound-engineering-plugin) for Claude Code is a related effort worth exploring.
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** by Anthropic — the AI coding agent that Cabrero observes and improves. Its hook system (`PreCompact`, `SessionEnd`) makes non-invasive capture possible without modifying CC itself. This is no small feat — the hooks are what make the entire approach viable.
 - **[SKILL.md convention](https://www.anthropic.com/engineering/claude-code-best-practices)** — Anthropic's approach to reusable, structured instructions for Claude. Cabrero treats these as the primary artifact to iterate on.
+- **[Bubble Tea](https://github.com/charmbracelet/bubbletea)** by Charm — the TUI framework powering the review interface. Mature, composable, and purpose-built for interactive terminal UIs. Along with [Lip Gloss](https://github.com/charmbracelet/lipgloss) for styling and [Bubbles](https://github.com/charmbracelet/bubbles) for standard components.
 - **Feedback loops in developer tooling** — inspired by how linters, type checkers, and test suites create tight loops between action and learning. Cabrero extends that pattern to the AI layer: your skills get the same continuous-improvement treatment your code does.
 - **[GoReleaser](https://goreleaser.com/)** — powers the cross-compilation and release automation.
 - **[Keep a Changelog](https://keepachangelog.com/)** and **[Conventional Commits](https://www.conventionalcommits.org/)** — the documentation and commit conventions this project follows.
