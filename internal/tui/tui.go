@@ -86,10 +86,45 @@ func gatherStats(proposals []pipeline.ProposalWithSession) message.DashboardStat
 	stats.DaemonRunning = alive
 	stats.DaemonPID = pid
 
+	// Daemon start time from PID file modtime.
+	if alive {
+		pidPath := filepath.Join(store.Root(), "daemon.pid")
+		if info, err := os.Stat(pidPath); err == nil {
+			t := info.ModTime()
+			stats.DaemonStartTime = &t
+		}
+	}
+
+	// Daemon intervals from compile-time defaults.
+	defaults := daemon.DefaultConfig()
+	stats.PollInterval = defaults.PollInterval
+	stats.StaleInterval = defaults.StaleInterval
+	stats.InterSessionDelay = defaults.InterSessionDelay
+
+	// Store metrics.
+	stats.StorePath = store.Root()
+	stats.SessionCount = len(sessions)
+	stats.DiskBytes = storeDiskBytes(store.Root())
+
 	// Hook status.
 	stats.HookPreCompact, stats.HookSessionEnd = checkHookStatus()
 
 	return stats
+}
+
+// storeDiskBytes returns the total size of all files under the given directory.
+func storeDiskBytes(root string) int64 {
+	var total int64
+	_ = filepath.WalkDir(root, func(_ string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if info, err := d.Info(); err == nil {
+			total += info.Size()
+		}
+		return nil
+	})
+	return total
 }
 
 // checkHookStatus reads Claude Code settings to determine hook installation status.

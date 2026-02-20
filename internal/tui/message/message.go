@@ -43,6 +43,17 @@ type DashboardStats struct {
 	HookSessionEnd bool
 
 	LastCaptureTime *time.Time
+
+	// Daemon metadata
+	DaemonStartTime   *time.Time    // nil if not running; from PID file modtime
+	PollInterval      time.Duration // 0 if unknown
+	StaleInterval     time.Duration
+	InterSessionDelay time.Duration
+
+	// Store metrics
+	StorePath    string
+	SessionCount int
+	DiskBytes    int64 // total size of store directory
 }
 
 // Review action messages.

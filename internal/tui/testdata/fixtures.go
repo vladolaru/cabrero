@@ -90,6 +90,7 @@ trigger: when working with git branches and commits
 // TestDashboardStats returns realistic dashboard statistics.
 func TestDashboardStats() message.DashboardStats {
 	t := time.Now().Add(-12 * time.Minute)
+	startTime := time.Now().Add(-3*24*time.Hour - 14*time.Hour - 22*time.Minute)
 	return message.DashboardStats{
 		PendingCount:  3,
 		ApprovedCount: 7,
@@ -102,6 +103,15 @@ func TestDashboardStats() message.DashboardStats {
 		HookSessionEnd: true,
 
 		LastCaptureTime: &t,
+
+		DaemonStartTime:   &startTime,
+		PollInterval:      2 * time.Minute,
+		StaleInterval:     30 * time.Minute,
+		InterSessionDelay: 30 * time.Second,
+
+		StorePath:    "/home/test/.cabrero",
+		SessionCount: 18,
+		DiskBytes:    297_795_584, // ~284 MB
 	}
 }
 
