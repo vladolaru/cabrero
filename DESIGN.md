@@ -1,0 +1,745 @@
+# Cabrero — CC Auto-Improvement System
+
+## What This Is
+
+**Cabrero** is a macOS background process that observes Claude Code sessions, extracts behavioral
+signals, and proposes improvements to SKILL.md files — with human approval before any changes land.
+Runs detached from CC sessions via launchd. No modifications to CC itself.
+
+Named after the Spanish word for goatherd — the one who tends and guides the goats, keeping insights
+from scattering. A quiet authority that makes the whole system work.
+
+**Repository:** https://github.com/vladolaru/cabrero
+
+**The goal is to automate compound engineering** — every CC session makes the next one better.
+Skills improve from real usage patterns, not manual curation. Over time, the system accumulates
+a continuously refined knowledge base that compounds across all future sessions.
+
+### Scope
+
+Cabrero tracks and improves three artifact types across all sources:
+- **Skills** — SKILL.md files loaded by CC sessions
+- **Commands** — custom slash commands
+- **Agents** — sub-agent definitions
+- **CLAUDE.md hierarchy** — project and user-level memory files (distinct proposal types, see below)
+
+---
+
+## Source Registry
+
+Artifacts come from multiple sources with different ownership and therefore different
+pipeline approaches. Cabrero maintains a source registry:
+
+```
+user-level skills/commands/agents   → owned → ITERATE
+project-level skills/commands/agents → owned → ITERATE
+my-plugins/*                        → owned → ITERATE
+third-party-plugins/*               → not owned → EVALUATE
+```
+
+**ITERATE** — pipeline produces skill diffs for human approval. The goal is improvement.
+
+**EVALUATE** — pipeline produces fitness assessments. No diffs. The goal is to determine
+whether the source is helping or creating friction, informing whether to keep, replace,
+or supplement it.
+
+### Fitness Reports (EVALUATE mode output)
+
+Instead of a proposed diff, the evaluator produces a fitness report:
+
+```
+PLUGIN: some-third-party-plugin
+SKILL:  docx-helper
+─────────────────────────────────
+Observed in: 14 sessions
+Followed correctly: 5
+Worked around: 6
+Appeared to cause confusion: 3
+
+ASSESSMENT: Low fitness for your workflow.
+Consider replacing or supplementing with a user-level skill.
+```
+
+Fitness reports appear in the Cabrero Review App as a distinct item type alongside proposals.
+
+### New Source Discovery
+
+When Cabrero encounters a source it hasn't seen before, it pauses processing for that
+source and prompts the user to classify it in the Source Manager before proceeding.
+
+---
+
+## CLAUDE.md Pipeline
+
+CLAUDE.md files are memory and steering, not instructions. They go wrong differently
+than SKILL.md files, and require a distinct pipeline treatment.
+
+### How CLAUDE.md files degrade
+
+- **Drift** — entries added months ago that no longer reflect how the project works
+- **Contradiction** — two entries pulling behavior in opposite directions
+- **Over-specification** — so many rules that CC spends cognitive overhead navigating
+  them rather than working
+- **Silent misfires** — an entry is steering CC away from something that would actually
+  be right, visible only as repeated workarounds across sessions
+
+### Signal the evaluator looks for
+
+For SKILL.md the evaluator looks for a skill being read but not helping. For CLAUDE.md
+it looks for CC *ignoring or working around* something that should be in memory, or
+*following* an instruction that produced friction across multiple sessions. The raw
+turn pattern is different — not "skill loaded but bypassed" but "correction repeated
+despite persistent context."
+
+### Two proposal sub-types
+
+**Review flag** — an existing entry may be causing friction. The evaluator surfaces the
+entry, the sessions where it appeared to misfire, and a brief assessment. No diff is
+proposed. The human decides whether to edit, remove, or leave it — CLAUDE.md content
+is too project-specific for the evaluator to rewrite safely.
+
+```
+CLAUDE.md REVIEW FLAG
+Entry:    "Always use the legacy checkout flow for card payments"
+─────────────────────────────────────────────────────────────────
+Observed in: 8 sessions
+Appeared to cause friction: 5
+Pattern: CC followed this instruction but workaround was applied afterward in 4 of 5 cases
+
+ASSESSMENT: Entry may no longer reflect current project direction.
+Review and edit or remove as appropriate.
+```
+
+**Addition proposal** — a repeated correction pattern suggests something worth making
+permanent. If the evaluator sees you correcting the same thing across three or more
+sessions, it proposes a new CLAUDE.md entry. This *is* a diff proposal, same flow as
+SKILL.md: human sees the proposed addition and the sessions that motivated it, approves
+or rejects, CLI blends it in if approved.
+
+### What the evaluator does not do
+
+The evaluator never proposes rewrites of existing CLAUDE.md entries — only flags them
+for human review. The addition proposal path is the only case where it generates new
+content. This keeps the human in control of steering decisions while automating the
+pattern recognition that surfaces when steering may have gone wrong.
+
+
+
+## Architecture
+
+### Capture Layer (event-driven)
+
+Three-tier hierarchy, in priority order:
+
+1. **`PreCompact` hook** — fires before CC writes a compaction boundary. Receives `transcript_path`,
+   `trigger` (auto/manual), `session_id` via stdin JSON. Copies raw JSONL to backup store immediately.
+   Note: compaction appends a boundary marker to the existing file rather than rewriting it —
+   pre-boundary entries remain physically on disk but become invisible to CC's runtime.
+
+2. **`SessionEnd` hook** — fires on normal session close. Final backup + queues session for
+   analysis pipeline.
+
+3. **Daemon stale scan** — crash/kill recovery. Periodic walk of `~/.claude/projects/`
+   for session files not in the store and idle >24h. Recovers sessions where hooks never
+   fired (e.g. process killed, machine crash).
+
+Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessions).
+`/clear` does NOT delete JSONL — it starts a new session with a new UUID, so no special handling needed.
+
+### Raw Backup Store
+
+```
+~/.cabrero/
+  raw/
+    {sessionId}/
+      transcript.jsonl       # copied verbatim from CC session
+      metadata.json          # session_id, timestamp, capture_trigger, cc_version, status, project
+  digests/
+    {sessionId}.json         # pre-parser output (structured digest)
+  evaluations/
+    {sessionId}-haiku.json   # Haiku classification output
+    {sessionId}-sonnet.json  # Sonnet evaluator output
+  proposals/
+    {proposalId}.json        # improvement proposals awaiting human approval
+  prompts/
+    haiku-classifier-v2.txt  # Haiku stage prompt (versioned, v2 adds friction + patterns)
+    sonnet-evaluator-v2.txt  # Sonnet stage prompt (versioned, v2 adds skill_scaffold)
+  blocklist.json             # session IDs to never process (loop prevention)
+  daemon.log                 # background daemon log (rotated, 5MB × 3)
+  daemon.pid                 # PID file for single-instance enforcement
+```
+
+**Rules:** immutable writes on raw backups. Configurable retention (e.g. 90 days raw,
+indefinite digests). CC version captured at copy time for schema drift detection.
+
+### JSONL Structure (key facts)
+
+Each line is a JSON entry with: `type`, `message`, `uuid`, `parentUuid`, `sessionId`, `timestamp`.
+Sub-agents get their own `agent-{shortId}.jsonl` files linked via `parentUuid`.
+Compaction appends `compact_boundary` markers inline — prior entries remain in the file.
+
+### Analysis Pipeline
+
+```
+SessionEnd hook fires → transcript + metadata written to store
+        ↓
+Daemon picks up pending session (status: "pending", trigger contains "session-end")
+        ↓
+Pre-parser (pure code, fast) → structured digest with citations + friction signals
+        ↓
+Pattern aggregator (pure code) → cross-session recurring patterns (if 3+ project sessions)
+        ↓
+claude --model haiku  (goal inference, error classification, key turn selection,
+                       pattern assessment if cross-session data available)
+        ↓
+claude --model sonnet (skill performance assessment, proposal generation,
+                       skill_scaffold proposals for recurring patterns)
+        ↓
+macOS notification if proposals generated
+        ↓
+Human approval gate
+        ↓
+claude --model sonnet (blends approved change into SKILL.md via writing skill)
+```
+
+All LLM calls are mediated by the `claude` CLI using `--model` to select the right model
+per stage. No API keys in the app — CC's existing auth is reused throughout. The daemon
+sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
+
+**Trigger:** session-end, not every file write. The daemon only processes sessions where
+`capture_trigger` contains `"session-end"` (session is complete). PreCompact-only sessions
+wait until session-end fires.
+
+### Pre-Parser (pure code, no LLM)
+
+Defensive design: skip anything ambiguous, leave nulls for Haiku to fill, validate
+JSONL line-by-line, preserve unknown entry types in `raw_unknown` bucket.
+
+Extracts deterministically:
+- Session shape: duration, turn count, token usage, cache hit ratio, compaction count
+- Sub-agent inventory: count, depth, abandoned agents (JSONL exists but result unreferenced)
+- Tool call summary: per-tool counts with error attribution, retry anomalies (same tool,
+  near-identical inputs, tight window)
+- Friction signals: soft failures beyond hard errors — empty search results (Grep/Glob
+  returning nothing), search fumbles (3+ distinct search inputs in 60s), backtracking
+  (returning to a file after 3+ intervening file accesses)
+- Skill usage: which SKILL.md files read (view calls on /mnt/skills/ paths), timing relative
+  to first relevant tool call (read-before vs read-after)
+- Error signals: tool_result entries with is_error=true, attributed to tool names via
+  tool_use_id → tool_name mapping
+- Completion signals: todos checked off vs open, git diff presence
+- Compaction segments: boundary markers parsed, each segment labeled
+
+Every digest entry references source by `uuid` + `sessionId`. No inference at parse time.
+Output explicitly distinguishes extracted fields from skipped/null fields.
+
+### Retrieval Interface (shared across all layers)
+
+All layers (pre-parser, Haiku, evaluator) can reach back to raw JSONL:
+
+```
+get_entry(session_id, uuid) → raw JSONL line
+get_turns(session_id, uuid_list) → ordered raw entries
+get_agent_transcript(agent_short_id) → full agent JSONL
+get_session_range(session_id, from_uuid, to_uuid) → slice
+```
+
+Full citation chain: every Haiku classification and evaluator finding cites the UUIDs
+it's based on. Skill proposals trace back through evaluator → Haiku → pre-parser → raw entries.
+
+### LLM Stack
+
+All models invoked via `claude --model <model> --print`. CC's existing authentication
+is reused — no separate API key management.
+
+- **Haiku** (`claude-haiku-4-5`) — classifier: goal inference, error classification,
+  key turn selection, skill/CLAUDE.md signal assessment, cross-session pattern assessment.
+  Runs per session. Receives digest + optional cross-session patterns.
+- **Sonnet** (`claude-sonnet-4-6`) — evaluator: skill performance assessment and
+  proposal generation (including `skill_scaffold` proposals for recurring patterns)
+  with `--effort high`. Receives structured digest + Haiku output, not raw JSONL.
+  Validates citations against retrieval layer.
+- **Sonnet** — apply: blends approved changes into SKILL.md using the writing skill.
+  Runs on approval only — infrequent, quality-critical.
+- **Sonnet** — chat: interactive proposal interrogation in the Review App. Latency-
+  sensitive; Sonnet is fast enough to feel conversational.
+
+### Cross-Session Pattern Aggregation
+
+The pipeline processes sessions in isolation, but some inefficiencies only become visible
+across sessions. The pattern aggregator runs between the pre-parser and Haiku, detecting
+recurring friction by comparing the current session's digest against recent sessions in
+the same project.
+
+**How it works:**
+1. Loads digests from the most recent 20 sessions in the same project (30-day window)
+2. Requires at least 3 sessions with digests to detect patterns
+3. Computes project-wide baseline error rates per tool
+4. Detects two pattern types:
+   - **correction_pattern** — the same error (normalized snippet) recurring in 3+ sessions
+   - **error_prone_sequence** — a tool with error rate >2× the project baseline across 3+ sessions
+5. Error anchoring: only emits patterns backed by actual errors or friction — no patterns
+   from repetition alone
+
+**Context budget:** Aggregator output is ~200–500 tokens (pre-filtered in code, limited to
+top 5 patterns). Haiku classifies each pattern as "confirmed", "coincidental", or "resolved"
+(~300 tokens added to Haiku output). Sonnet sees Haiku's assessment, never the raw
+cross-session data.
+
+**Graceful degradation:** No project metadata → aggregator skipped. Fewer than 3 sessions →
+returns nil. Aggregator error → non-fatal warning, pipeline continues without cross-session
+context.
+
+### Human Approval Gate
+
+All SKILL.md modifications require explicit approval before writing. Gate shows full
+citation chain (proposal → evaluator reasoning → Haiku classification → raw turns).
+Implementation TBD: menu bar app, Raycast extension, or simple TUI.
+
+### Background Daemon
+
+`cabrero daemon` is a long-running process managed by launchd:
+
+- **Polling** — checks for pending sessions every 2 minutes (configurable via `--poll`)
+- **Stale recovery** — scans `~/.claude/projects/` every 30 minutes for sessions where
+  hooks never fired (crashes). Imports sessions idle >24h with trigger `"stale-recovery"`
+- **Single instance** — PID file at `~/.cabrero/daemon.pid` prevents concurrent daemons
+- **Rate limiting** — 30-second delay between processing sessions (configurable via `--delay`)
+- **Error isolation** — failed sessions marked `status: "error"` to prevent infinite retry;
+  use `cabrero run <id>` to retry manually
+- **Notifications** — macOS notification via `osascript` when new proposals are generated
+- **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
+  (5 MB × 3 files)
+- **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
+
+LaunchAgent plist template at `launchd/com.cabrero.daemon.plist` with `KeepAlive`,
+`RunAtLoad`, low-priority I/O, and `Nice: 10`.
+
+---
+
+---
+
+---
+
+## Iteration & Prompt Management
+
+Cabrero cannot auto-improve its own pipeline prompts — those files live outside monitored
+skill paths by design. Iteration is deliberate, not automatic, which is appropriate:
+these prompts shape everything the system proposes, and changes to them deserve the same
+care as changes to any critical configuration.
+
+### Prompt files as first-class artifacts
+
+Each pipeline stage's prompt is a named file in `~/.cabrero/prompts/` with a version
+header and a short changelog:
+
+```
+~/.cabrero/prompts/
+  haiku-classifier-v3.txt
+  opus-evaluator-v5.txt
+  opus-apply-v2.txt
+```
+
+Editing a file and bumping the version is all it takes to deploy a change — the next
+pipeline run picks it up. The version is recorded in every evaluation output, so you
+always know which prompt produced which proposal.
+
+### The evaluations store as feedback signal
+
+Every rejected proposal is a calibration data point. If you're consistently rejecting
+a certain type of proposal — too aggressive, wrong scope, misreading the signal — that
+pattern is visible in the rejections store. The reasons you write when rejecting are
+the clearest signal you have for what the evaluator prompt is getting wrong.
+
+### Replay mode
+
+The key capability for prompt iteration. Given a past session already in the backup
+store, re-run the pipeline with a new prompt and compare its output against the original
+output and your actual approval or rejection at the time:
+
+```bash
+cabrero replay --session abc123 --prompt prompts/opus-evaluator-v6.txt
+```
+
+This is a CLI command — see the Cabrero CLI section.
+
+Output shows: old proposal, new proposal, your actual decision. Ground truth comes for
+free from your own decision history. Across a handful of sessions you can see
+immediately whether a new prompt is better calibrated to your judgment before deploying
+it.
+
+### Calibration set
+
+As proposals accumulate, tag a small set as canonical examples — clear approvals, clear
+rejections, instructive edge cases. Any new prompt candidate runs against the calibration
+set before deployment. No infrastructure required: replay mode over a fixed session list
+is sufficient.
+
+The iteration loop: notice rejection pattern → adjust prompt file → replay against
+calibration set → deploy if output looks right.
+
+## Loop Prevention
+
+When Cabrero invokes `claude`, those CLI calls produce their own session transcripts in
+`~/.claude/projects/`. Without explicit filtering, the capture layer would pick them up,
+analyze Cabrero's own sessions, generate proposals about how Cabrero prompts models, and
+apply them — the system improving its own internals unsupervised.
+
+Three layers of defense, each independent:
+
+**Environment variable sentinel.** Every Cabrero CLI invocation sets a marker:
+
+```bash
+CABRERO_SESSION=1 claude --model opus --print < apply_prompt.txt
+```
+
+The `SessionEnd` hook reads its own environment and exits immediately if the marker is
+present:
+
+```bash
+if [ "${CABRERO_SESSION}" = "1" ]; then
+  exit 0
+fi
+```
+
+**Session ID blocklist.** Cabrero records the session ID of every CLI process it spawns.
+The capture layer checks incoming session IDs against this blocklist before processing.
+Independent of the env var — a second structural filter that doesn't rely on hook behavior.
+
+**Skill path restriction.** Cabrero's internal prompts and any operational files are
+stored outside all monitored skill paths — not in `~/.claude/` or any project skill
+directory. Even if a session slipped through both filters, there would be no actionable
+skill to propose changes to.
+
+The env var approach handles the common case cleanly. The blocklist and path restriction
+make the guarantee structural rather than behavioral.
+
+## Key Design Principles
+
+- Hooks are the primary capture mechanism, daemon stale scan is the safety net
+- Raw backups are immutable and always written first
+- Pre-parser is dumb and fast — no inference, explicit about what it skipped
+- AI layers are protected from noise: Haiku sees digests, Sonnet sees curated digests + Haiku output
+- Full traceability from proposal back to raw JSONL at every layer
+- Schema versioning from day one — CC JSONL format is undocumented and can change
+- Cabrero's own CLI sessions are never analyzed — env var sentinel, session ID blocklist, and skill path restriction work in concert
+- Failed sessions are marked "error" not retried infinitely — human reviews via `cabrero run`
+
+---
+
+---
+
+## Cabrero CLI
+
+The CLI is built first. It provides full control over the pipeline from the terminal,
+enabling every stage to be exercised and tested before the SwiftUI app exists. The app
+is a UI layer over a system that already works — not a dependency of it.
+
+### Build order
+
+1. **CLI** — capture, backup, pre-parser, pipeline stages, replay, inspection, apply
+2. **App** — reads the same `~/.cabrero/` store the CLI writes; approval workflow and
+   notifications built on top of a proven foundation
+
+### Implementation
+
+**Go binary with Bubble Tea.** A self-contained compiled binary with no runtime
+dependencies — install it and it works, same distribution story as any well-built CLI
+tool. Bubble Tea is the right TUI library for the review interface: mature, composable,
+and purpose-built for exactly this kind of interactive terminal UI.
+
+Claude Code itself is TypeScript/JavaScript — a single heavily obfuscated 20MB bundle
+distributed via npm. Community deobfuscations exist if CC internals are ever worth
+referencing, but the language difference doesn't matter here. Go's single binary
+compilation is cleaner for a personal tool: no Node runtime assumption, no npm install,
+just a binary in PATH.
+
+Lives at `~/.cabrero/bin/cabrero`, added to PATH on install.
+
+### Subcommands
+
+```
+cabrero run <session_id>        Run the full pipeline on a session
+cabrero sessions                List captured sessions with status (processed/pending/error)
+cabrero status                  Show pipeline health: sessions, daemon, hooks
+cabrero proposals               List pending proposals
+cabrero inspect <proposal_id>   Show full proposal with citation chain
+cabrero approve <proposal_id>   Approve and apply a proposal (same flow as app)
+cabrero reject <proposal_id>    Reject with optional reason
+cabrero import [--from <path>]  Seed store from existing CC session files
+cabrero daemon                  Run background session processor (for launchd)
+  --poll <duration>               Pending session check interval (default 2m)
+  --stale <duration>              Stale session scan interval (default 30m)
+  --delay <duration>              Pause between processing sessions (default 30s)
+cabrero replay                  Re-run pipeline with a different prompt against a past session
+  --session <id>
+  --prompt <path>
+  --compare                     Diff new output against original and show your decision
+cabrero prompts                 List prompt files with current versions
+```
+
+### Separation of concerns
+
+The app handles the approval workflow with richer UI — diffs, AI chat, side-by-side
+comparison. The CLI handles operating and debugging the system itself — pipeline
+execution, prompt iteration, batch operations, inspection. Both read and write the same
+`~/.cabrero/` store; there is no duplication of state.
+
+## macOS UI — Cabrero Review App
+
+### Form Factor
+
+Menu bar app (no dock icon). Cabrero lives quietly in the background.
+Badge on menu bar icon shows count of pending proposals.
+Clicking opens the main Review Window.
+
+### Menu Bar States
+
+- **No badge** — nothing pending, pipeline idle
+- **Badge (n)** — n proposals awaiting approval
+- **Spinner** — pipeline actively processing a session
+
+### Main Review Window — Pipeline View
+
+A vertically scrollable list of pending learnings, each showing:
+
+```
+[ SKILL: docx ]  Session: 2h ago  Signal: retry anomaly (3x)
+  raw → parsed → classified → evaluated → ● AWAITING APPROVAL
+  [Approve]  [Reject]  [Defer]  [→ Details]
+```
+
+Each item displays:
+- Which skill is affected
+- Session age and duration
+- Signal type that triggered it (retry anomaly, skill read late, sub-agent failure, etc.)
+- Pipeline stage indicator (where it currently sits in the chain)
+- Quick actions inline: Approve / Reject / Defer without opening details
+
+### Detail View (drill-down)
+
+Full citation chain, navigable top-to-bottom:
+
+```
+PROPOSED DIFF
+─────────────
++ Added step: read SKILL.md before first write tool call
+- Removed: redundant re-read pattern
+
+EVALUATOR REASONING
+───────────────────
+"Skill was read after 3 write attempts in session abc123.
+ Pattern observed across 2 sessions in the past 7 days."
+
+HAIKU CLASSIFICATION
+────────────────────
+Goal inferred: "Create a formatted Word report"
+Signal: skill read at turn 18, first write at turn 9
+Confidence: high
+
+RAW SESSION TURNS  [↗ open in viewer]
+────────────────────────────────────
+Turn 9:  [tool_use] write → report.docx
+Turn 12: [tool_use] write → report.docx (retry)
+Turn 15: [tool_use] write → report.docx (retry)
+Turn 18: [tool_use] view → /mnt/skills/public/docx/SKILL.md
+```
+
+Raw turns are readable inline. "Open in viewer" link opens the full session
+JSONL in a dedicated session browser (separate lightweight window).
+
+Diffs render as actual colored diffs — red/green, line numbers — not code blocks.
+Raw turns cited by the AI are expandable inline without leaving the view.
+
+### AI Chat Integration
+
+The detail view includes an AI chat panel for interrogating proposals you want to
+understand before deciding. This is not a general-purpose chatbot — it is scoped
+entirely to the current proposal.
+
+**Cold start** — the panel never opens blank. Haiku generates 3–4 proposal-specific
+question chips as part of its evaluation output, e.g.:
+
+```
+Why was this flagged?
+Show me the turns where this broke down
+Make a more conservative version
+What's the risk of approving this?
+```
+
+Tapping a chip sends it immediately. Writing your own question is always available.
+
+**What the model can do:**
+- Explain the evaluator's reasoning in plain terms
+- Retrieve and display specific raw turns on demand (via tool call into the retrieval interface — it doesn't guess, it fetches)
+- Produce a revised diff if you ask for a modification ("make this a suggestion, not a rule")
+- Assess risk of approving or rejecting
+
+**Revised diffs** produced in chat render immediately as a visual diff alongside the
+original. You can approve the revision or the original — both are tracked. Provenance
+record shows: evaluator diff → chat modification → approved revision.
+
+**Implementation:** The `claude` CLI is invoked directly — no separate API key, no
+extra auth. CC's existing authentication is reused. The citation chain for the current
+proposal is injected as the system context. Responses stream via stdout capture from the
+spawned process. No server, no network dependency beyond what CC already has.
+
+**Approve / Reject / Defer buttons remain visible at all times during chat.** The
+conversation sharpens judgment; it does not replace the decision.
+
+### Applying Changes
+
+All changes are applied by invoking the `claude` CLI rather than patching files directly.
+This means the SKILL.md writing skill is loaded at apply time, so changes blend into the
+existing document — matching its tone, structure, and conventions — rather than landing
+as a foreign patch.
+
+The apply flow on approval:
+
+```
+User approves proposal
+        ↓
+App invokes claude CLI with:
+  - SKILL.md writing skill loaded
+  - Current SKILL.md content
+  - Proposed change and its rationale
+  - Instruction to blend the change in, preserving style and structure
+        ↓
+Claude writes the updated file
+        ↓
+App shows before/after diff for final confirmation
+        ↓
+User confirms → change committed
+User rejects  → file untouched, back to proposal
+```
+
+The final confirmation step matters because Claude is blending, not applying verbatim —
+you see what it actually produced before anything is locked in.
+
+This also means the system compounds at two levels: as the SKILL.md writing skill itself
+improves over time (via Cabrero), the quality of how Cabrero writes its own changes
+improves with it.
+
+Three scenarios:
+
+**Approve original** — the evaluator's proposed change is handed to the CLI alongside
+the current file. Claude blends it in and writes the result. Backup of the previous state
+is written first. Before the write is committed, the app shows the full diff for
+confirmation.
+
+**Approve chat-revised change** — the revision produced during chat is stored as a
+distinct proposal version alongside the original. Same CLI-mediated apply process. Full
+provenance trail: evaluator proposal → chat revision → approved result.
+
+**Reject with reason** — the rejection reason is written back to the evaluations store
+and fed to the evaluator as calibration signal over time. Consistent rejection patterns
+raise the bar for future proposals of the same type.
+
+**Rollback** — every approved change stores the previous SKILL.md verbatim as a rollback
+entry. The Source Manager shows recent changes per skill with one-click revert. Any
+change Cabrero has ever applied can be undone without digging through git history.
+
+### File System Access
+
+Cabrero runs as your user and has standard read/write access to your home directory —
+including `~/.claude/` and wherever skills live. No special permissions, no sandboxing
+issues for a directly distributed or locally built app.
+
+**App Store distribution would break this.** Apple's sandbox restricts arbitrary file
+system writes. Since Cabrero is a personal developer tool, direct distribution (or just
+building and running locally) is the right call. App Store is not a target.
+
+**First-write confirmation** — before writing to any SKILL.md for the first time, the
+app shows the exact target path and asks for confirmation. After that initial
+confirmation per skill, subsequent approved proposals write without additional prompts.
+This ensures there is never ambiguity about which copy of a skill is being patched.
+
+### Actions
+
+- **Approve** — applies the diff (original or chat-revised) to the target SKILL.md
+- **Reject** — discards proposal, optionally prompts for a short rejection reason
+- **Defer** — keeps pending, moves to bottom of list
+- **Reject All / Approve All** — bulk actions with confirmation dialog
+
+### Notification
+
+macOS notification fires when new proposals arrive while window is closed.
+Notification shows skill name and signal type. Click opens Review Window directly
+to that proposal.
+
+### Tech Stack
+
+SwiftUI — native macOS menu bar app. Reads from and writes to `~/.cabrero/` and
+skill paths directly. No server. File-system driven: the UI watches the `proposals/`
+and `evaluations/` directories for changes and updates reactively. The `claude` CLI
+is invoked for all AI interactions — chat and change application alike — reusing CC's
+existing authentication with no additional keys or dependencies.
+
+### Source Manager View
+
+Accessible from the menu bar or a dedicated tab. Lists all discovered artifact sources
+with their classification:
+
+```
+SOURCE                        OWNERSHIP    APPROACH
+─────────────────────────────────────────────────────
+user-level skills             mine         ● Iterate
+project: woocommerce          mine         ● Iterate
+plugin: my-plugin             mine         ● Iterate
+plugin: some-third-party      not mine     ◎ Evaluate
+plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
+```
+
+- Toggle per source between Iterate and Evaluate
+- Unclassified sources are flagged — Cabrero pauses processing them until classified
+- New source discovery triggers a macOS notification prompting classification
+
+---
+
+## Progress & Next Steps
+
+**Phase 0 — Repository bootstrap** ✓
+
+- README, Go scaffold, `cabrero help` working
+
+**Phase 1 — Foundation (CLI skeleton + capture)** ✓
+
+- Hook scripts (`pre-compact-backup.sh`, `session-end.sh`), `~/.cabrero/` store layout,
+  session ID blocklist, loop prevention, `cabrero sessions` + `cabrero status` + `cabrero import`
+
+**Phase 2 — Analysis pipeline** ✓
+
+- Pre-parser (JSONL → structured digest with citations, compaction segments, anomaly detection)
+- Friction detection: empty search results, search fumbles, backtracking signals
+- Error attribution: tool_use_id → tool_name mapping, ErrorCount incremented per tool
+- Retrieval interface (UUID-based raw entry access shared across all pipeline stages)
+- Cross-session pattern aggregator (recurring errors/friction across 3+ project sessions)
+- Haiku classifier prompt (`haiku-classifier-v2.txt`) — goal, errors, key turns,
+  skill/CLAUDE.md signals, friction signal awareness, pattern assessment
+- Sonnet evaluator prompt (`sonnet-evaluator-v2.txt`) — proposal generation with citation
+  validation, `skill_scaffold` proposals for recurring cross-session patterns
+- `cabrero run` + `cabrero proposals` + `cabrero inspect`
+
+**Phase 3 — Background daemon** ✓
+
+- `cabrero daemon` — polls for pending sessions, runs pipeline, macOS notifications
+- Stale session recovery (crash scenarios where hooks never fired)
+- PID-based single instance, graceful shutdown, file logging with rotation
+- LaunchAgent plist template for auto-start on login
+- Daemon status indicator in `cabrero status`
+
+**Phase 4 — Review TUI**
+
+12. **Bubble Tea review interface** — proposal list, detail view with colored diffs,
+    keyboard navigation, approve/reject/defer
+13. **AI chat panel** — streaming Sonnet via `claude` CLI, citation chain as context,
+    question chips, revised proposal rendering
+14. **`cabrero approve` + `cabrero reject`** — apply flow via Sonnet + writing skill,
+    before/after diff confirmation, rollback entry written
+
+**Phase 5 — Iteration tooling**
+
+15. **`cabrero replay`** — re-run pipeline against past session with alternate prompt,
+    compare against original output and recorded decision
+16. **Calibration set tagging** — mark proposals as canonical examples for regression
+    testing new prompt versions
