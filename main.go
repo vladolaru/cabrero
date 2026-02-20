@@ -31,6 +31,7 @@ var commands = []command{
 	{"setup", "Install and configure Cabrero", cmdSetup},
 	{"update", "Update Cabrero to latest release", cmdUpdate},
 	{"doctor", "Diagnose issues and auto-fix problems", cmdDoctor},
+	{"uninstall", "Remove Cabrero from this system", cmd.Uninstall},
 }
 
 func main() {

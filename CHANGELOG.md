@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`cabrero uninstall`** — clean removal command that reverses setup: stops
+  daemon, removes LaunchAgent, unregisters Claude Code hooks, deletes hook
+  scripts and binary. Prompts whether to keep `~/.cabrero` data for
+  reinstallation or remove everything. `--yes` skips confirmations,
+  `--keep-data`/`--remove-data` control data directory without prompting.
+
 - **`cabrero doctor`** — comprehensive diagnostic command that checks store,
   hook scripts, Claude Code integration, LaunchAgent, daemon, PATH, and
   pipeline health. Reports issues with severity (pass/warn/fail) and offers
