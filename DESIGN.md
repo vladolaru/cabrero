@@ -820,12 +820,15 @@ Configurable via `~/.cabrero/config.json` (arrow/vim navigation, theme,
 chat panel width, confirmation toggles). See `docs/plans/2026-02-20-review-tui-design.md`
 for the full design specification.
 
-**Phase 4b — Review TUI (assessment & management)**
+**Phase 4b — Review TUI (assessment & management)** ✅
 
-15. **Fitness report detail view** — visual assessment bars, session evidence,
-    action recommendations
-16. **Source manager** — ownership classification, iterate/evaluate toggles,
-    rollback history, new source classification via huh forms
+15. **Fitness report detail view** — visual assessment bars (three-bucket health
+    breakdown), expandable session evidence by category, dismiss and jump-to-sources
+    navigation. Dashboard shows fitness reports alongside proposals with `◎` indicator.
+16. **Source manager** — grouped source list by origin with collapsible sections,
+    ownership classification, iterate/evaluate approach toggles with confirmation gates,
+    change history detail with rollback support. Adaptive column layout for wide/standard/narrow
+    terminals. See `docs/plans/2026-02-20-review-tui-phase4b-plan.md` for the implementation plan.
 
 **Phase 4c — Review TUI (operational monitoring)**
 

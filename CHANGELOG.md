@@ -25,6 +25,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`cabrero reject`** — non-interactive CLI command that archives a proposal
   with an optional rejection reason (`--reason "text"`).
 
+- **Fitness Report Detail view** — assessment bars showing three-bucket health
+  breakdown (followed/worked around/confused), expandable session evidence grouped
+  by category, dismiss and jump-to-sources actions. Fitness reports appear in the
+  dashboard with `◎` indicator alongside proposals.
+
+- **Source Manager** — grouped source list organized by origin (user, project,
+  plugin) with collapsible sections. Ownership classification, iterate/evaluate
+  approach toggles with confirmation gates, change history detail with rollback
+  support. Adaptive column layout for different terminal widths.
+
+- **Dashboard mixed item list** — unified list showing both proposals and fitness
+  reports. `s` keyboard shortcut opens Source Manager from dashboard.
+
 - **TUI configuration** — `~/.cabrero/config.json` with navigation mode,
   theme, dashboard sort order, chat panel width, personality flavor text,
   and per-action confirmation toggles. Partial configs merge with defaults.
