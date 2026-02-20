@@ -135,6 +135,8 @@ func ParseSession(sessionID string) (*Digest, error) {
 		skillToolUseIDs  = make(map[string]*SkillEntry) // tool_use_id → skill entry
 		toolUseIDToName  = make(map[string]string)      // tool_use_id → tool name (for error attribution)
 		claudeMdSeen     = make(map[string]bool)        // path → already recorded
+		fileAccessLog    []fileAccess                    // ordered file accesses for backtrack detection
+		seqIndex         int                             // global sequence counter for tool calls
 	)
 
 	for scanner.Scan() {
@@ -200,7 +202,7 @@ func ParseSession(sessionID string) (*Digest, error) {
 			d.processUser(&entry, modelsSet, agentResultIDs, skillToolUseIDs, toolUseIDToName, claudeMdSeen)
 
 		case "assistant":
-			d.processAssistant(&entry, modelsSet, agentSpawns, &recentToolCalls, &lastToolName, skillToolUseIDs, toolUseIDToName, claudeMdSeen)
+			d.processAssistant(&entry, modelsSet, agentSpawns, &recentToolCalls, &lastToolName, skillToolUseIDs, toolUseIDToName, claudeMdSeen, &fileAccessLog, &seqIndex)
 
 		case "summary":
 			seg := CompactionSegment{
@@ -285,8 +287,10 @@ func ParseSession(sessionID string) (*Digest, error) {
 	// Finalize agents.
 	d.finalizeAgents(sessionID, agentSpawns, agentResultIDs, agentIDCounts)
 
-	// Detect retry anomalies.
+	// Detect retry anomalies and friction signals.
 	d.ToolCalls.RetryAnomalies = detectRetryAnomalies(recentToolCalls)
+	d.ToolCalls.FrictionSignals = append(d.ToolCalls.FrictionSignals, detectSearchFumbles(recentToolCalls)...)
+	d.ToolCalls.FrictionSignals = append(d.ToolCalls.FrictionSignals, detectBacktracking(fileAccessLog)...)
 
 	// Set last tool name.
 	d.Completion.LastToolName = lastToolName
@@ -385,10 +389,25 @@ func (d *Digest) processUser(entry *rawEntry, modelsSet map[string]bool, agentRe
 
 			d.Errors = append(d.Errors, errEntry)
 		}
+
+		// Detect empty search results (non-error tool_results from search tools).
+		if !tr.IsError && tr.ToolUseID != "" {
+			if tn, ok := toolUseIDToName[tr.ToolUseID]; ok {
+				if isSearchTool(tn) && isEmptySearchResult(tr.Content) {
+					d.ToolCalls.FrictionSignals = append(d.ToolCalls.FrictionSignals, FrictionSignal{
+						Type:      "empty_search",
+						ToolName:  tn,
+						UUIDs:     []string{uuid},
+						Detail:    "search returned no results",
+						Timestamp: ts,
+					})
+				}
+			}
+		}
 	}
 }
 
-func (d *Digest) processAssistant(entry *rawEntry, modelsSet map[string]bool, agentSpawns map[string]*AgentInventoryItem, recentToolCalls *[]recentToolCall, lastToolName **string, skillToolUseIDs map[string]*SkillEntry, toolUseIDToName map[string]string, claudeMdSeen map[string]bool) {
+func (d *Digest) processAssistant(entry *rawEntry, modelsSet map[string]bool, agentSpawns map[string]*AgentInventoryItem, recentToolCalls *[]recentToolCall, lastToolName **string, skillToolUseIDs map[string]*SkillEntry, toolUseIDToName map[string]string, claudeMdSeen map[string]bool, fileAccessLog *[]fileAccess, seqIndex *int) {
 	if len(entry.Message) == 0 {
 		return
 	}
@@ -471,6 +490,19 @@ func (d *Digest) processAssistant(entry *rawEntry, modelsSet map[string]bool, ag
 
 		// Detect CLAUDE.md in tool input file paths.
 		d.detectClaudeMdInToolUse(tu, uuid, ts, claudeMdSeen)
+
+		// Track file accesses for backtracking detection.
+		if isFileAccessTool(toolName) {
+			if fp := extractFilePath(tu.Input); fp != "" {
+				*fileAccessLog = append(*fileAccessLog, fileAccess{
+					filePath: fp,
+					toolName: toolName,
+					uuid:     uuid,
+					seqIndex: *seqIndex,
+				})
+			}
+		}
+		(*seqIndex)++
 	}
 }
 
@@ -775,6 +807,190 @@ func detectRetryAnomalies(calls []recentToolCall) []RetryAnomaly {
 	}
 
 	return anomalies
+}
+
+// --- Friction detection helpers ---
+
+// fileAccess records a Read/Edit tool call for backtrack detection.
+type fileAccess struct {
+	filePath string
+	toolName string
+	uuid     string
+	seqIndex int
+}
+
+// isSearchTool returns true for tools that perform searches.
+func isSearchTool(name string) bool {
+	switch name {
+	case "Grep", "Glob", "WebSearch":
+		return true
+	}
+	return false
+}
+
+// isFileAccessTool returns true for tools that access files by path.
+func isFileAccessTool(name string) bool {
+	switch name {
+	case "Read", "Edit", "Write":
+		return true
+	}
+	return false
+}
+
+// isEmptySearchResult checks if a tool_result content represents an empty/no-match result.
+// Conservative: returns false if uncertain.
+func isEmptySearchResult(content json.RawMessage) bool {
+	if len(content) == 0 {
+		return true
+	}
+
+	// Try string form — most common for search results.
+	var s string
+	if err := json.Unmarshal(content, &s); err == nil {
+		trimmed := strings.TrimSpace(s)
+		if trimmed == "" {
+			return true
+		}
+		// Common zero-match indicators.
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(lower, "no files found") ||
+			strings.HasPrefix(lower, "no matches found") ||
+			strings.HasPrefix(lower, "no results") ||
+			trimmed == "[]" {
+			return true
+		}
+		return false
+	}
+
+	// Try array form — empty array means no results.
+	var arr []json.RawMessage
+	if err := json.Unmarshal(content, &arr); err == nil {
+		return len(arr) == 0
+	}
+
+	return false
+}
+
+// extractFilePath reads file_path or path from a tool_use input JSON.
+func extractFilePath(input json.RawMessage) string {
+	if len(input) == 0 {
+		return ""
+	}
+	var fields struct {
+		FilePath string `json:"file_path"`
+		Path     string `json:"path"`
+	}
+	if err := json.Unmarshal(input, &fields); err != nil {
+		return ""
+	}
+	if fields.FilePath != "" {
+		return fields.FilePath
+	}
+	return fields.Path
+}
+
+// detectSearchFumbles finds sequences of 3+ same-tool search calls with different
+// inputs within a 60s window — the inverse of retry detection (same tool, different inputs).
+func detectSearchFumbles(calls []recentToolCall) []FrictionSignal {
+	if len(calls) < 3 {
+		return nil
+	}
+
+	var signals []FrictionSignal
+
+	i := 0
+	for i < len(calls) {
+		if !isSearchTool(calls[i].toolName) {
+			i++
+			continue
+		}
+
+		// Collect consecutive same-tool calls within time window.
+		j := i + 1
+		distinctInputs := map[string]bool{calls[i].inputKey: true}
+		for j < len(calls) {
+			if calls[j].toolName != calls[i].toolName {
+				break
+			}
+			t1, err1 := time.Parse(time.RFC3339, calls[i].timestamp)
+			t2, err2 := time.Parse(time.RFC3339, calls[j].timestamp)
+			if err1 != nil || err2 != nil {
+				break
+			}
+			if t2.Sub(t1).Seconds() > retryWindowSeconds {
+				break
+			}
+			distinctInputs[calls[j].inputKey] = true
+			j++
+		}
+
+		// Emit fumble if 3+ distinct inputs in the window.
+		if len(distinctInputs) >= 3 {
+			uuids := make([]string, 0, j-i)
+			for k := i; k < j; k++ {
+				uuids = append(uuids, calls[k].uuid)
+			}
+			ts := calls[i].timestamp
+			signals = append(signals, FrictionSignal{
+				Type:      "search_fumble",
+				ToolName:  calls[i].toolName,
+				UUIDs:     uuids,
+				Detail:    fmt.Sprintf("%d distinct search inputs in sequence", len(distinctInputs)),
+				Timestamp: ts,
+			})
+		}
+
+		i = j
+	}
+
+	return signals
+}
+
+// detectBacktracking finds files accessed 2+ times with significant intervening
+// tool calls to different files between accesses.
+func detectBacktracking(accesses []fileAccess) []FrictionSignal {
+	if len(accesses) < 2 {
+		return nil
+	}
+
+	// Group accesses by file path.
+	groups := make(map[string][]fileAccess)
+	for _, a := range accesses {
+		groups[a.filePath] = append(groups[a.filePath], a)
+	}
+
+	var signals []FrictionSignal
+	for filePath, group := range groups {
+		if len(group) < 2 {
+			continue
+		}
+
+		// Check for ≥3 intervening tool calls to different files between any pair.
+		for k := 1; k < len(group); k++ {
+			prev := group[k-1]
+			curr := group[k]
+
+			// Count intervening accesses to different files.
+			intervening := 0
+			for _, a := range accesses {
+				if a.seqIndex > prev.seqIndex && a.seqIndex < curr.seqIndex && a.filePath != filePath {
+					intervening++
+				}
+			}
+
+			if intervening >= 3 {
+				signals = append(signals, FrictionSignal{
+					Type:     "backtrack",
+					ToolName: curr.toolName,
+					UUIDs:    []string{prev.uuid, curr.uuid},
+					Detail:   fmt.Sprintf("returned to %s after %d intervening file accesses", filepath.Base(filePath), intervening),
+				})
+				break // One signal per file is enough.
+			}
+		}
+	}
+
+	return signals
 }
 
 // WriteDigest writes a Digest to the digests directory as JSON.

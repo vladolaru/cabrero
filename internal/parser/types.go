@@ -72,10 +72,11 @@ type AgentInventoryItem struct {
 	Abandoned        bool   `json:"abandoned"`
 }
 
-// ToolCalls aggregates tool usage and anomalies.
+// ToolCalls aggregates tool usage, anomalies, and friction signals.
 type ToolCalls struct {
-	Summary        map[string]ToolCallDetail `json:"summary"`
-	RetryAnomalies []RetryAnomaly            `json:"retryAnomalies"`
+	Summary         map[string]ToolCallDetail `json:"summary"`
+	RetryAnomalies  []RetryAnomaly            `json:"retryAnomalies"`
+	FrictionSignals []FrictionSignal          `json:"frictionSignals"`
 }
 
 // ToolCallDetail tracks counts for a specific tool.
@@ -92,6 +93,15 @@ type RetryAnomaly struct {
 	UUIDs           []string `json:"uuids"`
 	WindowSeconds   float64  `json:"windowSeconds"`
 	InputSimilarity string   `json:"inputSimilarity"`
+}
+
+// FrictionSignal records a soft failure or inefficiency that isn't a hard error.
+type FrictionSignal struct {
+	Type      string   `json:"type"`      // "empty_search" | "search_fumble" | "backtrack"
+	ToolName  string   `json:"toolName"`
+	UUIDs     []string `json:"uuids"`
+	Detail    string   `json:"detail"`
+	Timestamp string   `json:"timestamp"`
 }
 
 // SkillEntry records a Skill tool invocation.
