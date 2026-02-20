@@ -30,6 +30,7 @@ var commands = []command{
 	{"daemon", "Run background session processor (for launchd)", cmd.Daemon},
 	{"setup", "Install and configure Cabrero", cmdSetup},
 	{"update", "Update Cabrero to latest release", cmdUpdate},
+	{"doctor", "Diagnose issues and auto-fix problems", cmdDoctor},
 }
 
 func main() {
@@ -97,6 +98,13 @@ func cmdSetup(args []string) error {
 
 func cmdUpdate(args []string) error {
 	return cmd.Update(args, version, cmd.EmbeddedHooks{
+		PreCompact: preCompactHookScript,
+		SessionEnd: sessionEndHookScript,
+	})
+}
+
+func cmdDoctor(args []string) error {
+	return cmd.Doctor(args, cmd.EmbeddedHooks{
 		PreCompact: preCompactHookScript,
 		SessionEnd: sessionEndHookScript,
 	})

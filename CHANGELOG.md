@@ -5,6 +5,17 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`cabrero doctor`** — comprehensive diagnostic command that checks store,
+  hook scripts, Claude Code integration, LaunchAgent, daemon, PATH, and
+  pipeline health. Reports issues with severity (pass/warn/fail) and offers
+  auto-fix for stale hooks, missing registrations, broken LaunchAgent, and
+  stopped daemon. `--fix` auto-fixes without prompting, `--json` for scripted
+  usage.
+
 ## [0.5.0] - 2026-02-20
 
 First tagged release. Covers Phases 0–3.5 of the design.
