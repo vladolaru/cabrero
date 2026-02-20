@@ -28,6 +28,7 @@ var commands = []command{
 	{"prompts", "List prompt files with versions", cmdNotImplemented},
 	{"import", "Seed the store from existing CC session files", cmd.Import},
 	{"daemon", "Run background session processor (for launchd)", cmd.Daemon},
+	{"setup", "Install and configure Cabrero", cmdSetup},
 }
 
 func main() {
@@ -84,6 +85,13 @@ func printHelp() {
 	}
 	fmt.Println()
 	fmt.Println("Run 'cabrero help' for this message.")
+}
+
+func cmdSetup(args []string) error {
+	return cmd.Setup(args, cmd.EmbeddedHooks{
+		PreCompact: preCompactHookScript,
+		SessionEnd: sessionEndHookScript,
+	})
 }
 
 func cmdNotImplemented(args []string) error {
