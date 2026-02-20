@@ -457,6 +457,71 @@ func TestPipelineToLogViewerAndBack(t *testing.T) {
 	}
 }
 
+func TestPipelineRetryFlow(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Push to pipeline monitor.
+	m, _ = update(m, message.PushView{View: message.ViewPipelineMonitor})
+	if m.state != message.ViewPipelineMonitor {
+		t.Fatal("should be in pipeline monitor")
+	}
+
+	// Move cursor to the errored run at index 2.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+
+	// Press 'R' to retry — should activate confirmation dialog.
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	if cmd != nil {
+		t.Fatal("R on errored run with confirmation enabled should not produce cmd")
+	}
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "[y/N]") {
+		t.Error("confirmation dialog should be visible")
+	}
+
+	// Press 'y' to confirm — should produce ConfirmResult.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	if cmd == nil {
+		t.Fatal("y on confirm should produce cmd")
+	}
+
+	// Process ConfirmResult — should produce RetryRunStarted cmd.
+	confirmMsg := cmd()
+	m, cmd = update(m, confirmMsg)
+	if cmd == nil {
+		t.Fatal("ConfirmResult should produce RetryRunStarted cmd")
+	}
+
+	// Process RetryRunStarted — root model handles it and returns RetryRunFinished.
+	retryStartMsg := cmd()
+	startMsg, ok := retryStartMsg.(message.RetryRunStarted)
+	if !ok {
+		t.Fatalf("expected RetryRunStarted, got %T", retryStartMsg)
+	}
+	if startMsg.SessionID != "91cd02ab" {
+		t.Errorf("SessionID = %q, want %q", startMsg.SessionID, "91cd02ab")
+	}
+
+	m, cmd = update(m, retryStartMsg)
+	if cmd == nil {
+		t.Fatal("RetryRunStarted should produce cmd")
+	}
+
+	// Process RetryRunFinished — should set status message.
+	retryFinishMsg := cmd()
+	_, ok = retryFinishMsg.(message.RetryRunFinished)
+	if !ok {
+		t.Fatalf("expected RetryRunFinished, got %T", retryFinishMsg)
+	}
+
+	m, _ = update(m, retryFinishMsg)
+	if m.statusMsg != "Retry complete." {
+		t.Errorf("statusMsg = %q, want %q", m.statusMsg, "Retry complete.")
+	}
+}
+
 func TestFullStackNavigation(t *testing.T) {
 	m := newTestRoot()
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
