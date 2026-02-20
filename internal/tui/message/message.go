@@ -14,7 +14,12 @@ const (
 // Navigation messages.
 
 // PushView pushes a new view onto the navigation stack.
-type PushView struct{ View ViewState }
+// Action is an optional follow-up action to trigger after the transition
+// (e.g., "approve" to auto-start the approve flow in the detail view).
+type PushView struct {
+	View   ViewState
+	Action string
+}
 
 // PopView pops the current view, returning to the previous one.
 type PopView struct{}

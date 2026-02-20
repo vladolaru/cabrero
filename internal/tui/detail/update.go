@@ -113,6 +113,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// TriggerApprove starts the approve flow programmatically (e.g., from dashboard shortcut).
+func (m Model) TriggerApprove() (Model, tea.Cmd) { return m.startApprove() }
+
+// TriggerReject starts the reject flow programmatically.
+func (m Model) TriggerReject() (Model, tea.Cmd) { return m.startReject() }
+
+// TriggerDefer starts the defer flow programmatically.
+func (m Model) TriggerDefer() (Model, tea.Cmd) { return m.startDefer() }
+
 func (m Model) startApprove() (Model, tea.Cmd) {
 	if m.proposal == nil {
 		return m, nil

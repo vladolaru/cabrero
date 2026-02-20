@@ -4,7 +4,6 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 )
 
@@ -70,13 +69,28 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Approve):
-		return m, approveCmd(m.SelectedProposal())
+		if m.SelectedProposal() != nil {
+			return m, func() tea.Msg {
+				return message.PushView{View: message.ViewProposalDetail, Action: "approve"}
+			}
+		}
+		return m, nil
 
 	case key.Matches(msg, m.keys.Reject):
-		return m, rejectCmd(m.SelectedProposal())
+		if m.SelectedProposal() != nil {
+			return m, func() tea.Msg {
+				return message.PushView{View: message.ViewProposalDetail, Action: "reject"}
+			}
+		}
+		return m, nil
 
 	case key.Matches(msg, m.keys.Defer):
-		return m, deferCmd(m.SelectedProposal())
+		if m.SelectedProposal() != nil {
+			return m, func() tea.Msg {
+				return message.PushView{View: message.ViewProposalDetail, Action: "defer"}
+			}
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -106,32 +120,3 @@ func (m Model) updateFilter(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func approveCmd(p *pipeline.ProposalWithSession) tea.Cmd {
-	if p == nil {
-		return nil
-	}
-	id := p.Proposal.ID
-	return func() tea.Msg {
-		return message.ApproveStarted{ProposalID: id}
-	}
-}
-
-func rejectCmd(p *pipeline.ProposalWithSession) tea.Cmd {
-	if p == nil {
-		return nil
-	}
-	id := p.Proposal.ID
-	return func() tea.Msg {
-		return message.RejectFinished{ProposalID: id}
-	}
-}
-
-func deferCmd(p *pipeline.ProposalWithSession) tea.Cmd {
-	if p == nil {
-		return nil
-	}
-	id := p.Proposal.ID
-	return func() tea.Msg {
-		return message.DeferFinished{ProposalID: id}
-	}
-}

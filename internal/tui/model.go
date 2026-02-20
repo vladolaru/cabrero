@@ -85,7 +85,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case message.PushView:
-		return m.pushView(msg.View)
+		return m.pushView(msg.View, msg.Action)
 
 	case message.PopView:
 		return m.popView()
@@ -206,9 +206,11 @@ func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool
 	return m, nil, false
 }
 
-func (m reviewModel) pushView(view message.ViewState) (tea.Model, tea.Cmd) {
+func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model, tea.Cmd) {
 	m.viewStack = append(m.viewStack, m.state)
 	m.state = view
+
+	var cmds []tea.Cmd
 
 	switch view {
 	case message.ViewProposalDetail:
@@ -222,10 +224,32 @@ func (m reviewModel) pushView(view message.ViewState) (tea.Model, tea.Cmd) {
 			// Initialize chat for this proposal.
 			chips := defaultChips()
 			m.chat = chat.New(chips, "", chatWidth(m.width, m.config), m.height-6)
+
+			// Trigger follow-up action if specified.
+			switch action {
+			case "approve":
+				var cmd tea.Cmd
+				m.detail, cmd = m.detail.TriggerApprove()
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			case "reject":
+				var cmd tea.Cmd
+				m.detail, cmd = m.detail.TriggerReject()
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			case "defer":
+				var cmd tea.Cmd
+				m.detail, cmd = m.detail.TriggerDefer()
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			}
 		}
 	}
 
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 func (m reviewModel) popView() (tea.Model, tea.Cmd) {
