@@ -1,4 +1,6 @@
 #!/bin/sh
+# DEPRECATED: Use 'cabrero setup' instead. This script is kept for reference.
+#
 # Installs Cabrero hook scripts into ~/.claude/settings.json.
 # Preserves any existing hooks already configured.
 # Requires: python3 (available on macOS by default) for JSON manipulation.

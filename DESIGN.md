@@ -511,6 +511,11 @@ cabrero replay                  Re-run pipeline with a different prompt against 
   --prompt <path>
   --compare                     Diff new output against original and show your decision
 cabrero prompts                 List prompt files with current versions
+cabrero setup                   Install and configure Cabrero (interactive wizard)
+  --yes                           Skip all confirmations
+  --dry-run                       Show what would be done without doing it
+cabrero update                  Update Cabrero to latest release from GitHub
+  --check                         Check for updates without downloading
 ```
 
 ### Separation of concerns
@@ -762,6 +767,16 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - PID-based single instance, graceful shutdown, file logging with rotation
 - LaunchAgent plist template for auto-start on login
 - Daemon status indicator in `cabrero status`
+
+**Phase 3.5 — Self-packaging & setup** ✓
+
+- goreleaser builds darwin/amd64 + darwin/arm64 on tag push
+- One-liner install script downloads binary from GitHub Releases
+- `cabrero setup` — interactive wizard: prerequisite checks, store init,
+  hook installation, CC registration, LaunchAgent, daemon start, PATH check
+- `cabrero update` — self-update from GitHub Releases with checksum verification
+- Hook scripts embedded in binary via `//go:embed`
+- `--yes` flag for scripted installs, `--dry-run` for preview
 
 **Phase 4 — Review TUI**
 
