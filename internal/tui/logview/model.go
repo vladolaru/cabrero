@@ -89,6 +89,21 @@ func (m *Model) UpdateContent(content string) {
 	}
 }
 
+// AppendContent adds new bytes to the end of the log content.
+// More efficient than UpdateContent for follow mode where only
+// the file tail has changed.
+func (m *Model) AppendContent(newBytes string) {
+	if newBytes == "" {
+		return
+	}
+	m.content += newBytes
+	m.lines = strings.Split(m.content, "\n")
+	m.refreshViewportContent()
+	if m.followMode {
+		m.viewport.GotoBottom()
+	}
+}
+
 // performSearch finds all lines matching the search term.
 func (m *Model) performSearch() {
 	m.matches = nil
