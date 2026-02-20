@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/retrieval"
 )
 
-const sonnetPromptFile = "sonnet-evaluator-v2.txt"
+const sonnetPromptFile = "sonnet-evaluator-v3.txt"
 
 // RunSonnet constructs the prompt, invokes the Sonnet evaluator via the claude CLI,
 // validates the output, and returns the parsed result.
@@ -30,21 +31,28 @@ func RunSonnet(sessionID string, digest *parser.Digest, haikuOutput *HaikuOutput
 		return nil, fmt.Errorf("marshalling digest: %w", err)
 	}
 
-	// System prompt goes via --system-prompt flag; data goes via stdin.
+	// System prompt goes via --system-prompt; data goes as the -p prompt.
 	data := "<haiku_classification>\n" + string(haikuJSON) + "\n</haiku_classification>" +
 		"\n\n<session_digest>\n" + string(digestJSON) + "\n</session_digest>"
+
+	// Inject turn budget into the prompt template.
+	systemPrompt = strings.Replace(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.SonnetMaxTurns), 1)
 
 	stdout, err := invokeClaude(claudeConfig{
 		Model:        "claude-sonnet-4-6",
 		SystemPrompt: systemPrompt,
 		Effort:       "high",
-		Stdin:        strings.NewReader(data),
+		Agentic:      true,
+		Prompt:       data,
+		AllowedTools: "Read,Grep",
+		MaxTurns:     cfg.SonnetMaxTurns,
+		Timeout:      cfg.SonnetTimeout,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking sonnet: %w", err)
 	}
 
-	// Parse output — --json-schema guarantees valid JSON matching our schema.
+	// Parse JSON output (instructed via system prompt, cleaned defensively).
 	output, err := parseSonnetOutput(stdout)
 	if err != nil {
 		return nil, fmt.Errorf("parsing sonnet output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))

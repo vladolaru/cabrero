@@ -163,7 +163,7 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
     {proposalId}.json        # improvement proposals awaiting human approval
   prompts/
     haiku-classifier-v3.txt  # Haiku stage prompt (v3: agentic with Read/Grep, triage, turn budget)
-    sonnet-evaluator-v2.txt  # Sonnet stage prompt (versioned, v2 adds skill_scaffold)
+    sonnet-evaluator-v3.txt  # Sonnet stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
   blocklist.json             # session IDs to never process (loop prevention)
   daemon.log                 # background daemon log (rotated, 5MB × 3)
   daemon.pid                 # PID file for single-instance enforcement
@@ -826,7 +826,7 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - Cross-session pattern aggregator (recurring errors/friction across 3+ project sessions)
 - Haiku classifier prompt (`haiku-classifier-v3.txt`) — agentic with Read/Grep on raw store,
   goal, errors, key turns, skill/CLAUDE.md signals, friction signals, triage gate, turn budget
-- Sonnet evaluator prompt (`sonnet-evaluator-v2.txt`) — proposal generation with citation
+- Sonnet evaluator prompt (`sonnet-evaluator-v3.txt`) — proposal generation with citation
   validation, `skill_scaffold` proposals for recurring cross-session patterns
 - `cabrero run` + `cabrero proposals` + `cabrero inspect`
 
