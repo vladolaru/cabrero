@@ -202,6 +202,70 @@ func TestModelRetryKey(t *testing.T) {
 	}
 }
 
+func TestModelViewRunRowWide(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(140, 40)
+	view := ansi.Strip(m.View())
+
+	// Wide: 8-char ID, full project name (up to 20), all 3 timing stages.
+	if !strings.Contains(view, "e7f2a103") {
+		t.Error("wide view should show 8-char session ID")
+	}
+	// All 3 timing columns.
+	if !strings.Contains(view, "parse") || !strings.Contains(view, "cls") || !strings.Contains(view, "eval") {
+		t.Error("wide view should show all 3 timing stages")
+	}
+}
+
+func TestModelViewRunRowStandard(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(100, 40)
+	view := ansi.Strip(m.View())
+
+	// Standard: 8-char ID still shown.
+	if !strings.Contains(view, "e7f2a103") {
+		t.Error("standard view should show 8-char session ID")
+	}
+	// Standard: 2 stages (parse + eval) — classifier omitted.
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "e7f2a103") {
+			if strings.Contains(line, "cls") {
+				t.Error("standard view should omit classifier timing (show 2 stages)")
+			}
+			break
+		}
+	}
+}
+
+func TestModelViewRunRowNarrow(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(70, 40)
+	view := ansi.Strip(m.View())
+
+	// Narrow: 6-char ID.
+	if !strings.Contains(view, "e7f2a1") {
+		t.Error("narrow view should show 6-char session ID")
+	}
+	// Ensure the full 8-char ID is NOT shown (would mean no truncation).
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "e7f2a103") {
+			t.Error("narrow view should truncate session ID to 6 chars, not 8")
+			break
+		}
+	}
+	// Narrow: total-only timing (no stage names).
+	for _, line := range lines {
+		if strings.Contains(line, "e7f2a1") {
+			if strings.Contains(line, "parse") || strings.Contains(line, "cls") || strings.Contains(line, "eval") {
+				t.Error("narrow view should show total timing only, not per-stage")
+			}
+			break
+		}
+	}
+}
+
 func TestModelViewNarrowActivityStats(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(70, 40) // narrow

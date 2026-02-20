@@ -203,10 +203,25 @@ func (m Model) renderActivityStats() string {
 	return b.String()
 }
 
+// runLayout returns the display parameters for a run row based on terminal width.
+func (m Model) runLayout() (idLen int, projectMax int) {
+	switch m.layoutMode() {
+	case layoutWide:
+		return 8, 20
+	case layoutStandard:
+		return 8, 15
+	default: // narrow
+		return 6, 10
+	}
+}
+
 func (m Model) renderRecentRuns() string {
 	var b strings.Builder
 	b.WriteString(sectionHeaderStyle.Render("RECENT RUNS"))
 	b.WriteString("\n")
+
+	idLen, projectMax := m.runLayout()
+	mode := m.layoutMode()
 
 	for i, run := range m.runs {
 		cursor := "  "
@@ -216,11 +231,14 @@ func (m Model) renderRecentRuns() string {
 
 		status := statusIndicator(run.Status)
 		shortID := truncateID(run.SessionID)
+		if len(shortID) > idLen {
+			shortID = shortID[:idLen]
+		}
 		age := relativeTime(run.Timestamp)
-		project := truncate(run.Project, 16)
-		timing := formatTiming(run)
+		project := truncate(run.Project, projectMax)
+		timing := formatTimingForMode(run, mode)
 
-		line := fmt.Sprintf("%s%s %s  %-8s  %-16s  %s", cursor, status, shortID, age, project, timing)
+		line := fmt.Sprintf("%s%s %s  %-8s  %-*s  %s", cursor, status, shortID, age, projectMax, project, timing)
 		b.WriteString(line)
 
 		// Inline expansion.
@@ -285,18 +303,33 @@ func checkmark(ok bool) string {
 	return errorStyle.Render("✗")
 }
 
-func formatTiming(run pl.PipelineRun) string {
+// formatTimingForMode formats per-stage timing based on layout mode.
+//   - Wide: all 3 stages (parse, cls, eval)
+//   - Standard: 2 stages (parse, eval) — classifier omitted
+//   - Narrow: total duration only
+func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 	if run.Status == "pending" {
 		return mutedStyle.Render("(pending)")
 	}
+
+	if mode == layoutNarrow {
+		total := run.ParseDuration + run.ClassifierDuration + run.EvaluatorDuration
+		if total == 0 {
+			return ""
+		}
+		return fmt.Sprintf("%.0fs", total.Seconds())
+	}
+
 	var parts []string
 	if run.HasDigest {
 		parts = append(parts, fmt.Sprintf("%.1fs parse", run.ParseDuration.Seconds()))
 	}
-	if run.HasClassifier {
-		parts = append(parts, fmt.Sprintf("%.1fs cls", run.ClassifierDuration.Seconds()))
-	} else if run.Status == "error" && run.HasDigest {
-		parts = append(parts, errorStyle.Render("✗ cls failed"))
+	if mode == layoutWide {
+		if run.HasClassifier {
+			parts = append(parts, fmt.Sprintf("%.1fs cls", run.ClassifierDuration.Seconds()))
+		} else if run.Status == "error" && run.HasDigest {
+			parts = append(parts, errorStyle.Render("✗ cls failed"))
+		}
 	}
 	if run.HasEvaluator {
 		parts = append(parts, fmt.Sprintf("%.0fs eval", run.EvaluatorDuration.Seconds()))
