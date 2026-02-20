@@ -76,6 +76,7 @@ func (m Model) updateSearch(msg tea.Msg) (Model, tea.Cmd) {
 		case key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))):
 			m.searchActive = false
 			m.searchInput.Blur()
+			m.searchInput.Reset()
 			return m, nil
 		case key.Matches(kmsg, key.NewBinding(key.WithKeys("enter"))):
 			m.searchActive = false
