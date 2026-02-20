@@ -290,6 +290,41 @@ cross-session data.
 returns nil. Aggregator error → non-fatal warning, pipeline continues without cross-session
 context.
 
+### Context Window Budget (known gap)
+
+LLM evaluators receive all data via stdin — no tool access, pure classification. Current
+worst-case input sizes (measured across ~60 digests):
+
+| Component | Haiku input | Sonnet input |
+|-----------|-------------|--------------|
+| System prompt | ~1.5K tokens | ~1.1K tokens |
+| Digest | ~15K tokens (largest: 3923-entry session) | ~15K tokens |
+| Cross-session patterns | ~500 tokens | — |
+| Haiku output | — | ~2K tokens |
+| **Total** | **~17K tokens** | **~18K tokens** |
+
+Against a 200K context window this is comfortable (~10x headroom). However, digest size
+scales with session length and is currently unbounded. The two largest cost centers are:
+
+- **`toolCalls` section** (35% of largest digest) — friction signals are the main driver;
+  one session had 76 signals at 16KB. Grows linearly with session tool call count.
+- **`errors` section** (23% of largest digest) — snippets are capped at 200 chars each,
+  but error count is unbounded; one session had 32 errors.
+
+**No safeguards exist yet.** A session with 10K+ entries or hundreds of errors could
+produce a digest that exceeds context limits. Needed:
+
+1. **Digest size cap** — truncate or summarize sections when total digest exceeds a
+   configurable token budget (e.g. 50K tokens). Priority for retention: shape > toolCalls
+   summary > errors (deduplicated) > friction signals (top N per type) > agents > skills.
+2. **Per-section limits** — cap friction signals (e.g. top 20 by severity), cap errors
+   (e.g. top 30, deduplicated by normalized snippet), cap retry anomalies (e.g. top 10).
+3. **Token estimation** — lightweight char-based estimate before invoking claude, with
+   a warning log and truncation fallback if over budget.
+4. **Sonnet double-input** — Sonnet receives both the digest and Haiku output, so its
+   budget is tighter. If digest truncation is needed, Sonnet's copy could be more
+   aggressively summarized since Haiku has already classified the key signals.
+
 ### Human Approval Gate
 
 All SKILL.md modifications require explicit approval before writing. Gate shows full
