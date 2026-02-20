@@ -4,15 +4,17 @@ import (
 	"fmt"
 
 	"github.com/vladolaru/cabrero/internal/parser"
+	"github.com/vladolaru/cabrero/internal/patterns"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
 // RunResult holds the outcome of a pipeline run.
 type RunResult struct {
-	Digest       *parser.Digest
-	HaikuOutput  *HaikuOutput
-	SonnetOutput *SonnetOutput
-	DryRun       bool
+	Digest           *parser.Digest
+	AggregatorOutput *patterns.AggregatorOutput
+	HaikuOutput      *HaikuOutput
+	SonnetOutput     *SonnetOutput
+	DryRun           bool
 }
 
 // Run executes the full analysis pipeline for a session.
@@ -42,8 +44,24 @@ func Run(sessionID string, dryRun bool) (*RunResult, error) {
 	if err := parser.WriteDigest(digest); err != nil {
 		return nil, fmt.Errorf("writing digest: %w", err)
 	}
-	fmt.Printf("  Digest written: %d entries, %d turns, %d errors\n",
-		digest.Shape.EntryCount, digest.Shape.TurnCount, len(digest.Errors))
+	fmt.Printf("  Digest written: %d entries, %d turns, %d errors, %d friction signals\n",
+		digest.Shape.EntryCount, digest.Shape.TurnCount, len(digest.Errors), len(digest.ToolCalls.FrictionSignals))
+
+	// Step 1b: Cross-session pattern aggregation (pure code, no LLM cost).
+	var aggregatorOutput *patterns.AggregatorOutput
+	meta, metaErr := store.ReadMetadata(sessionID)
+	if metaErr == nil && meta.Project != "" {
+		fmt.Println("  Aggregating cross-session patterns...")
+		aggregatorOutput, err = patterns.Aggregate(sessionID, meta.Project)
+		if err != nil {
+			fmt.Printf("  Warning: pattern aggregation failed: %v\n", err)
+			// Non-fatal: continue without cross-session context.
+		} else if aggregatorOutput != nil {
+			fmt.Printf("  Found %d recurring pattern(s) across %d sessions\n",
+				len(aggregatorOutput.Patterns), aggregatorOutput.SessionsScanned)
+		}
+		result.AggregatorOutput = aggregatorOutput
+	}
 
 	if dryRun {
 		fmt.Println("  Dry run — stopping after pre-parser.")
@@ -52,7 +70,7 @@ func Run(sessionID string, dryRun bool) (*RunResult, error) {
 
 	// Step 2: Haiku classifier.
 	fmt.Println("  Running Haiku classifier...")
-	haikuOutput, err := RunHaiku(sessionID, digest)
+	haikuOutput, err := RunHaiku(sessionID, digest, aggregatorOutput)
 	if err != nil {
 		return nil, fmt.Errorf("haiku classifier failed: %w", err)
 	}
@@ -98,8 +116,7 @@ func Run(sessionID string, dryRun bool) (*RunResult, error) {
 	}
 
 	// Mark session as processed.
-	meta, err := store.ReadMetadata(sessionID)
-	if err == nil {
+	if metaErr == nil {
 		meta.Status = "processed"
 		if err := store.WriteMetadata(store.RawDir(sessionID), meta); err != nil {
 			fmt.Printf("  Warning: failed to update session status: %v\n", err)
