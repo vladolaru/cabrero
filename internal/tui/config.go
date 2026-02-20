@@ -52,7 +52,7 @@ func LoadConfigFrom(path string) (*Config, error) {
 		"navigation": true, "theme": true,
 		"dashboard": true, "detail": true,
 		"personality": true, "confirmations": true,
-		"sourceManager": true,
+		"sourceManager": true, "pipeline": true,
 	}
 	cfg.Extra = make(map[string]json.RawMessage)
 	for k, v := range raw {
@@ -62,11 +62,6 @@ func LoadConfigFrom(path string) (*Config, error) {
 	}
 
 	return cfg, nil
-}
-
-// SaveConfig writes config to ~/.cabrero/config.json atomically.
-func SaveConfig(cfg *Config) error {
-	return SaveConfigTo(cfg, configPath())
 }
 
 // SaveConfigTo writes config to a specific path atomically (for testing).

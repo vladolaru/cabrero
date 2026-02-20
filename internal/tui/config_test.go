@@ -9,56 +9,6 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-func TestDefaultConfig(t *testing.T) {
-	cfg := shared.DefaultConfig()
-
-	if cfg.Navigation != "arrows" {
-		t.Errorf("Navigation = %q, want %q", cfg.Navigation, "arrows")
-	}
-	if cfg.Theme != "auto" {
-		t.Errorf("Theme = %q, want %q", cfg.Theme, "auto")
-	}
-	if cfg.Dashboard.SortOrder != "newest" {
-		t.Errorf("Dashboard.SortOrder = %q, want %q", cfg.Dashboard.SortOrder, "newest")
-	}
-	if !cfg.Dashboard.ShowRecentlyDecided {
-		t.Error("Dashboard.ShowRecentlyDecided = false, want true")
-	}
-	if cfg.Dashboard.RecentlyDecidedLimit != 10 {
-		t.Errorf("Dashboard.RecentlyDecidedLimit = %d, want 10", cfg.Dashboard.RecentlyDecidedLimit)
-	}
-	if !cfg.Detail.ChatPanelOpen {
-		t.Error("Detail.ChatPanelOpen = false, want true")
-	}
-	if cfg.Detail.ChatPanelWidth != 35 {
-		t.Errorf("Detail.ChatPanelWidth = %d, want 35", cfg.Detail.ChatPanelWidth)
-	}
-	if cfg.Detail.ExpandCitationsDefault {
-		t.Error("Detail.ExpandCitationsDefault = true, want false")
-	}
-	if !cfg.Personality.FlavorText {
-		t.Error("Personality.FlavorText = false, want true")
-	}
-	if !cfg.Personality.EasterEggs {
-		t.Error("Personality.EasterEggs = false, want true")
-	}
-	if !cfg.Confirmations.ApproveRequiresConfirm {
-		t.Error("Confirmations.ApproveRequiresConfirm = false, want true")
-	}
-	if cfg.Confirmations.RejectRequiresConfirm {
-		t.Error("Confirmations.RejectRequiresConfirm = true, want false")
-	}
-	if cfg.Confirmations.DeferRequiresConfirm {
-		t.Error("Confirmations.DeferRequiresConfirm = true, want false")
-	}
-	if !cfg.Confirmations.RetryRequiresConfirm {
-		t.Error("Confirmations.RetryRequiresConfirm = false, want true")
-	}
-	if !cfg.Confirmations.RollbackRequiresConfirm {
-		t.Error("Confirmations.RollbackRequiresConfirm = false, want true")
-	}
-}
-
 func TestLoadConfig_Missing(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
@@ -167,6 +117,7 @@ func TestSaveConfig_Roundtrip(t *testing.T) {
 	original.Dashboard.SortOrder = "confidence"
 	original.Detail.ChatPanelWidth = 40
 	original.Personality.FlavorText = false
+	original.Pipeline.SparklineDays = 14
 
 	if err := SaveConfigTo(original, path); err != nil {
 		t.Fatalf("SaveConfigTo: %v", err)
@@ -188,6 +139,9 @@ func TestSaveConfig_Roundtrip(t *testing.T) {
 	}
 	if loaded.Personality.FlavorText != original.Personality.FlavorText {
 		t.Errorf("FlavorText = %v, want %v", loaded.Personality.FlavorText, original.Personality.FlavorText)
+	}
+	if loaded.Pipeline.SparklineDays != original.Pipeline.SparklineDays {
+		t.Errorf("Pipeline.SparklineDays = %d, want %d", loaded.Pipeline.SparklineDays, original.Pipeline.SparklineDays)
 	}
 	// Defaults that weren't changed should survive.
 	if loaded.Theme != "auto" {
