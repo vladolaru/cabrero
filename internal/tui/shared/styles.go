@@ -11,14 +11,15 @@ var (
 	ColorMuted   = lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"}
 	ColorChat    = lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#4DB6AC"}
 
-	ColorFg     = lipgloss.AdaptiveColor{Light: "#212121", Dark: "#E0E0E0"}
-	ColorFgBold = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
-	ColorBorder = lipgloss.AdaptiveColor{Light: "#BDBDBD", Dark: "#616161"}
+	ColorFgBold      = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
+	ColorBorder      = lipgloss.AdaptiveColor{Light: "#BDBDBD", Dark: "#616161"}
+	ColorHighlightFg = lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}
+	ColorHighlightBg = lipgloss.AdaptiveColor{Light: "#6A1B9A", Dark: "#9C27B0"}
 )
 
 // HighlightFg returns the foreground color string for search match highlighting.
-func HighlightFg() string { return "#FFFFFF" }
+func HighlightFg() string { return ColorHighlightFg.Dark }
 
 // HighlightBg returns the background color string for search match highlighting.
-func HighlightBg() string { return "#6A1B9A" }
+func HighlightBg() string { return ColorHighlightBg.Dark }
 
