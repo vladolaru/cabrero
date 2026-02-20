@@ -29,13 +29,13 @@ type PipelineRun struct {
 
     // Per-stage completion
     HasDigest bool
-    HasHaiku  bool
-    HasSonnet bool
+    HasClassifier  bool
+    HasEvaluator bool
 
     // Per-stage timing (zero if stage not completed)
     ParseDuration  time.Duration
-    HaikuDuration  time.Duration
-    SonnetDuration time.Duration
+    ClassifierDuration  time.Duration
+    EvaluatorDuration time.Duration
 
     // Results
     ProposalCount int
@@ -55,7 +55,7 @@ type PipelineStats struct {
 }
 
 type PromptVersion struct {
-    Name     string    // e.g., "haiku-classifier"
+    Name     string    // e.g., "classifier"
     Version  string    // e.g., "v3"
     LastUsed time.Time
 }
@@ -67,7 +67,7 @@ type PromptVersion struct {
 - File existence in `digests/` and `evaluations/` determines stage completion
 - File modification timestamps provide per-stage timing (modtime of each output
   minus modtime of previous stage's output)
-- Sonnet output JSON provides proposal count
+- Evaluator output JSON provides proposal count
 
 **Functions:**
 
@@ -115,16 +115,16 @@ No fsnotify dependency. Manual refresh also available via `r` key.
 │                                                                           │
 │  RECENT RUNS                                                              │
 │  ───────────                                                              │
-│  > ✓ e7f2a103  12m ago   woo-payments    1.2s parse  8.4s haiku  12s son │
-│    ✓ 3bc891ff  2h ago    cabrero         0.8s parse  6.1s haiku  9s son  │
-│    ✗ 91cd02ab  8h ago    woo-payments    0.4s parse  ✗ haiku failed      │
+│  > ✓ e7f2a103  12m ago   woo-payments    1.2s parse  8.4s cls  12s eval  │
+│    ✓ 3bc891ff  2h ago    cabrero         0.8s parse  6.1s cls  9s eval   │
+│    ✗ 91cd02ab  8h ago    woo-payments    0.4s parse  ✗ cls failed        │
 │    ○ 7e0b1234  1d ago    woo-payments    (pending)                       │
 │                                                                           │
 │  PROMPTS                                                                  │
 │  ───────                                                                  │
-│  haiku-classifier    v3   last used: 12m ago                              │
-│  sonnet-evaluator    v3   last used: 12m ago                              │
-│  sonnet-apply        v1   last used: 3d ago                               │
+│  classifier          v3   last used: 12m ago                              │
+│  evaluator           v3   last used: 12m ago                              │
+│  apply               v1   last used: 3d ago                               │
 │                                                                           │
 ├───────────────────────────────────────────────────────────────────────────┤
 │  ↑↓ navigate  enter run details  R retry errored  L view log  ? help      │
@@ -144,7 +144,7 @@ characters `▁▂▃▄▅▆▇█`.
 **Recent runs:** Scrollable list (limit from `pipeline.recentRunsLimit`,
 default 20). Each run shows: status indicator (`✓`/`✗`/`○`), short session ID
 (8 chars), relative time, project display name, per-stage timing. Failed stages
-show `✗ stage failed`.
+show `✗ cls failed` or `✗ eval failed`.
 
 **Prompts:** Static list of prompt files with version parsed from filename
 and last-used time from most recent evaluation that references it.
@@ -189,8 +189,8 @@ at 5MB with rotation (3 files), so reading the whole file into memory is safe.
 │  2026-02-20T10:15:03Z INFO  poll=2m0s stale=30m0s delay=30s              │
 │  2026-02-20T10:15:03Z INFO  processing session e7f2a103                  │
 │  2026-02-20T10:15:04Z INFO  pre-parser: 142 entries, 0.8s               │
-│  2026-02-20T10:15:12Z INFO  haiku: classified, triage=evaluate           │
-│  2026-02-20T10:15:24Z INFO  sonnet: 1 proposal generated                │
+│  2026-02-20T10:15:12Z INFO  classifier: classified, triage=evaluate      │
+│  2026-02-20T10:15:24Z INFO  evaluator: 1 proposal generated             │
 │  2026-02-20T10:17:05Z INFO  poll: 0 pending sessions                    │
 │  ...                                                                     │
 │                                                                           │
