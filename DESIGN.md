@@ -886,11 +886,12 @@ for the full design specification.
     change history detail with rollback support. Adaptive column layout for wide/standard/narrow
     terminals. See `docs/plans/2026-02-20-review-tui-phase4b-plan.md` for the implementation plan.
 
-**Phase 4c — Review TUI (operational monitoring)**
+**Phase 4c — Review TUI (operational monitoring)** ✓
 
-17. **Pipeline monitor** — daemon health, recent runs with timing, sparkline
-    activity chart, prompt versions
-18. **Log viewer** — full-screen scrollable log with search, follow mode
+17. **Pipeline monitor** — daemon health, recent runs with per-stage timing,
+    sparkline activity chart, prompt versions, retry flow, polling auto-refresh
+18. **Log viewer** — full-screen scrollable log with search, follow mode,
+    auto-refresh via polling
 
 **Phase 5 — Iteration tooling**
 

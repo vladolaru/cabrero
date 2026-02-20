@@ -5,6 +5,27 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Pipeline monitor view** — daemon health, recent runs with per-stage timing
+  breakdown (parse/classifier/evaluator), sparkline activity chart, prompt
+  version listing, inline run detail expansion, and retry flow with
+  configurable confirmation gate.
+- **Log viewer view** — full-screen scrollable daemon log with incremental
+  search, match navigation (n/N), follow mode toggle, and auto-refresh via
+  polling.
+- **PipelineRun data layer** — reconstructs pipeline run history from store
+  artifacts (session metadata, classifier/evaluator output files, timestamps)
+  without requiring a dedicated database.
+- **Sparkline component** — Unicode block-character sparkline renderer for
+  visualizing sessions-per-day activity in the pipeline monitor.
+- **Polling auto-refresh** — pipeline monitor refreshes every 5 seconds, log
+  viewer refreshes every 1 second when follow mode is active.
+- **PipelineConfig settings** — configurable sparkline days, recent runs limit,
+  and log follow mode default via `shared.Config`.
+
 ## [0.6.0] - 2026-02-20
 
 ### Changed
