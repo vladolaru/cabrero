@@ -101,18 +101,53 @@ func TestModelViewDaemonHeader(t *testing.T) {
 
 func TestModelViewNarrowLayout(t *testing.T) {
 	m := newTestModel()
-	m.SetSize(80, 40) // narrow mode
+	m.SetSize(70, 40) // narrow mode (< 80)
 	view := ansi.Strip(m.View())
 
-	// Should still have all sections, just stacked.
+	// Essentials should be present.
 	if !strings.Contains(view, "DAEMON") {
 		t.Error("narrow view missing DAEMON section")
 	}
 	if !strings.Contains(view, "HOOKS") {
 		t.Error("narrow view missing HOOKS section")
 	}
+
+	// Abbreviated: no intervals, no STORE section.
+	if strings.Contains(view, "Poll:") {
+		t.Error("narrow view should not show Poll interval")
+	}
+	if strings.Contains(view, "STORE") {
+		t.Error("narrow view should not show STORE section")
+	}
+
+	// Prompts should be hidden in narrow mode.
+	if strings.Contains(view, "PROMPTS") {
+		t.Error("narrow view should not show PROMPTS section")
+	}
+}
+
+func TestModelViewStandardLayout(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(100, 40) // standard mode (80-119)
+	view := ansi.Strip(m.View())
+
+	// All sections present, stacked (not side-by-side).
+	if !strings.Contains(view, "DAEMON") {
+		t.Error("standard view missing DAEMON section")
+	}
 	if !strings.Contains(view, "STORE") {
-		t.Error("narrow view missing STORE section")
+		t.Error("standard view missing STORE section")
+	}
+	if !strings.Contains(view, "PROMPTS") {
+		t.Error("standard view missing PROMPTS section")
+	}
+
+	// Stacked: DAEMON and HOOKS should NOT share a line.
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "DAEMON") && strings.Contains(line, "HOOKS") {
+			t.Error("standard view should stack DAEMON and HOOKS, not side-by-side")
+		}
 	}
 }
 

@@ -60,8 +60,8 @@ func (m Model) View() string {
 	// Recent runs.
 	sections = append(sections, m.renderRecentRuns())
 
-	// Prompts.
-	if len(m.prompts) > 0 {
+	// Prompts: hidden in narrow mode.
+	if len(m.prompts) > 0 && m.layoutMode() != layoutNarrow {
 		sections = append(sections, m.renderPrompts())
 	}
 
@@ -79,6 +79,8 @@ func (m Model) View() string {
 }
 
 func (m Model) renderDaemonHeader() string {
+	mode := m.layoutMode()
+
 	// Build left column: DAEMON section.
 	var left strings.Builder
 	left.WriteString(sectionHeaderStyle.Render("DAEMON"))
@@ -91,27 +93,31 @@ func (m Model) renderDaemonHeader() string {
 	} else {
 		left.WriteString(fmt.Sprintf("  Status:  %s\n", errorStyle.Render("● stopped")))
 	}
-	if m.dashStats.PollInterval > 0 {
+	// Intervals: shown in standard and wide, omitted in narrow.
+	if mode != layoutNarrow && m.dashStats.PollInterval > 0 {
 		left.WriteString(fmt.Sprintf("  Poll:    every %s\n", formatInterval(m.dashStats.PollInterval)))
 		left.WriteString(fmt.Sprintf("  Stale:   every %s\n", formatInterval(m.dashStats.StaleInterval)))
 		left.WriteString(fmt.Sprintf("  Delay:   %s", formatInterval(m.dashStats.InterSessionDelay)))
 	}
 
-	// Build right column: HOOKS + STORE.
+	// Build right column: HOOKS + STORE (store hidden in narrow).
 	var right strings.Builder
 	right.WriteString(sectionHeaderStyle.Render("HOOKS"))
 	right.WriteString("\n")
 	right.WriteString(fmt.Sprintf("  pre-compact:  %s\n", checkmark(m.dashStats.HookPreCompact)))
-	right.WriteString(fmt.Sprintf("  session-end:  %s\n", checkmark(m.dashStats.HookSessionEnd)))
-	right.WriteString("\n")
-	right.WriteString(sectionHeaderStyle.Render("STORE"))
-	right.WriteString("\n")
-	right.WriteString(fmt.Sprintf("  Path: %s\n", m.dashStats.StorePath))
-	right.WriteString(fmt.Sprintf("  Raw:  %d sessions\n", m.dashStats.SessionCount))
-	right.WriteString(fmt.Sprintf("  Disk: %s", formatBytes(m.dashStats.DiskBytes)))
+	right.WriteString(fmt.Sprintf("  session-end:  %s", checkmark(m.dashStats.HookSessionEnd)))
 
-	// Two-column layout in wide mode, stacked otherwise.
-	if m.width >= 120 {
+	if mode != layoutNarrow {
+		right.WriteString("\n\n")
+		right.WriteString(sectionHeaderStyle.Render("STORE"))
+		right.WriteString("\n")
+		right.WriteString(fmt.Sprintf("  Path: %s\n", m.dashStats.StorePath))
+		right.WriteString(fmt.Sprintf("  Raw:  %d sessions\n", m.dashStats.SessionCount))
+		right.WriteString(fmt.Sprintf("  Disk: %s", formatBytes(m.dashStats.DiskBytes)))
+	}
+
+	// Layout: wide = two-column, standard/narrow = stacked.
+	if mode == layoutWide {
 		colWidth := m.width / 2
 		leftStyle := lipgloss.NewStyle().Width(colWidth)
 		return lipgloss.JoinHorizontal(lipgloss.Top, leftStyle.Render(left.String()), right.String())
