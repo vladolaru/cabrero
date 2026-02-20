@@ -43,6 +43,9 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 	cmd := exec.Command("claude",
 		"--model", "claude-sonnet-4-6",
 		"--print",
+		"--no-session-persistence",
+		"--disable-slash-commands",
+		"--tools", "",
 	)
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
@@ -77,6 +80,11 @@ func Commit(proposal *pipeline.Proposal, blendedContent string) error {
 
 // Archive moves a proposal from proposals/ to proposals/archived/.
 func Archive(proposalID string, reason string) error {
+	// Reject IDs with path separators or directory traversal components.
+	if strings.ContainsAny(proposalID, "/\\") || proposalID == ".." || strings.Contains(proposalID, "..") {
+		return fmt.Errorf("invalid proposal ID: %q", proposalID)
+	}
+
 	srcDir := filepath.Join(store.Root(), "proposals")
 	dstDir := filepath.Join(store.Root(), "proposals", "archived")
 

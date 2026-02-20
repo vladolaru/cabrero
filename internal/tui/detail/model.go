@@ -90,11 +90,17 @@ func (m Model) renderCitationContent() string {
 	return renderCitations(m.citations, m.width)
 }
 
-// SelectedCitationIndex returns the index of the citation at cursor, or -1.
-func (m Model) SelectedCitationIndex() int {
-	// For now, citations aren't individually selectable via cursor.
-	// Expansion is toggled via Enter on the viewport.
-	return -1
+// Proposal returns the underlying proposal, or nil.
+func (m Model) Proposal() *pipeline.ProposalWithSession {
+	return m.proposal
+}
+
+// BlendResult returns the blended content from the approve flow, or empty string.
+func (m Model) BlendResult() string {
+	if m.blendResult != nil {
+		return *m.blendResult
+	}
+	return ""
 }
 
 // HasRevision returns true if a chat-produced revision is available.
@@ -102,7 +108,3 @@ func (m Model) HasRevision() bool {
 	return m.revision != nil
 }
 
-// HasChatFocus returns true if the chat pane has focus.
-func (m Model) HasChatFocus() bool {
-	return m.focus == FocusChat
-}

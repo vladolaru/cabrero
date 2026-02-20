@@ -38,6 +38,9 @@ func StartChat(question string, systemContext string) tea.Cmd {
 			"--model", "claude-sonnet-4-6",
 			"--print",
 			"--output-format", "stream-json",
+			"--no-session-persistence",
+			"--disable-slash-commands",
+			"--tools", "",
 		)
 		cmd.Env = append(cmd.Environ(), "CABRERO_SESSION=1")
 		cmd.Stdin = strings.NewReader(prompt)
@@ -73,6 +76,12 @@ func StartChat(question string, systemContext string) tea.Cmd {
 				fullResponse.WriteString(token)
 				ch <- streamMsg{token: token}
 			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			ch <- streamMsg{err: err}
+			_ = cmd.Wait()
+			return
 		}
 
 		if err := cmd.Wait(); err != nil {

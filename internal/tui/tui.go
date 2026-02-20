@@ -32,7 +32,7 @@ func Run() error {
 		return fmt.Errorf("loading proposals: %w", err)
 	}
 
-	stats := gatherStats()
+	stats := gatherStats(proposals)
 
 	// Future: reports := fitness.ListReports()
 	var reports []fitness.Report
@@ -51,11 +51,10 @@ func Run() error {
 }
 
 // gatherStats collects dashboard statistics from the store and daemon.
-func gatherStats() message.DashboardStats {
+func gatherStats(proposals []pipeline.ProposalWithSession) message.DashboardStats {
 	stats := message.DashboardStats{}
 
-	// Proposal counts.
-	proposals, _ := pipeline.ListProposals()
+	// Proposal count from already-loaded data.
 	stats.PendingCount = len(proposals)
 
 	// Session counts for last capture time.

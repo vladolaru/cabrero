@@ -52,6 +52,7 @@ func LoadConfigFrom(path string) (*Config, error) {
 		"navigation": true, "theme": true,
 		"dashboard": true, "detail": true,
 		"personality": true, "confirmations": true,
+		"sourceManager": true,
 	}
 	cfg.Extra = make(map[string]json.RawMessage)
 	for k, v := range raw {

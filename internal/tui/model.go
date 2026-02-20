@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/vladolaru/cabrero/internal/apply"
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/chat"
@@ -26,7 +27,6 @@ type reviewModel struct {
 	state     message.ViewState
 	viewStack []message.ViewState
 	config    *shared.Config
-	styles    shared.Styles
 
 	// Status bar
 	statusMsg    string
@@ -57,12 +57,10 @@ type reviewModel struct {
 // newReviewModel creates the root model with loaded data.
 func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, cfg *shared.Config) reviewModel {
 	keys := shared.NewKeyMap(cfg.Navigation)
-	styles := shared.ThemeFromConfig(cfg)
 
 	m := reviewModel{
 		state:        message.ViewDashboard,
 		config:       cfg,
-		styles:       styles,
 		keys:         keys,
 		proposals:    proposals,
 		sourceGroups: sourceGroups,
@@ -116,8 +114,65 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case message.RejectFinished, message.DeferFinished:
-		// Return to dashboard after action.
+	case message.ApproveStarted:
+		// Start blending in a background goroutine.
+		p := m.detail.Proposal()
+		if p != nil {
+			proposalID := msg.ProposalID
+			proposal := &p.Proposal
+			sessionID := p.SessionID
+			return m, func() tea.Msg {
+				diff, err := apply.Blend(proposal, sessionID)
+				return message.BlendFinished{
+					ProposalID:      proposalID,
+					BeforeAfterDiff: diff,
+					Err:             err,
+				}
+			}
+		}
+		return m, nil
+
+	case message.ApplyConfirmed:
+		// Apply blended content and archive the proposal.
+		p := m.detail.Proposal()
+		if p != nil {
+			proposalID := msg.ProposalID
+			proposal := &p.Proposal
+			blended := m.detail.BlendResult()
+			return m, func() tea.Msg {
+				if blended != "" {
+					if err := apply.Commit(proposal, blended); err != nil {
+						return message.ApplyFinished{ProposalID: proposalID, Err: err}
+					}
+				}
+				if err := apply.Archive(proposalID, "approved"); err != nil {
+					return message.ApplyFinished{ProposalID: proposalID, Err: err}
+				}
+				return message.ApplyFinished{ProposalID: proposalID}
+			}
+		}
+		return m, nil
+
+	case message.RejectFinished:
+		// Archive the proposal and return to dashboard.
+		proposalID := msg.ProposalID
+		go func() { _ = apply.Archive(proposalID, "rejected") }()
+		m.statusMsg = actionStatusText(msg)
+		m.statusExpiry = time.Now().Add(3 * time.Second)
+		if m.state != message.ViewDashboard {
+			m2, cmd := m.popView()
+			cmds = append(cmds, cmd)
+			m = m2.(reviewModel)
+		}
+		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
+			return message.StatusMessageExpired{}
+		}))
+		return m, tea.Batch(cmds...)
+
+	case message.DeferFinished:
+		// Archive the proposal and return to dashboard.
+		proposalID := msg.ProposalID
+		go func() { _ = apply.Archive(proposalID, "deferred") }()
 		m.statusMsg = actionStatusText(msg)
 		m.statusExpiry = time.Now().Add(3 * time.Second)
 		if m.state != message.ViewDashboard {
