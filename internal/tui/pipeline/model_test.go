@@ -202,6 +202,22 @@ func TestModelRetryKey(t *testing.T) {
 	}
 }
 
+func TestModelViewNarrowActivityStats(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(70, 40) // narrow
+	view := ansi.Strip(m.View())
+
+	// Activity section should still be present.
+	if !strings.Contains(view, "PIPELINE ACTIVITY") {
+		t.Error("narrow view missing PIPELINE ACTIVITY section")
+	}
+
+	// Sparkline should be hidden in narrow mode.
+	if strings.Contains(view, "sessions/day") {
+		t.Error("narrow view should not show sparkline")
+	}
+}
+
 func TestLayoutMode(t *testing.T) {
 	m := newTestModel()
 

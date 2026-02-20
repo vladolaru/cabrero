@@ -172,22 +172,32 @@ func formatBytes(b int64) string {
 }
 
 func (m Model) renderActivityStats() string {
+	mode := m.layoutMode()
 	var b strings.Builder
 	days := m.config.Pipeline.SparklineDays
 	b.WriteString(sectionHeaderStyle.Render(fmt.Sprintf("PIPELINE ACTIVITY (last %d days)", days)))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Sessions captured:  %-6d Proposals generated:  %d\n",
-		m.stats.SessionsCaptured, m.stats.ProposalsGenerated))
-	b.WriteString(fmt.Sprintf("  Sessions processed: %-6d Proposals approved:   %d\n",
-		m.stats.SessionsProcessed, m.stats.ProposalsApproved))
-	b.WriteString(fmt.Sprintf("  Sessions pending:   %-6d Proposals rejected:   %d\n",
-		m.stats.SessionsPending, m.stats.ProposalsRejected))
-	b.WriteString(fmt.Sprintf("  Sessions errored:   %-6d Proposals pending:    %d",
-		m.stats.SessionsErrored, m.stats.ProposalsPending))
 
-	if len(m.stats.SessionsPerDay) > 0 {
-		sparkline := components.RenderSparkline(m.stats.SessionsPerDay, m.width-4)
-		b.WriteString("\n\n  " + sparkline + "  sessions/day")
+	if mode == layoutNarrow {
+		// Stacked: one stat per line.
+		b.WriteString(fmt.Sprintf("  Captured:  %d   Processed: %d\n", m.stats.SessionsCaptured, m.stats.SessionsProcessed))
+		b.WriteString(fmt.Sprintf("  Pending:   %d   Errored:   %d\n", m.stats.SessionsPending, m.stats.SessionsErrored))
+		b.WriteString(fmt.Sprintf("  Proposals: %d gen  %d ok  %d rej", m.stats.ProposalsGenerated, m.stats.ProposalsApproved, m.stats.ProposalsRejected))
+	} else {
+		// Wide/standard: 2-column layout.
+		b.WriteString(fmt.Sprintf("  Sessions captured:  %-6d Proposals generated:  %d\n",
+			m.stats.SessionsCaptured, m.stats.ProposalsGenerated))
+		b.WriteString(fmt.Sprintf("  Sessions processed: %-6d Proposals approved:   %d\n",
+			m.stats.SessionsProcessed, m.stats.ProposalsApproved))
+		b.WriteString(fmt.Sprintf("  Sessions pending:   %-6d Proposals rejected:   %d\n",
+			m.stats.SessionsPending, m.stats.ProposalsRejected))
+		b.WriteString(fmt.Sprintf("  Sessions errored:   %-6d Proposals pending:    %d",
+			m.stats.SessionsErrored, m.stats.ProposalsPending))
+
+		if len(m.stats.SessionsPerDay) > 0 {
+			sparkline := components.RenderSparkline(m.stats.SessionsPerDay, m.width-4)
+			b.WriteString("\n\n  " + sparkline + "  sessions/day")
+		}
 	}
 
 	return b.String()
