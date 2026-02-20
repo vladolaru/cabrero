@@ -192,6 +192,17 @@ watcher (fsnotify) relies on rename events to trigger reloads — which aligns
 with the atomic write pattern since the final rename is the event that signals
 a complete write.
 
+### Store Query & Status Helpers
+
+- **`store.QuerySessions(filter SessionFilter)`** — returns sessions matching the
+  filter, sorted oldest-first. `SessionFilter` fields: `Since`/`Until` (time range),
+  `Project` (substring match), `Statuses` (e.g. `["pending"]` or `["pending", "error"]`).
+  Used by `cabrero backfill` and setup wizard.
+- **`store.MarkProcessed(sessionID)`** — sets a session's status to `"processed"`.
+- **`store.MarkError(sessionID)`** — sets a session's status to `"error"`.
+
+Both helpers read the current metadata, update the status field, and write atomically.
+
 ### JSONL Structure (key facts)
 
 Each line is a JSON entry with: `type`, `message`, `uuid`, `parentUuid`, `sessionId`, `timestamp`.
@@ -369,16 +380,26 @@ use more tokens than `--print`. The cost guard is the Classifier's triage qualit
 classified as clean skip the Evaluator entirely. If 60% of sessions are clean, the agentic
 Classifier's higher per-session cost is offset by eliminating 60% of Evaluator invocations.
 
-### Smart Batching
+### Smart Batching — `pipeline.BatchProcessor`
 
-When multiple pending sessions belong to the same project, the daemon batches them
-to reduce Evaluator invocations and improve cross-session reasoning:
+When multiple pending sessions belong to the same project, they are batched
+to reduce Evaluator invocations and improve cross-session reasoning.
 
-1. Group pending sessions by project
-2. Run Classifier individually on each (cheap, independent triage)
-3. Collect sessions where `triage == "evaluate"`
-4. If 1 session: individual Evaluator call
-5. If 2+ sessions: batched Evaluator call with all digests + Classifier outputs
+`pipeline.BatchProcessor` is the shared infrastructure for batching, used by both
+the daemon and `cabrero backfill`. Configuration:
+
+- `Config` — pipeline settings (turn budgets, timeouts)
+- `MaxBatchSize` — max sessions per Evaluator invocation (default 10, keeps within
+  the Evaluator's 60-turn / 15-minute caps)
+- `OnStatus` — callback for progress events (`classifier_done`, `evaluator_done`, `error`)
+
+`ProcessGroup(ctx, sessions)` runs the two-phase algorithm:
+
+1. **Phase 1:** Run Classifier individually on each session (cheap, independent triage).
+   Clean sessions are marked processed immediately.
+2. **Phase 2:** Collect sessions where `triage == "evaluate"`, chunk by `MaxBatchSize`.
+   Single-session chunks get individual Evaluator calls; multi-session chunks get
+   batched Evaluator calls with all digests + Classifier outputs.
 
 The batching decision is pure code — no orchestrator agent needed. The only
 criterion is "same project," which is available from session metadata. The Evaluator's
@@ -386,7 +407,7 @@ max turns and timeout scale linearly with batch size (capped at reasonable
 maximums). Sessions without project metadata fall back to individual processing.
 
 `cabrero run <session_id>` always processes one session individually — batching
-only happens in the daemon when multiple sessions are pending.
+only happens in the daemon and backfill when multiple sessions are pending.
 
 ### Human Approval Gate
 
@@ -409,8 +430,9 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (5 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
-- **Smart batching** — groups pending sessions by project, runs Classifier individually (cheap
-  triage), then batches "evaluate" sessions into a single Evaluator call per project
+- **Smart batching** — uses `pipeline.BatchProcessor` to group pending sessions by project,
+  run Classifier individually (cheap triage), then batch "evaluate" sessions into a single
+  Evaluator call per project
 - **Evaluator tuning** — turn budgets and timeouts configurable via CLI flags
   (`--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`, `--evaluator-timeout`)
 
@@ -574,6 +596,20 @@ cabrero inspect <proposal_id>   Show full proposal with citation chain
 cabrero approve <proposal_id>   Approve and apply a proposal (same flow as app)
 cabrero reject <proposal_id>    Reject with optional reason
 cabrero import [--from <path>]  Seed store from existing CC session files
+                                  Runs pre-parser on each imported session to generate a digest.
+                                  RunImport(from, dryRun, quiet) available for programmatic use
+                                  (quiet mode suppresses per-session output, used by setup wizard).
+cabrero backfill                Process existing sessions through the full pipeline
+  --since <date>                  Start date filter, YYYY-MM-DD (default: 30 days ago)
+  --until <date>                  End date filter, YYYY-MM-DD (default: now)
+  --project <slug>                Filter by project slug substring
+  --dry-run                       Show preview only, don't process
+  --yes                           Skip confirmation prompt
+  --retry-errors                  Also re-process sessions with status "error"
+  --classifier-max-turns <int>    Override Classifier max turns
+  --evaluator-max-turns <int>     Override Evaluator max turns
+  --classifier-timeout <duration> Override Classifier timeout
+  --evaluator-timeout <duration>  Override Evaluator timeout
 cabrero daemon                  Run background session processor (for launchd)
   --poll <duration>               Pending session check interval (default 2m)
   --stale <duration>              Stale session scan interval (default 30m)
@@ -856,7 +892,10 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - goreleaser builds darwin/amd64 + darwin/arm64 on tag push
 - One-liner install script downloads binary from GitHub Releases
 - `cabrero setup` — interactive wizard: prerequisite checks, store init,
-  hook installation, CC registration, LaunchAgent, daemon start, PATH check
+  hook installation, CC registration, LaunchAgent, daemon start, PATH check,
+  process existing sessions (Step 8: imports CC sessions in quiet mode, counts
+  pending, offers to backfill recent sessions with configurable lookback —
+  default 1 month, skippable)
 - `cabrero update` — self-update from GitHub Releases with checksum verification
 - Hook scripts embedded in binary via `//go:embed`
 - `--yes` flag for scripted installs, `--dry-run` for preview

@@ -5,6 +5,30 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `cabrero backfill` command to process existing sessions through the full
+  pipeline with `--since`, `--until`, `--project`, `--retry-errors` filtering,
+  preview with confirmation, and smart batching via `pipeline.BatchProcessor`.
+- Setup wizard Step 8: offers to import and process existing CC sessions after
+  installation (imports in quiet mode, counts pending, offers backfill with
+  configurable lookback — default 1 month, skippable).
+- `store.QuerySessions` for filtered session queries by date range, project
+  substring, and status. Returns oldest-first.
+- `pipeline.BatchProcessor` as shared smart batching infrastructure with
+  configurable max batch size (default 10) and progress callbacks. Used by
+  both daemon and backfill command.
+
+### Changed
+
+- `cabrero import` now runs the pre-parser on each imported session to generate
+  digests. `RunImport` function available for programmatic use (quiet mode).
+- Daemon batching logic refactored into `pipeline.BatchProcessor` (no behavior
+  change).
+- `store.MarkProcessed` and `store.MarkError` extracted as public helpers.
+
 ## [0.6.0] - 2026-02-20
 
 ### Changed
