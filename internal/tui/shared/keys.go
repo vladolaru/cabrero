@@ -48,6 +48,17 @@ type KeyMap struct {
 	SetOwnership   key.Binding
 	Rollback       key.Binding
 
+	// Pipeline Monitor
+	Retry        key.Binding
+	LogView      key.Binding
+	Refresh      key.Binding
+
+	// Log Viewer
+	Search       key.Binding
+	SearchNext   key.Binding
+	SearchPrev   key.Binding
+	FollowToggle key.Binding
+
 	// Future views
 	Sources  key.Binding
 	Pipeline key.Binding
@@ -89,6 +100,17 @@ func NewKeyMap(nav string) KeyMap {
 		ToggleApproach: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle mode")),
 		SetOwnership:   key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "ownership")),
 		Rollback:       key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "rollback")),
+
+		// Pipeline Monitor.
+		Retry:   key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "retry")),
+		LogView: key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "log")),
+		Refresh: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+
+		// Log Viewer.
+		Search:       key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+		SearchNext:   key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next")),
+		SearchPrev:   key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev")),
+		FollowToggle: key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "follow")),
 
 		// Future views.
 		Sources:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sources")),
@@ -150,4 +172,14 @@ func (k KeyMap) FitnessShortHelp() []key.Binding {
 // SourcesShortHelp returns help bindings for the source manager view.
 func (k KeyMap) SourcesShortHelp() []key.Binding {
 	return []key.Binding{k.Up, k.Down, k.Open, k.ToggleApproach, k.SetOwnership, k.Help}
+}
+
+// PipelineShortHelp returns help bindings for the pipeline monitor view.
+func (k KeyMap) PipelineShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Open, k.Retry, k.LogView, k.Help}
+}
+
+// LogViewShortHelp returns help bindings for the log viewer.
+func (k KeyMap) LogViewShortHelp() []key.Binding {
+	return []key.Binding{k.Search, k.SearchNext, k.SearchPrev, k.FollowToggle, k.Back, k.Help}
 }

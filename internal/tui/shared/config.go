@@ -15,6 +15,7 @@ type Config struct {
 	Personality   PersonalityConfig   `json:"personality"`
 	Confirmations ConfirmConfig       `json:"confirmations"`
 	SourceManager SourceManagerConfig `json:"sourceManager"`
+	Pipeline      PipelineConfig      `json:"pipeline"`
 
 	// Extra preserves unknown JSON fields for forward compatibility.
 	Extra map[string]json.RawMessage `json:"-"`
@@ -43,6 +44,13 @@ type PersonalityConfig struct {
 // SourceManagerConfig holds source manager view settings.
 type SourceManagerConfig struct {
 	GroupCollapsedDefault bool `json:"groupCollapsedDefault"`
+}
+
+// PipelineConfig holds pipeline monitor view settings.
+type PipelineConfig struct {
+	SparklineDays   int  `json:"sparklineDays"`
+	RecentRunsLimit int  `json:"recentRunsLimit"`
+	LogFollowMode   bool `json:"logFollowMode"`
 }
 
 // ConfirmConfig controls which actions require confirmation.
@@ -82,6 +90,11 @@ func DefaultConfig() *Config {
 		},
 		SourceManager: SourceManagerConfig{
 			GroupCollapsedDefault: false,
+		},
+		Pipeline: PipelineConfig{
+			SparklineDays:   7,
+			RecentRunsLimit: 20,
+			LogFollowMode:   true,
 		},
 	}
 }

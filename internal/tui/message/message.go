@@ -12,6 +12,8 @@ const (
 	ViewFitnessDetail
 	ViewSourceManager
 	ViewSourceDetail
+	ViewPipelineMonitor
+	ViewLogViewer
 )
 
 // Navigation messages.
@@ -133,3 +135,20 @@ type RollbackFinished struct {
 	ChangeID string
 	Err      error
 }
+
+// Pipeline monitor messages.
+
+// RetryRunStarted signals the beginning of a pipeline retry.
+type RetryRunStarted struct{ SessionID string }
+
+// RetryRunFinished carries the result of retrying a pipeline run.
+type RetryRunFinished struct {
+	SessionID string
+	Err       error
+}
+
+// PipelineTickMsg triggers auto-refresh of pipeline data.
+type PipelineTickMsg struct{}
+
+// LogTickMsg triggers log viewer follow-mode refresh.
+type LogTickMsg struct{}
