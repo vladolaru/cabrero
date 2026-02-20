@@ -16,3 +16,9 @@ var (
 	ColorBorder = lipgloss.AdaptiveColor{Light: "#BDBDBD", Dark: "#616161"}
 )
 
+// HighlightFg returns the foreground color string for search match highlighting.
+func HighlightFg() string { return "#FFFFFF" }
+
+// HighlightBg returns the background color string for search match highlighting.
+func HighlightBg() string { return "#6A1B9A" }
+

@@ -89,6 +89,47 @@ func TestLogModelFollowToggle(t *testing.T) {
 	}
 }
 
+func TestLogModelSearchHighlighting(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// Activate search.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+
+	// Type search term.
+	for _, r := range "classifier" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// Press Enter to search.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if len(m.matches) == 0 {
+		t.Fatal("expected matches for 'classifier'")
+	}
+
+	// The highlighted content should contain ANSI escape sequences.
+	highlighted := m.highlightedContent()
+	if !strings.Contains(highlighted, "\x1b[") {
+		t.Error("highlighted content should contain ANSI escape sequences")
+	}
+
+	// The highlighted content should differ from the raw content.
+	if highlighted == m.content {
+		t.Error("highlighted content should differ from raw content when matches exist")
+	}
+
+	// The stripped highlighted content should still contain the match text.
+	stripped := ansi.Strip(highlighted)
+	if !strings.Contains(stripped, "classifier") {
+		t.Error("stripped highlighted content should still contain the match text")
+	}
+
+	// Non-matching lines should be unchanged.
+	if !strings.Contains(stripped, "daemon started") {
+		t.Error("non-matching content should be preserved")
+	}
+}
+
 func TestLogModelEscFromSearch(t *testing.T) {
 	m := newTestLogModel()
 	m.SetSize(120, 40)
