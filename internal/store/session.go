@@ -16,7 +16,7 @@ type Metadata struct {
 	Timestamp      string `json:"timestamp"`
 	CaptureTrigger string `json:"capture_trigger"`
 	CCVersion      string `json:"cc_version,omitempty"`
-	Status         string `json:"status"`              // "pending", "processed", or "error"
+	Status         string `json:"status"`              // "queued", "imported", "processed", or "error"
 	Project        string `json:"project,omitempty"`    // CC project slug (parent dir name)
 }
 
@@ -50,7 +50,7 @@ func WriteSession(sessionID, transcriptSrc, trigger, ccVersion string, ts time.T
 		Timestamp:      ts.UTC().Format(time.RFC3339),
 		CaptureTrigger: trigger,
 		CCVersion:      ccVersion,
-		Status:         "pending",
+		Status:         "imported",
 		Project:        project,
 	}
 	return WriteMetadata(dir, meta)
@@ -86,6 +86,16 @@ func MarkProcessed(sessionID string) error {
 		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
 	}
 	meta.Status = "processed"
+	return WriteMetadata(RawDir(sessionID), meta)
+}
+
+// MarkQueued sets a session's status to "queued" so the daemon will process it.
+func MarkQueued(sessionID string) error {
+	meta, err := ReadMetadata(sessionID)
+	if err != nil {
+		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
+	}
+	meta.Status = "queued"
 	return WriteMetadata(RawDir(sessionID), meta)
 }
 
