@@ -13,9 +13,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   breakdown (parse/classifier/evaluator), sparkline activity chart, prompt
   version listing, inline run detail expansion, and retry flow with
   configurable confirmation gate.
+- **Pipeline monitor daemon header** — uptime, poll/stale/delay intervals, store
+  metrics (path, session count, disk usage), and two-column layout at width >= 120.
 - **Log viewer view** — full-screen scrollable daemon log with incremental
   search, match navigation (n/N), follow mode toggle, and auto-refresh via
   polling.
+- **Log viewer search highlighting** — search matches highlighted with accent
+  color in the viewport using termenv styling.
+- **Log viewer two-stage Esc** — first Esc clears active search matches and
+  highlighting, second Esc navigates back to the pipeline monitor.
 - **PipelineRun data layer** — reconstructs pipeline run history from store
   artifacts (session metadata, classifier/evaluator output files, timestamps)
   without requiring a dedicated database.
