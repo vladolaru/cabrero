@@ -70,7 +70,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	d.log.Info("poll=%s stale=%s delay=%s", d.config.PollInterval, d.config.StaleInterval, d.config.InterSessionDelay)
 
 	// Run an immediate scan on startup.
-	d.processPending(ctx)
+	d.processQueued(ctx)
 
 	pollTicker := time.NewTicker(d.config.PollInterval)
 	defer pollTicker.Stop()
@@ -84,29 +84,29 @@ func (d *Daemon) Run(ctx context.Context) error {
 			d.log.Info("daemon shutting down")
 			return nil
 		case <-pollTicker.C:
-			d.processPending(ctx)
+			d.processQueued(ctx)
 		case <-staleTicker.C:
 			d.scanStale()
 		}
 	}
 }
 
-func (d *Daemon) processPending(ctx context.Context) {
-	pending, err := ScanPending()
+func (d *Daemon) processQueued(ctx context.Context) {
+	queued, err := ScanQueued()
 	if err != nil {
-		d.log.Error("scanning pending sessions: %v", err)
+		d.log.Error("scanning queued sessions: %v", err)
 		return
 	}
-	if len(pending) == 0 {
+	if len(queued) == 0 {
 		return
 	}
 
-	d.log.Info("found %d pending session(s)", len(pending))
+	d.log.Info("found %d queued session(s)", len(queued))
 
 	// Group by project for smart batching.
-	byProject := make(map[string][]PendingSession)
+	byProject := make(map[string][]QueuedSession)
 	var projectOrder []string
-	for _, p := range pending {
+	for _, p := range queued {
 		key := p.Project
 		if _, seen := byProject[key]; !seen {
 			projectOrder = append(projectOrder, key)
@@ -163,7 +163,7 @@ func (d *Daemon) processPending(ctx context.Context) {
 
 // processProjectBatch runs the Classifier individually on each session in a project,
 // then batches sessions flagged as "evaluate" into a single Evaluator invocation.
-func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessions []PendingSession) {
+func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessions []QueuedSession) {
 	d.log.Info("batch: %d session(s) for project %s", len(sessions), store.ProjectDisplayName(project))
 
 	batchSessions := make([]pipeline.BatchSession, len(sessions))

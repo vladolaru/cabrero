@@ -1,39 +1,32 @@
 package daemon
 
 import (
-	"strings"
-
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
-// PendingSession holds a session ID and its project for batching.
-type PendingSession struct {
+// QueuedSession holds a session ID and its project for batching.
+type QueuedSession struct {
 	SessionID string
 	Project   string
 }
 
-// ScanPending returns sessions that are ready for processing:
-// status is "pending" and capture_trigger contains "session-end".
+// ScanQueued returns sessions with status "queued" that are ready for processing.
 // Results are ordered oldest-first so the daemon processes in chronological order.
-// Each result includes the session's project slug for batch grouping.
-func ScanPending() ([]PendingSession, error) {
+func ScanQueued() ([]QueuedSession, error) {
 	sessions, err := store.ListSessions()
 	if err != nil {
 		return nil, err
 	}
 
-	var ready []PendingSession
+	var ready []QueuedSession
 	for _, s := range sessions {
-		if s.Status != "pending" {
-			continue
-		}
-		if !strings.Contains(s.CaptureTrigger, "session-end") {
+		if s.Status != "queued" {
 			continue
 		}
 		if store.IsBlocked(s.SessionID) {
 			continue
 		}
-		ready = append(ready, PendingSession{
+		ready = append(ready, QueuedSession{
 			SessionID: s.SessionID,
 			Project:   s.Project,
 		})

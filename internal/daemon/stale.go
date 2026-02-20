@@ -68,6 +68,10 @@ func ScanStale(log *Logger) (int, error) {
 			log.Error("stale recovery: failed to import %s: %v", sessionID, err)
 			return nil
 		}
+		// Stale-recovered sessions should be processed by the daemon.
+		if err := store.MarkQueued(sessionID); err != nil {
+			log.Error("stale recovery: failed to queue %s: %v", sessionID, err)
+		}
 
 		log.Info("stale recovery: imported session %s (idle since %s)", sessionID, info.ModTime().Format("2006-01-02 15:04"))
 		recovered++
