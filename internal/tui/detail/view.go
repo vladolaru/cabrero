@@ -11,12 +11,10 @@ import (
 )
 
 var (
-	detailHeader = lipgloss.NewStyle().Bold(true)
-	detailMuted  = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"})
+	detailHeader  = lipgloss.NewStyle().Bold(true)
+	detailMuted   = lipgloss.NewStyle().Foreground(shared.ColorMuted)
 	detailSection = lipgloss.NewStyle().Bold(true)
-	detailAccent  = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#6A1B9A", Dark: "#CE93D8"})
+	detailAccent  = lipgloss.NewStyle().Foreground(shared.ColorAccent)
 )
 
 // View renders the proposal detail view.
@@ -87,6 +85,9 @@ func (m Model) View() string {
 			b.WriteString("\n\n")
 			b.WriteString("  " + m.confirm.View())
 		}
+	case ApplyRejectConfirming, ApplyDeferConfirming:
+		b.WriteString("\n")
+		b.WriteString("  " + m.confirm.View())
 	case ApplyDone:
 		b.WriteString("\n")
 		b.WriteString("  " + components.ConfirmApprove())

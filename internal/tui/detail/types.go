@@ -17,4 +17,6 @@ const (
 	ApplyBlending
 	ApplyReviewing
 	ApplyDone
+	ApplyRejectConfirming
+	ApplyDeferConfirming
 )

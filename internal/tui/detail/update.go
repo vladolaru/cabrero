@@ -71,6 +71,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// When confirming reject or defer, route to confirm component.
+	if m.applyState == ApplyRejectConfirming || m.applyState == ApplyDeferConfirming {
+		var cmd tea.Cmd
+		m.confirm, cmd = m.confirm.Update(msg)
+		return m, cmd
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.TabForward):
 		if m.focus == FocusProposal {
@@ -145,6 +152,18 @@ func (m Model) handleConfirmResult(msg components.ConfirmResult) (Model, tea.Cmd
 		return m, func() tea.Msg {
 			return message.ApplyConfirmed{ProposalID: id}
 		}
+	case ApplyRejectConfirming:
+		id := m.proposal.Proposal.ID
+		m.applyState = ApplyIdle
+		return m, func() tea.Msg {
+			return message.RejectFinished{ProposalID: id}
+		}
+	case ApplyDeferConfirming:
+		id := m.proposal.Proposal.ID
+		m.applyState = ApplyIdle
+		return m, func() tea.Msg {
+			return message.DeferFinished{ProposalID: id}
+		}
 	}
 
 	return m, nil
@@ -186,6 +205,11 @@ func (m Model) startReject() (Model, tea.Cmd) {
 	if m.proposal == nil {
 		return m, nil
 	}
+	if m.config.Confirmations.RejectRequiresConfirm {
+		m.applyState = ApplyRejectConfirming
+		m.confirm = components.NewConfirm("Reject this proposal?")
+		return m, nil
+	}
 	id := m.proposal.Proposal.ID
 	return m, func() tea.Msg {
 		return message.RejectFinished{ProposalID: id}
@@ -194,6 +218,11 @@ func (m Model) startReject() (Model, tea.Cmd) {
 
 func (m Model) startDefer() (Model, tea.Cmd) {
 	if m.proposal == nil {
+		return m, nil
+	}
+	if m.config.Confirmations.DeferRequiresConfirm {
+		m.applyState = ApplyDeferConfirming
+		m.confirm = components.NewConfirm("Defer this proposal?")
 		return m, nil
 	}
 	id := m.proposal.Proposal.ID
