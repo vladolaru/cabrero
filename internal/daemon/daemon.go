@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -167,139 +166,44 @@ func (d *Daemon) processPending(ctx context.Context) {
 func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessions []PendingSession) {
 	d.log.Info("batch: %d session(s) for project %s", len(sessions), store.ProjectDisplayName(project))
 
-	// Phase 1: Run Classifier individually on each session.
-	var toEvaluate []pipeline.BatchSession
-	for _, s := range sessions {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		result, err := pipeline.RunThroughClassifier(s.SessionID, d.config.Pipeline)
-		if err != nil {
-			d.log.Error("classifier failed for %s: %v", s.SessionID, err)
-			d.markError(s.SessionID)
-			continue
-		}
-
-		if result.ClassifierOutput.Triage == "clean" {
-			d.log.Info("session %s triaged as clean", shortID(s.SessionID))
-			d.markProcessed(s.SessionID)
-			continue
-		}
-
-		toEvaluate = append(toEvaluate, pipeline.BatchSession{
-			SessionID:        s.SessionID,
-			Digest:           result.Digest,
-			ClassifierOutput: result.ClassifierOutput,
-		})
+	batchSessions := make([]pipeline.BatchSession, len(sessions))
+	for i, s := range sessions {
+		batchSessions[i] = pipeline.BatchSession{SessionID: s.SessionID}
 	}
 
-	if len(toEvaluate) == 0 {
-		d.log.Info("batch: all %d session(s) triaged as clean", len(sessions))
-		return
+	bp := &pipeline.BatchProcessor{
+		Config: d.config.Pipeline,
+		OnStatus: func(sessionID string, event pipeline.BatchEvent) {
+			switch event.Type {
+			case "classifier_done":
+				if event.Triage == "clean" {
+					d.log.Info("session %s triaged as clean", shortID(sessionID))
+				}
+			case "error":
+				d.log.Error("pipeline error for %s: %v", shortID(sessionID), event.Error)
+			}
+		},
 	}
 
-	d.log.Info("batch: %d of %d session(s) need evaluation", len(toEvaluate), len(sessions))
+	results := bp.ProcessGroup(ctx, batchSessions)
 
-	// Phase 2: Run Evaluator — batch if 2+, individual if 1.
-	if len(toEvaluate) == 1 {
-		s := toEvaluate[0]
-		d.runEvaluatorSingle(s)
-	} else {
-		d.runEvaluatorBatch(toEvaluate)
-	}
-}
-
-func (d *Daemon) runEvaluatorSingle(s pipeline.BatchSession) {
-	d.log.Info("running Evaluator on session %s", shortID(s.SessionID))
-	evaluatorOutput, err := pipeline.RunEvaluator(s.SessionID, s.Digest, s.ClassifierOutput, d.config.Pipeline)
-	if err != nil {
-		d.log.Error("evaluator failed for %s: %v", s.SessionID, err)
-		d.markError(s.SessionID)
-		return
-	}
-
-	d.persistEvaluatorOutput(s.SessionID, evaluatorOutput)
-}
-
-func (d *Daemon) runEvaluatorBatch(sessions []pipeline.BatchSession) {
-	d.log.Info("running batched Evaluator on %d sessions", len(sessions))
-	evaluatorOutput, err := pipeline.RunEvaluatorBatch(sessions, d.config.Pipeline)
-	if err != nil {
-		d.log.Error("evaluator batch failed: %v", err)
-		for _, s := range sessions {
-			d.markError(s.SessionID)
-		}
-		return
-	}
-
-	// Partition proposals by session: proposal IDs encode their session
-	// via the format "prop-{first 8 chars of sessionId}-{index}".
-	totalMatched := 0
-	for _, s := range sessions {
-		prefix := "prop-" + shortID(s.SessionID) + "-"
-		filtered := filterProposals(evaluatorOutput, prefix)
-		filtered.SessionID = s.SessionID
-		totalMatched += len(filtered.Proposals)
-		d.persistEvaluatorOutput(s.SessionID, filtered)
-	}
-	if totalMatched != len(evaluatorOutput.Proposals) {
-		d.log.Error("batch: %d of %d proposals unmatched after partitioning",
-			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
-	}
-}
-
-// filterProposals returns a shallow copy of the EvaluatorOutput with only
-// the proposals whose ID starts with the given prefix.
-func filterProposals(output *pipeline.EvaluatorOutput, prefix string) *pipeline.EvaluatorOutput {
-	filtered := *output // shallow copy
-	filtered.Proposals = []pipeline.Proposal{}
-	for _, p := range output.Proposals {
-		if strings.HasPrefix(p.ID, prefix) {
-			filtered.Proposals = append(filtered.Proposals, p)
+	totalProposals := 0
+	toEvalCount := 0
+	for _, r := range results {
+		totalProposals += r.Proposals
+		if r.Triage == "evaluate" {
+			toEvalCount++
 		}
 	}
-	return &filtered
-}
 
-func (d *Daemon) persistEvaluatorOutput(sessionID string, output *pipeline.EvaluatorOutput) {
-	if err := pipeline.WriteEvaluatorOutput(sessionID, output); err != nil {
-		d.log.Error("writing evaluator output for %s: %v", sessionID, err)
-		d.markError(sessionID)
-		return
-	}
+	d.log.Info("batch: %d of %d session(s) needed evaluation, %d proposals",
+		toEvalCount, len(sessions), totalProposals)
 
-	proposalCount := 0
-	for i := range output.Proposals {
-		p := &output.Proposals[i]
-		if err := pipeline.WriteProposal(p, sessionID); err != nil {
-			d.log.Error("writing proposal %s: %v", p.ID, err)
-			continue
-		}
-		proposalCount++
-	}
-
-	d.markProcessed(sessionID)
-
-	if proposalCount > 0 {
-		msg := fmt.Sprintf("%d new proposal(s) from session %s", proposalCount, shortID(sessionID))
+	if totalProposals > 0 {
+		msg := fmt.Sprintf("%d new proposal(s) from %d session(s)", totalProposals, len(sessions))
 		if err := Notify("Cabrero", msg); err != nil {
 			d.log.Error("notification failed: %v", err)
 		}
-	}
-}
-
-func (d *Daemon) markProcessed(sessionID string) {
-	meta, err := store.ReadMetadata(sessionID)
-	if err != nil {
-		d.log.Error("reading metadata for %s to mark processed: %v", sessionID, err)
-		return
-	}
-	meta.Status = "processed"
-	if err := store.WriteMetadata(store.RawDir(sessionID), meta); err != nil {
-		d.log.Error("writing processed status for %s: %v", sessionID, err)
 	}
 }
 
@@ -309,7 +213,9 @@ func (d *Daemon) processOne(sessionID string) {
 	result, err := pipeline.Run(sessionID, false, d.config.Pipeline)
 	if err != nil {
 		d.log.Error("pipeline failed for %s: %v", sessionID, err)
-		d.markError(sessionID)
+		if markErr := store.MarkError(sessionID); markErr != nil {
+			d.log.Error("marking error for %s: %v", sessionID, markErr)
+		}
 		return
 	}
 
@@ -325,18 +231,6 @@ func (d *Daemon) processOne(sessionID string) {
 		if err := Notify("Cabrero", msg); err != nil {
 			d.log.Error("notification failed: %v", err)
 		}
-	}
-}
-
-func (d *Daemon) markError(sessionID string) {
-	meta, err := store.ReadMetadata(sessionID)
-	if err != nil {
-		d.log.Error("reading metadata for %s to mark error: %v", sessionID, err)
-		return
-	}
-	meta.Status = "error"
-	if err := store.WriteMetadata(store.RawDir(sessionID), meta); err != nil {
-		d.log.Error("writing error status for %s: %v", sessionID, err)
 	}
 }
 
