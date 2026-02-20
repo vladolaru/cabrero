@@ -16,10 +16,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.SetSize(msg.Width, msg.Height)
 		return m, nil
 
-	case message.ChatStreamToken:
-		m.streamBuf.WriteString(msg.Token)
+	case chatTokenWithContinuation:
+		m.streamBuf.WriteString(msg.token)
 		m.updateViewportContent()
-		return m, nil
+		return m, msg.NextCmd()
 
 	case message.ChatStreamDone:
 		m.streaming = false

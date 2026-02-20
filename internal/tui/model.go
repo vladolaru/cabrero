@@ -107,17 +107,6 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case message.ChatStreamToken, message.ChatStreamDone, message.ChatStreamError:
-		// Forward chat messages to the chat model.
-		if m.state == message.ViewProposalDetail {
-			var cmd tea.Cmd
-			m.chat, cmd = m.chat.Update(msg)
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-		}
-		return m, tea.Batch(cmds...)
-
 	case message.RejectFinished, message.DeferFinished:
 		// Return to dashboard after action.
 		m.statusMsg = actionStatusText(msg)
@@ -164,13 +153,11 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-		// Also forward to chat when it has focus.
-		if m.detail.HasChatFocus() {
-			var chatCmd tea.Cmd
-			m.chat, chatCmd = m.chat.Update(msg)
-			if chatCmd != nil {
-				cmds = append(cmds, chatCmd)
-			}
+		// Always forward to chat — it handles stream messages and input when focused.
+		var chatCmd tea.Cmd
+		m.chat, chatCmd = m.chat.Update(msg)
+		if chatCmd != nil {
+			cmds = append(cmds, chatCmd)
 		}
 	}
 
