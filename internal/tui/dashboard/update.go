@@ -79,6 +79,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return message.PushView{View: message.ViewSourceManager}
 		}
 
+	case key.Matches(msg, m.keys.Pipeline):
+		return m, func() tea.Msg {
+			return message.PushView{View: message.ViewPipelineMonitor}
+		}
+
 	case key.Matches(msg, m.keys.Approve):
 		if m.SelectedProposal() != nil {
 			return m, func() tea.Msg {

@@ -40,7 +40,22 @@ func Run() error {
 	// Future: sourceGroups := fitness.ListSourceGroups(sources)
 	sourceGroups := []fitness.SourceGroup{}
 
-	m := newReviewModel(proposals, reports, stats, sourceGroups, cfg)
+	runs, err := pipeline.ListPipelineRuns(cfg.Pipeline.RecentRunsLimit)
+	if err != nil {
+		runs = nil // non-fatal
+	}
+
+	pipelineStats, err := pipeline.GatherPipelineStats(cfg.Pipeline.SparklineDays)
+	if err != nil {
+		pipelineStats = pipeline.PipelineStats{}
+	}
+
+	prompts, err := pipeline.ListPromptVersions()
+	if err != nil {
+		prompts = nil
+	}
+
+	m := newReviewModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

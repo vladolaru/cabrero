@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -12,12 +14,15 @@ import (
 	"github.com/vladolaru/cabrero/internal/apply"
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
+	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/chat"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/dashboard"
 	"github.com/vladolaru/cabrero/internal/tui/detail"
 	fitness_tui "github.com/vladolaru/cabrero/internal/tui/fitness"
+	"github.com/vladolaru/cabrero/internal/tui/logview"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	pipeline_tui "github.com/vladolaru/cabrero/internal/tui/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 	"github.com/vladolaru/cabrero/internal/tui/sources"
 )
@@ -33,11 +38,13 @@ type reviewModel struct {
 	statusExpiry time.Time
 
 	// Child models
-	dashboard dashboard.Model
-	detail    detail.Model
-	chat      chat.Model
-	fitness   fitness_tui.Model
-	sources   sources.Model
+	dashboard       dashboard.Model
+	detail          detail.Model
+	chat            chat.Model
+	fitness         fitness_tui.Model
+	sources         sources.Model
+	pipelineMonitor pipeline_tui.Model
+	logViewer       logview.Model
 
 	// Source groups for re-use when pushing ViewSourceManager.
 	sourceGroups []fitness.SourceGroup
@@ -55,17 +62,18 @@ type reviewModel struct {
 }
 
 // newReviewModel creates the root model with loaded data.
-func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, cfg *shared.Config) reviewModel {
+func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, runs []pipeline.PipelineRun, pipelineStats pipeline.PipelineStats, prompts []pipeline.PromptVersion, cfg *shared.Config) reviewModel {
 	keys := shared.NewKeyMap(cfg.Navigation)
 
 	m := reviewModel{
-		state:        message.ViewDashboard,
-		config:       cfg,
-		keys:         keys,
-		proposals:    proposals,
-		sourceGroups: sourceGroups,
-		help:         help.New(),
-		dashboard:    dashboard.New(proposals, reports, stats, &keys, cfg),
+		state:           message.ViewDashboard,
+		config:          cfg,
+		keys:            keys,
+		proposals:       proposals,
+		sourceGroups:    sourceGroups,
+		help:            help.New(),
+		dashboard:       dashboard.New(proposals, reports, stats, &keys, cfg),
+		pipelineMonitor: pipeline_tui.New(runs, pipelineStats, prompts, stats, &keys, cfg),
 	}
 
 	return m
@@ -241,6 +249,50 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return message.StatusMessageExpired{}
 		}))
 		return m, tea.Batch(cmds...)
+
+	case message.PipelineTickMsg:
+		if m.state == message.ViewPipelineMonitor {
+			runs, _ := pipeline.ListPipelineRuns(m.config.Pipeline.RecentRunsLimit)
+			stats, _ := pipeline.GatherPipelineStats(m.config.Pipeline.SparklineDays)
+			prompts, _ := pipeline.ListPromptVersions()
+			dashStats := gatherStats(m.proposals)
+			m.pipelineMonitor = pipeline_tui.New(runs, stats, prompts, dashStats, &m.keys, m.config)
+			m.pipelineMonitor.SetSize(m.width, m.height)
+			return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
+				return message.PipelineTickMsg{}
+			})
+		}
+		return m, nil
+
+	case message.LogTickMsg:
+		if m.state == message.ViewLogViewer {
+			logPath := filepath.Join(store.Root(), "daemon.log")
+			content, _ := os.ReadFile(logPath)
+			m.logViewer.UpdateContent(string(content))
+			return m, tea.Tick(time.Second, func(time.Time) tea.Msg {
+				return message.LogTickMsg{}
+			})
+		}
+		return m, nil
+
+	case message.RetryRunStarted:
+		sessionID := msg.SessionID
+		return m, func() tea.Msg {
+			// Placeholder — actual retry via exec.Command in future.
+			return message.RetryRunFinished{SessionID: sessionID}
+		}
+
+	case message.RetryRunFinished:
+		if msg.Err != nil {
+			m.statusMsg = "Retry failed: " + msg.Err.Error()
+		} else {
+			m.statusMsg = "Retry complete."
+		}
+		m.statusExpiry = time.Now().Add(3 * time.Second)
+		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
+			return message.StatusMessageExpired{}
+		}))
+		return m, tea.Batch(cmds...)
 	}
 
 	// Route to active child.
@@ -275,6 +327,18 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
+	case message.ViewPipelineMonitor:
+		var cmd tea.Cmd
+		m.pipelineMonitor, cmd = m.pipelineMonitor.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	case message.ViewLogViewer:
+		var cmd tea.Cmd
+		m.logViewer, cmd = m.logViewer.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -300,6 +364,10 @@ func (m reviewModel) View() string {
 		content = m.fitness.View()
 	case message.ViewSourceManager, message.ViewSourceDetail:
 		content = m.sources.View()
+	case message.ViewPipelineMonitor:
+		content = m.pipelineMonitor.View()
+	case message.ViewLogViewer:
+		content = m.logViewer.View()
 	}
 
 	// Help overlay.
@@ -394,6 +462,23 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 		m.sources.SetSize(m.width, m.height)
 		if action != "" {
 			m.sources = m.sources.PreSelectSource(action)
+		}
+
+	case message.ViewPipelineMonitor:
+		m.pipelineMonitor.SetSize(m.width, m.height)
+		cmds = append(cmds, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
+			return message.PipelineTickMsg{}
+		}))
+
+	case message.ViewLogViewer:
+		logPath := filepath.Join(store.Root(), "daemon.log")
+		content, _ := os.ReadFile(logPath)
+		m.logViewer = logview.New(string(content), &m.keys, m.config)
+		m.logViewer.SetSize(m.width, m.height)
+		if m.config.Pipeline.LogFollowMode {
+			cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg {
+				return message.LogTickMsg{}
+			}))
 		}
 	}
 
