@@ -113,8 +113,14 @@ func ParseSession(sessionID string) (*Digest, error) {
 		SessionID:   sessionID,
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		ToolCalls: ToolCalls{
-			Summary: make(map[string]ToolCallDetail),
+			Summary:         make(map[string]ToolCallDetail),
+			RetryAnomalies:  []RetryAnomaly{},
+			FrictionSignals: []FrictionSignal{},
 		},
+		Agents: AgentsInfo{
+			Inventory: []AgentInventoryItem{},
+		},
+		RawUnknown: []RawUnknown{},
 	}
 
 	scanner := bufio.NewScanner(f)
