@@ -263,7 +263,7 @@ func shortID6(id string) string {
 // the proposals whose ID starts with the given prefix.
 func filterProposals(output *pipeline.SonnetOutput, prefix string) *pipeline.SonnetOutput {
 	filtered := *output // shallow copy
-	filtered.Proposals = nil
+	filtered.Proposals = []pipeline.Proposal{}
 	for _, p := range output.Proposals {
 		if strings.HasPrefix(p.ID, prefix) {
 			filtered.Proposals = append(filtered.Proposals, p)

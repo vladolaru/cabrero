@@ -128,7 +128,7 @@ func RunSonnetBatch(sessions []BatchSession, cfg PipelineConfig) (*SonnetOutput,
 	}
 
 	// Inject scaled turn budget into the prompt template.
-	systemPrompt = strings.Replace(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(maxTurns), 1)
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(maxTurns))
 
 	stdout, err := invokeClaude(claudeConfig{
 		Model:        "claude-sonnet-4-6",
