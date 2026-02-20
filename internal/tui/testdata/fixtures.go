@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/vladolaru/cabrero/internal/pipeline"
-	"github.com/vladolaru/cabrero/internal/tui"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 func ptr(s string) *string { return &s }
@@ -110,8 +110,8 @@ func TestDashboardStatsEmpty() message.DashboardStats {
 }
 
 // TestConfig returns a default config with optional overrides.
-func TestConfig(overrides ...func(*tui.Config)) *tui.Config {
-	cfg := tui.DefaultConfig()
+func TestConfig(overrides ...func(*shared.Config)) *shared.Config {
+	cfg := shared.DefaultConfig()
 	for _, fn := range overrides {
 		fn(cfg)
 	}
@@ -119,8 +119,8 @@ func TestConfig(overrides ...func(*tui.Config)) *tui.Config {
 }
 
 // TestCitations returns a set of citation entries for testing.
-func TestCitations() []tui.CitationEntry {
-	return []tui.CitationEntry{
+func TestCitations() []shared.CitationEntry {
+	return []shared.CitationEntry{
 		{
 			UUID:    "uuid-turn-9",
 			Summary: "[1] Turn 9:  tool_use write -> report.docx",

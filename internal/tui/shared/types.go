@@ -1,4 +1,4 @@
-package tui
+package shared
 
 // CitationEntry represents a single entry in the citation chain.
 type CitationEntry struct {

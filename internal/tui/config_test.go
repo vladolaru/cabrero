@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 func TestDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := shared.DefaultConfig()
 
 	if cfg.Navigation != "arrows" {
 		t.Errorf("Navigation = %q, want %q", cfg.Navigation, "arrows")
@@ -67,7 +69,7 @@ func TestLoadConfig_Missing(t *testing.T) {
 	}
 
 	// Should return defaults when file doesn't exist.
-	want := DefaultConfig()
+	want := shared.DefaultConfig()
 	if cfg.Navigation != want.Navigation {
 		t.Errorf("Navigation = %q, want %q", cfg.Navigation, want.Navigation)
 	}
@@ -160,7 +162,7 @@ func TestSaveConfig_Roundtrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
 
-	original := DefaultConfig()
+	original := shared.DefaultConfig()
 	original.Navigation = "vim"
 	original.Dashboard.SortOrder = "confidence"
 	original.Detail.ChatPanelWidth = 40

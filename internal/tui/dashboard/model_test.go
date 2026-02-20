@@ -7,13 +7,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/vladolaru/cabrero/internal/tui"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
 )
 
 func newTestModel() Model {
-	keys := tui.NewKeyMap("arrows")
+	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()
 	return New(testdata.TestProposals(), testdata.TestDashboardStats(), &keys, cfg)
 }
@@ -105,7 +105,7 @@ func TestDashboard_SortCycle(t *testing.T) {
 }
 
 func TestDashboard_EmptyState(t *testing.T) {
-	keys := tui.NewKeyMap("arrows")
+	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()
 	m := New(nil, testdata.TestDashboardStatsEmpty(), &keys, cfg)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
@@ -117,7 +117,7 @@ func TestDashboard_EmptyState(t *testing.T) {
 }
 
 func TestDashboard_EmptySelectedProposal(t *testing.T) {
-	keys := tui.NewKeyMap("arrows")
+	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()
 	m := New(nil, testdata.TestDashboardStatsEmpty(), &keys, cfg)
 

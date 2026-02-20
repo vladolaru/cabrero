@@ -5,15 +5,15 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 
 	"github.com/vladolaru/cabrero/internal/pipeline"
-	"github.com/vladolaru/cabrero/internal/tui"
 	"github.com/vladolaru/cabrero/internal/tui/components"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 // Model is the proposal detail view model.
 type Model struct {
 	proposal     *pipeline.ProposalWithSession
 	diffViewport viewport.Model
-	citations    []tui.CitationEntry
+	citations    []shared.CitationEntry
 	citationVP   viewport.Model
 	focus        Focus
 	applyState   ApplyState
@@ -24,12 +24,12 @@ type Model struct {
 	revConfirm   components.RevisionConfirmModel
 	width        int
 	height       int
-	keys         *tui.KeyMap
-	config       *tui.Config
+	keys         *shared.KeyMap
+	config       *shared.Config
 }
 
 // New creates a detail model for the given proposal.
-func New(p *pipeline.ProposalWithSession, citations []tui.CitationEntry, keys *tui.KeyMap, cfg *tui.Config) Model {
+func New(p *pipeline.ProposalWithSession, citations []shared.CitationEntry, keys *shared.KeyMap, cfg *shared.Config) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 

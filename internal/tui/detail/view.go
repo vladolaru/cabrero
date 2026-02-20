@@ -6,8 +6,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/vladolaru/cabrero/internal/tui"
 	"github.com/vladolaru/cabrero/internal/tui/components"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 var (
@@ -106,7 +106,7 @@ func (m Model) View() string {
 	return content
 }
 
-func renderCitations(citations []tui.CitationEntry, width int) string {
+func renderCitations(citations []shared.CitationEntry, width int) string {
 	var b strings.Builder
 	for i, c := range citations {
 		prefix := "  "

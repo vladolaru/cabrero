@@ -8,14 +8,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/vladolaru/cabrero/internal/tui"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
 )
 
 func newTestDetail() Model {
-	keys := tui.NewKeyMap("arrows")
+	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()
 	p := testdata.TestProposal()
 	citations := testdata.TestCitations()

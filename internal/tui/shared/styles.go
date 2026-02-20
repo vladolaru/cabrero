@@ -1,4 +1,4 @@
-package tui
+package shared
 
 import "github.com/charmbracelet/lipgloss"
 
@@ -11,16 +11,16 @@ var (
 	ColorMuted   = lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"}
 	ColorChat    = lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#4DB6AC"}
 
-	ColorFg      = lipgloss.AdaptiveColor{Light: "#212121", Dark: "#E0E0E0"}
-	ColorFgBold  = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
-	ColorBg      = lipgloss.AdaptiveColor{Light: "#FAFAFA", Dark: "#1E1E1E"}
-	ColorBorder  = lipgloss.AdaptiveColor{Light: "#BDBDBD", Dark: "#616161"}
+	ColorFg     = lipgloss.AdaptiveColor{Light: "#212121", Dark: "#E0E0E0"}
+	ColorFgBold = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
+	ColorBg     = lipgloss.AdaptiveColor{Light: "#FAFAFA", Dark: "#1E1E1E"}
+	ColorBorder = lipgloss.AdaptiveColor{Light: "#BDBDBD", Dark: "#616161"}
 )
 
 // Styles holds all pre-computed Lip Gloss styles for the TUI.
 type Styles struct {
 	// Borders
-	ActiveBorder  lipgloss.Style
+	ActiveBorder   lipgloss.Style
 	InactiveBorder lipgloss.Style
 
 	// List items

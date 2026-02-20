@@ -8,79 +8,11 @@ import (
 	"path/filepath"
 
 	"github.com/vladolaru/cabrero/internal/store"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-// Config holds all TUI configuration. Stored at ~/.cabrero/config.json.
-// Missing fields get defaults. Unknown fields are preserved on roundtrip.
-type Config struct {
-	Navigation    string            `json:"navigation"`
-	Theme         string            `json:"theme"`
-	Dashboard     DashboardConfig   `json:"dashboard"`
-	Detail        DetailConfig      `json:"detail"`
-	Personality   PersonalityConfig `json:"personality"`
-	Confirmations ConfirmConfig     `json:"confirmations"`
-
-	// extra preserves unknown JSON fields for forward compatibility.
-	extra map[string]json.RawMessage
-}
-
-// DashboardConfig holds dashboard-specific settings.
-type DashboardConfig struct {
-	SortOrder           string `json:"sortOrder"`
-	ShowRecentlyDecided bool   `json:"showRecentlyDecided"`
-	RecentlyDecidedLimit int   `json:"recentlyDecidedLimit"`
-}
-
-// DetailConfig holds proposal detail view settings.
-type DetailConfig struct {
-	ChatPanelOpen          bool `json:"chatPanelOpen"`
-	ChatPanelWidth         int  `json:"chatPanelWidth"`
-	ExpandCitationsDefault bool `json:"expandCitationsDefault"`
-}
-
-// PersonalityConfig controls pirategoat personality features.
-type PersonalityConfig struct {
-	FlavorText bool `json:"flavorText"`
-	EasterEggs bool `json:"easterEggs"`
-}
-
-// ConfirmConfig controls which actions require confirmation.
-type ConfirmConfig struct {
-	ApproveRequiresConfirm  bool `json:"approveRequiresConfirm"`
-	RejectRequiresConfirm   bool `json:"rejectRequiresConfirm"`
-	DeferRequiresConfirm    bool `json:"deferRequiresConfirm"`
-	RetryRequiresConfirm    bool `json:"retryRequiresConfirm"`
-	RollbackRequiresConfirm bool `json:"rollbackRequiresConfirm"`
-}
-
-// DefaultConfig returns a Config with all design-doc default values.
-func DefaultConfig() *Config {
-	return &Config{
-		Navigation: "arrows",
-		Theme:      "auto",
-		Dashboard: DashboardConfig{
-			SortOrder:            "newest",
-			ShowRecentlyDecided:  true,
-			RecentlyDecidedLimit: 10,
-		},
-		Detail: DetailConfig{
-			ChatPanelOpen:          true,
-			ChatPanelWidth:         35,
-			ExpandCitationsDefault: false,
-		},
-		Personality: PersonalityConfig{
-			FlavorText: true,
-			EasterEggs: true,
-		},
-		Confirmations: ConfirmConfig{
-			ApproveRequiresConfirm:  true,
-			RejectRequiresConfirm:   false,
-			DeferRequiresConfirm:    false,
-			RetryRequiresConfirm:    true,
-			RollbackRequiresConfirm: true,
-		},
-	}
-}
+// Config is an alias for shared.Config, used by the root tui package.
+type Config = shared.Config
 
 func configPath() string {
 	return filepath.Join(store.Root(), "config.json")
@@ -89,9 +21,14 @@ func configPath() string {
 // LoadConfig reads ~/.cabrero/config.json and merges with defaults.
 // Returns defaults if the file does not exist.
 func LoadConfig() (*Config, error) {
-	cfg := DefaultConfig()
+	return LoadConfigFrom(configPath())
+}
 
-	data, err := os.ReadFile(configPath())
+// LoadConfigFrom reads config from a specific path (for testing).
+func LoadConfigFrom(path string) (*Config, error) {
+	cfg := shared.DefaultConfig()
+
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
@@ -116,46 +53,10 @@ func LoadConfig() (*Config, error) {
 		"dashboard": true, "detail": true,
 		"personality": true, "confirmations": true,
 	}
-	cfg.extra = make(map[string]json.RawMessage)
+	cfg.Extra = make(map[string]json.RawMessage)
 	for k, v := range raw {
 		if !known[k] {
-			cfg.extra[k] = v
-		}
-	}
-
-	return cfg, nil
-}
-
-// LoadConfigFrom reads config from a specific path (for testing).
-func LoadConfigFrom(path string) (*Config, error) {
-	cfg := DefaultConfig()
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return cfg, nil
-		}
-		return nil, fmt.Errorf("reading config: %w", err)
-	}
-
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parsing config: %w", err)
-	}
-
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("parsing config: %w", err)
-	}
-
-	known := map[string]bool{
-		"navigation": true, "theme": true,
-		"dashboard": true, "detail": true,
-		"personality": true, "confirmations": true,
-	}
-	cfg.extra = make(map[string]json.RawMessage)
-	for k, v := range raw {
-		if !known[k] {
-			cfg.extra[k] = v
+			cfg.Extra[k] = v
 		}
 	}
 
@@ -181,7 +82,7 @@ func SaveConfigTo(cfg *Config, path string) error {
 	}
 
 	// Re-add unknown fields.
-	for k, v := range cfg.extra {
+	for k, v := range cfg.Extra {
 		merged[k] = v
 	}
 

@@ -5,8 +5,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 
 	"github.com/vladolaru/cabrero/internal/pipeline"
-	"github.com/vladolaru/cabrero/internal/tui"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 // Sort orders for the proposal list.
@@ -31,12 +31,12 @@ type Model struct {
 	sortOrder    string
 	width        int
 	height       int
-	keys         *tui.KeyMap
-	config       *tui.Config
+	keys         *shared.KeyMap
+	config       *shared.Config
 }
 
 // New creates a dashboard model with loaded data.
-func New(proposals []pipeline.ProposalWithSession, stats message.DashboardStats, keys *tui.KeyMap, cfg *tui.Config) Model {
+func New(proposals []pipeline.ProposalWithSession, stats message.DashboardStats, keys *shared.KeyMap, cfg *shared.Config) Model {
 	fi := textinput.New()
 	fi.Placeholder = "type:skill target:docx or free text..."
 	fi.Prompt = "/ "

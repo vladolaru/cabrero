@@ -22,6 +22,7 @@ var commands = []command{
 	{"status", "Show pipeline health and store overview", cmd.Status},
 	{"proposals", "List pending proposals", cmd.Proposals},
 	{"inspect", "Show a proposal with full citation chain", cmd.Inspect},
+	{"review", "Interactive review dashboard", cmd.Review},
 	{"approve", "Approve and apply a proposal", cmdNotImplemented},
 	{"reject", "Reject a proposal with optional reason", cmdNotImplemented},
 	{"replay", "Re-run pipeline with a different prompt", cmdNotImplemented},
