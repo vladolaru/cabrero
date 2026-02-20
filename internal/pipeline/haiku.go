@@ -55,7 +55,7 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 		return nil, fmt.Errorf("invoking haiku: %w", err)
 	}
 
-	// Parse output — --json-schema guarantees valid JSON matching our schema.
+	// Parse JSON output (instructed via system prompt, cleaned defensively).
 	output, err := parseHaikuOutput(stdout)
 	if err != nil {
 		return nil, fmt.Errorf("parsing haiku output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))

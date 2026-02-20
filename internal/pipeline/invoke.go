@@ -22,7 +22,7 @@ type claudeConfig struct {
 	Agentic      bool          // true = use -p with tools; false = use --print with stdin
 	Prompt       string        // user prompt (agentic mode: positional arg; print mode: ignored)
 	AllowedTools string        // comma-separated tool names for --allowedTools
-	MaxTurns     int           // turn budget (passed in prompt, NOT as CLI flag)
+	MaxTurns     int           // turn budget — no --max-turns CLI flag exists; callers embed this in the prompt
 	Timeout      time.Duration // hard wall-clock timeout via context.WithTimeout
 	Stdin        io.Reader     // only used in --print mode (Agentic=false)
 }
