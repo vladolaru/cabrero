@@ -90,14 +90,26 @@ func (m *Model) UpdateContent(content string) {
 }
 
 // AppendContent adds new bytes to the end of the log content.
-// More efficient than UpdateContent for follow mode where only
-// the file tail has changed.
+// Incrementally updates the lines slice instead of re-splitting
+// all content, which avoids O(n) overhead on every follow-mode tick.
 func (m *Model) AppendContent(newBytes string) {
 	if newBytes == "" {
 		return
 	}
 	m.content += newBytes
-	m.lines = strings.Split(m.content, "\n")
+
+	// Split only the new bytes and merge with the last existing line.
+	newLines := strings.Split(newBytes, "\n")
+	if len(m.lines) > 0 && len(newLines) > 0 {
+		// The last existing line may be incomplete — append the first chunk.
+		m.lines[len(m.lines)-1] += newLines[0]
+		if len(newLines) > 1 {
+			m.lines = append(m.lines, newLines[1:]...)
+		}
+	} else {
+		m.lines = append(m.lines, newLines...)
+	}
+
 	m.refreshViewportContent()
 	if m.followMode {
 		m.viewport.GotoBottom()

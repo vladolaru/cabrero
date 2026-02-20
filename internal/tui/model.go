@@ -60,6 +60,9 @@ type reviewModel struct {
 	// Log follow mode: track file size for incremental reads.
 	logFileSize int64
 
+	// Pipeline refresh state: track whether a refresh is in flight.
+	pipelineRefreshing bool
+
 	width  int
 	height int
 }
@@ -264,19 +267,34 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 
 	case message.PipelineTickMsg:
-		if m.state == message.ViewPipelineMonitor {
-			sessions, _ := store.ListSessions()
-			runs, _ := pipeline.ListPipelineRunsFromSessions(sessions, m.config.Pipeline.RecentRunsLimit)
-			stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, m.config.Pipeline.SparklineDays)
-			prompts, _ := pipeline.ListPromptVersions()
-			dashStats := gatherStatsFromSessions(sessions, m.proposals)
-			m.pipelineMonitor = pipeline_tui.New(runs, stats, prompts, dashStats, &m.keys, m.config)
-			m.pipelineMonitor.SetSize(m.width, m.height)
-			return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
-				return message.PipelineTickMsg{}
-			})
+		if m.state == message.ViewPipelineMonitor && !m.pipelineRefreshing {
+			m.pipelineRefreshing = true
+			recentRunsLimit := m.config.Pipeline.RecentRunsLimit
+			sparklineDays := m.config.Pipeline.SparklineDays
+			proposals := m.proposals
+			return m, func() tea.Msg {
+				sessions, _ := store.ListSessions()
+				runs, _ := pipeline.ListPipelineRunsFromSessions(sessions, recentRunsLimit)
+				stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, sparklineDays)
+				prompts, _ := pipeline.ListPromptVersions()
+				dashStats := gatherStatsFromSessions(sessions, proposals)
+				return message.PipelineDataRefreshed{
+					Runs:      runs,
+					Stats:     stats,
+					Prompts:   prompts,
+					DashStats: dashStats,
+				}
+			}
 		}
 		return m, nil
+
+	case message.PipelineDataRefreshed:
+		m.pipelineRefreshing = false
+		m.pipelineMonitor = pipeline_tui.New(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats, &m.keys, m.config)
+		m.pipelineMonitor.SetSize(m.width, m.height)
+		return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
+			return message.PipelineTickMsg{}
+		})
 
 	case message.LogTickMsg:
 		if m.state == message.ViewLogViewer {
@@ -289,13 +307,13 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					f, err := os.Open(logPath)
 					if err == nil {
 						buf := make([]byte, newSize-m.logFileSize)
-						_, err = f.ReadAt(buf, m.logFileSize)
+						n, _ := f.ReadAt(buf, m.logFileSize)
 						f.Close()
-						if err == nil {
-							m.logViewer.AppendContent(string(buf))
+						if n > 0 {
+							m.logViewer.AppendContent(string(buf[:n]))
+							m.logFileSize += int64(n)
 						}
 					}
-					m.logFileSize = newSize
 				} else if newSize < m.logFileSize {
 					// File was truncated (log rotation) — full reload.
 					content, _ := os.ReadFile(logPath)

@@ -2,15 +2,21 @@ package chat
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/vladolaru/cabrero/internal/tui/message"
 )
+
+// chatTimeout is the maximum wall-clock time for a chat streaming session.
+const chatTimeout = 5 * time.Minute
 
 // revisionFenceRe matches ```revision code fences.
 var revisionFenceRe = regexp.MustCompile("(?s)```revision\\s*\\n(.*?)```")
@@ -34,7 +40,10 @@ func StartChat(question string, systemContext string) tea.Cmd {
 
 		prompt := systemContext + "\n\nUser question: " + question
 
-		cmd := exec.Command("claude",
+		ctx, cancel := context.WithTimeout(context.Background(), chatTimeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "claude",
 			"--model", "claude-sonnet-4-6",
 			"--print",
 			"--output-format", "stream-json",
@@ -85,7 +94,11 @@ func StartChat(question string, systemContext string) tea.Cmd {
 		}
 
 		if err := cmd.Wait(); err != nil {
-			ch <- streamMsg{err: err}
+			if ctx.Err() == context.DeadlineExceeded {
+				ch <- streamMsg{err: fmt.Errorf("chat timed out after %s", chatTimeout)}
+			} else {
+				ch <- streamMsg{err: err}
+			}
 			return
 		}
 

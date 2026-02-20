@@ -1,7 +1,11 @@
 // Package message defines all Bubble Tea message types for the review TUI.
 package message
 
-import "time"
+import (
+	"time"
+
+	"github.com/vladolaru/cabrero/internal/pipeline"
+)
 
 // ViewState identifies which view is currently active.
 type ViewState int
@@ -160,6 +164,14 @@ type RetryRunFinished struct {
 
 // PipelineTickMsg triggers auto-refresh of pipeline data.
 type PipelineTickMsg struct{}
+
+// PipelineDataRefreshed carries refreshed pipeline data from a background I/O operation.
+type PipelineDataRefreshed struct {
+	Runs      []pipeline.PipelineRun
+	Stats     pipeline.PipelineStats
+	Prompts   []pipeline.PromptVersion
+	DashStats DashboardStats
+}
 
 // LogTickMsg triggers log viewer follow-mode refresh.
 type LogTickMsg struct{}

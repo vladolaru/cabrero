@@ -3,16 +3,21 @@
 package apply
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 )
+
+// blendTimeout is the maximum time to wait for a Blend operation.
+const blendTimeout = 2 * time.Minute
 
 // Blend invokes Claude to blend the proposed change into the target file.
 // Returns a before/after diff string suitable for human review.
@@ -39,8 +44,11 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 
 	prompt := buildBlendPrompt(string(current), changeText, proposal.Type, proposal.Rationale)
 
-	// Invoke Claude CLI.
-	cmd := exec.Command("claude",
+	// Invoke Claude CLI with timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), blendTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "claude",
 		"--model", "claude-sonnet-4-6",
 		"--print",
 		"--no-session-persistence",
@@ -52,6 +60,9 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 
 	out, err := cmd.Output()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("blend timed out after %s", blendTimeout)
+		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return "", fmt.Errorf("claude CLI failed: %s", string(exitErr.Stderr))
 		}

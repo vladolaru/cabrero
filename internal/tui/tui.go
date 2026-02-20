@@ -32,20 +32,22 @@ func Run() error {
 		return fmt.Errorf("loading proposals: %w", err)
 	}
 
-	stats := gatherStats(proposals)
+	// Load sessions once and reuse for all startup queries.
+	sessions, _ := store.ListSessions()
+
+	stats := gatherStatsFromSessions(sessions, proposals)
 
 	// Future: reports := fitness.ListReports()
 	var reports []fitness.Report
 
-	// Future: sourceGroups := fitness.ListSourceGroups(sources)
-	sourceGroups := []fitness.SourceGroup{}
+	var sourceGroups []fitness.SourceGroup
 
-	runs, err := pipeline.ListPipelineRuns(cfg.Pipeline.RecentRunsLimit)
+	runs, err := pipeline.ListPipelineRunsFromSessions(sessions, cfg.Pipeline.RecentRunsLimit)
 	if err != nil {
 		runs = nil // non-fatal
 	}
 
-	pipelineStats, err := pipeline.GatherPipelineStats(cfg.Pipeline.SparklineDays)
+	pipelineStats, err := pipeline.GatherPipelineStatsFromSessions(sessions, runs, cfg.Pipeline.SparklineDays)
 	if err != nil {
 		pipelineStats = pipeline.PipelineStats{}
 	}
@@ -65,14 +67,7 @@ func Run() error {
 	return nil
 }
 
-// gatherStats collects dashboard statistics from the store and daemon.
-func gatherStats(proposals []pipeline.ProposalWithSession) message.DashboardStats {
-	sessions, _ := store.ListSessions()
-	return gatherStatsFromSessions(sessions, proposals)
-}
-
-// gatherStatsFromSessions is like gatherStats but accepts pre-loaded sessions
-// to avoid redundant store.ListSessions() calls.
+// gatherStatsFromSessions collects dashboard statistics from pre-loaded sessions.
 func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.ProposalWithSession) message.DashboardStats {
 	stats := message.DashboardStats{}
 
@@ -118,8 +113,25 @@ func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.Pro
 	return stats
 }
 
+// Disk bytes cache to avoid expensive directory walks on every tick.
+var (
+	cachedDiskBytes      int64
+	cachedDiskBytesTime  time.Time
+	diskBytesCacheTTL    = 60 * time.Second
+)
+
 // storeDiskBytes returns the total size of all files under the given directory.
+// Results are cached for 60 seconds to avoid expensive walks on every tick.
 func storeDiskBytes(root string) int64 {
+	if time.Since(cachedDiskBytesTime) < diskBytesCacheTTL {
+		return cachedDiskBytes
+	}
+	cachedDiskBytes = walkDiskBytes(root)
+	cachedDiskBytesTime = time.Now()
+	return cachedDiskBytes
+}
+
+func walkDiskBytes(root string) int64 {
 	var total int64
 	_ = filepath.WalkDir(root, func(_ string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
