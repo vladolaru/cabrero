@@ -8,7 +8,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
-const version = "0.1.0-dev"
+var version = "dev"
 
 type command struct {
 	name string
