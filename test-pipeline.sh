@@ -35,6 +35,18 @@ fail() { echo "  FAIL: $1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 pass() { echo "  PASS: $1"; PASS_COUNT=$((PASS_COUNT + 1)); }
 warn() { echo "  WARN: $1"; WARN_COUNT=$((WARN_COUNT + 1)); }
 
+# ── 0. CLEANUP ──────────────────────────────────────────────
+echo "── Step 0: Clean previous artifacts ──"
+rm -f "$CABRERO_DIR/digests/$SESSION.json"
+rm -f "$CABRERO_DIR/evaluations/${SESSION}-haiku.json"
+rm -f "$CABRERO_DIR/evaluations/${SESSION}-sonnet.json"
+rm -f "$CABRERO_DIR/prompts/haiku-classifier-v2.txt"
+rm -f "$CABRERO_DIR/prompts/sonnet-evaluator-v2.txt"
+# Proposals use a prefix match on the first 6 chars of session ID.
+find "$CABRERO_DIR/proposals" -name "prop-${SESSION:0:6}-*.json" -maxdepth 1 -delete 2>/dev/null || true
+echo "  Done."
+echo ""
+
 # ── 1. BUILD ─────────────────────────────────────────────────
 echo "── Step 1: Build & vet ──"
 T=$(timer_start)
@@ -60,13 +72,6 @@ echo ""
 # ── 2. DRY-RUN (pre-parser + prompt file creation) ──────────
 echo "── Step 2: Dry-run (pre-parser + prompt creation) ──"
 T=$(timer_start)
-
-# Clean previous artifacts for this session to get fresh results.
-rm -f "$CABRERO_DIR/digests/$SESSION.json"
-rm -f "$CABRERO_DIR/evaluations/${SESSION}-haiku.json"
-rm -f "$CABRERO_DIR/evaluations/${SESSION}-sonnet.json"
-rm -f "$CABRERO_DIR/prompts/sonnet-evaluator-v2.txt"
-rm -f "$CABRERO_DIR/prompts/haiku-classifier-v2.txt"
 
 go run . run --dry-run "$SESSION" 2>&1
 
@@ -307,12 +312,6 @@ echo ""
 echo "── Step 8: Full pipeline (Haiku + Sonnet) ──"
 echo "  This calls the claude CLI twice. May take 30-120s."
 T=$(timer_start)
-
-# Clean evaluation artifacts from any previous run.
-rm -f "$CABRERO_DIR/evaluations/${SESSION}-haiku.json"
-rm -f "$CABRERO_DIR/evaluations/${SESSION}-sonnet.json"
-# Clean proposals from this session.
-rm -f "$CABRERO_DIR/proposals/prop-${SESSION:0:6}-"*.json
 
 cd "$REPO_DIR"
 PIPELINE_OUTPUT=$(go run . run "$SESSION" 2>&1) || true
