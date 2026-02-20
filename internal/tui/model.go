@@ -57,6 +57,9 @@ type reviewModel struct {
 	// All proposals for navigation context
 	proposals []pipeline.ProposalWithSession
 
+	// Log follow mode: track file size for incremental reads.
+	logFileSize int64
+
 	width  int
 	height int
 }
@@ -164,7 +167,6 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.RejectFinished:
 		// Archive the proposal and return to dashboard.
 		proposalID := msg.ProposalID
-		go func() { _ = apply.Archive(proposalID, "rejected") }()
 		m.statusMsg = actionStatusText(msg)
 		m.statusExpiry = time.Now().Add(3 * time.Second)
 		if m.state != message.ViewDashboard {
@@ -172,6 +174,12 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 			m = m2.(reviewModel)
 		}
+		cmds = append(cmds, func() tea.Msg {
+			if err := apply.Archive(proposalID, "rejected"); err != nil {
+				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
+			}
+			return nil
+		})
 		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
 			return message.StatusMessageExpired{}
 		}))
@@ -180,7 +188,6 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.DeferFinished:
 		// Archive the proposal and return to dashboard.
 		proposalID := msg.ProposalID
-		go func() { _ = apply.Archive(proposalID, "deferred") }()
 		m.statusMsg = actionStatusText(msg)
 		m.statusExpiry = time.Now().Add(3 * time.Second)
 		if m.state != message.ViewDashboard {
@@ -188,6 +195,12 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 			m = m2.(reviewModel)
 		}
+		cmds = append(cmds, func() tea.Msg {
+			if err := apply.Archive(proposalID, "deferred"); err != nil {
+				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
+			}
+			return nil
+		})
 		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
 			return message.StatusMessageExpired{}
 		}))
@@ -252,10 +265,11 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case message.PipelineTickMsg:
 		if m.state == message.ViewPipelineMonitor {
-			runs, _ := pipeline.ListPipelineRuns(m.config.Pipeline.RecentRunsLimit)
-			stats, _ := pipeline.GatherPipelineStats(m.config.Pipeline.SparklineDays)
+			sessions, _ := store.ListSessions()
+			runs, _ := pipeline.ListPipelineRunsFromSessions(sessions, m.config.Pipeline.RecentRunsLimit)
+			stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, m.config.Pipeline.SparklineDays)
 			prompts, _ := pipeline.ListPromptVersions()
-			dashStats := gatherStats(m.proposals)
+			dashStats := gatherStatsFromSessions(sessions, m.proposals)
 			m.pipelineMonitor = pipeline_tui.New(runs, stats, prompts, dashStats, &m.keys, m.config)
 			m.pipelineMonitor.SetSize(m.width, m.height)
 			return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
@@ -267,8 +281,28 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.LogTickMsg:
 		if m.state == message.ViewLogViewer {
 			logPath := filepath.Join(store.Root(), "daemon.log")
-			content, _ := os.ReadFile(logPath)
-			m.logViewer.UpdateContent(string(content))
+			info, err := os.Stat(logPath)
+			if err == nil {
+				newSize := info.Size()
+				if newSize > m.logFileSize {
+					// Read only new bytes from the end.
+					f, err := os.Open(logPath)
+					if err == nil {
+						buf := make([]byte, newSize-m.logFileSize)
+						_, err = f.ReadAt(buf, m.logFileSize)
+						f.Close()
+						if err == nil {
+							m.logViewer.AppendContent(string(buf))
+						}
+					}
+					m.logFileSize = newSize
+				} else if newSize < m.logFileSize {
+					// File was truncated (log rotation) — full reload.
+					content, _ := os.ReadFile(logPath)
+					m.logViewer.UpdateContent(string(content))
+					m.logFileSize = newSize
+				}
+			}
 			return m, tea.Tick(time.Second, func(time.Time) tea.Msg {
 				return message.LogTickMsg{}
 			})
@@ -477,6 +511,7 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 	case message.ViewLogViewer:
 		logPath := filepath.Join(store.Root(), "daemon.log")
 		content, _ := os.ReadFile(logPath)
+		m.logFileSize = int64(len(content))
 		m.logViewer = logview.New(string(content), &m.keys, m.config)
 		m.logViewer.SetSize(m.width, m.height)
 		if m.config.Pipeline.LogFollowMode {
