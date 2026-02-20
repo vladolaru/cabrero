@@ -209,22 +209,26 @@ Pre-parser (pure code, fast) → structured digest with citations + friction sig
         ↓
 Pattern aggregator (pure code) → cross-session recurring patterns (if 3+ project sessions)
         ↓
-claude --model haiku  (goal inference, error classification, key turn selection,
-                       pattern assessment if cross-session data available)
-        ↓
-claude --model sonnet (skill performance assessment, proposal generation,
-                       skill_scaffold proposals for recurring patterns)
+Agentic Haiku (Read/Grep on ~/.cabrero/raw/)
+  → digest as system context, verifies ambiguous signals by reading raw turns
+  → enriched classification with triage: worth evaluating or clean session
+        ↓ (only sessions Haiku flagged as worth evaluating)
+Agentic Sonnet (Read/Grep — unrestricted filesystem access)
+  → digest + Haiku output as system context
+  → reads current skill files, compares against session-time versions in transcript
+  → proposal generation, skill_scaffold proposals for recurring patterns
         ↓
 macOS notification if proposals generated
         ↓
 Human approval gate
         ↓
-claude --model sonnet (blends approved change into SKILL.md via writing skill)
+claude --model sonnet --print (blends approved change into SKILL.md via writing skill)
 ```
 
-All LLM calls are mediated by the `claude` CLI using `--model` to select the right model
-per stage. No API keys in the app — CC's existing auth is reused throughout. The daemon
-sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
+All LLM calls are mediated by the `claude` CLI. No API keys in the app — CC's existing
+auth is reused throughout. Haiku and Sonnet run as agentic tool-using sessions with
+constrained tool access (Read, Grep). Apply stage uses `--print` (non-agentic). The
+daemon sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
 
 **Trigger:** session-end, not every file write. The daemon only processes sessions where
 `capture_trigger` contains `"session-end"` (session is complete). PreCompact-only sessions
@@ -255,34 +259,48 @@ Output explicitly distinguishes extracted fields from skipped/null fields.
 
 ### Retrieval Interface (shared across all layers)
 
-All layers (pre-parser, Haiku, evaluator) can reach back to raw JSONL:
+Both Haiku and Sonnet are agentic — they run as tool-using `claude` sessions (not
+`--print`) with access to the `claude` CLI's built-in Read and Grep tools. This
+replaces the earlier design of custom retrieval functions; the built-in tools are
+sufficient for navigating JSONL by UUID, reading raw turns, and inspecting files.
 
-```
-get_entry(session_id, uuid) → raw JSONL line
-get_turns(session_id, uuid_list) → ordered raw entries
-get_agent_transcript(agent_short_id) → full agent JSONL
-get_session_range(session_id, from_uuid, to_uuid) → slice
-```
+The pre-parser digest provides the map: every signal includes `uuid` + `sessionId`
+references. Haiku and Sonnet use these to pull raw turns on demand via Read/Grep
+against `~/.cabrero/raw/`.
 
 Full citation chain: every Haiku classification and evaluator finding cites the UUIDs
 it's based on. Skill proposals trace back through evaluator → Haiku → pre-parser → raw entries.
 
 ### LLM Stack
 
-All models invoked via `claude --model <model> --print`. CC's existing authentication
-is reused — no separate API key management.
+CC's existing authentication is reused — no separate API key management. Haiku and
+Sonnet run as agentic tool-using sessions via the `claude` CLI with constrained
+tool access. Apply and chat stages remain non-agentic.
 
-- **Haiku** (`claude-haiku-4-5`) — classifier: goal inference, error classification,
-  key turn selection, skill/CLAUDE.md signal assessment, cross-session pattern assessment.
-  Runs per session. Receives digest + optional cross-session patterns.
-- **Sonnet** (`claude-sonnet-4-6`) — evaluator: skill performance assessment and
-  proposal generation (including `skill_scaffold` proposals for recurring patterns)
-  with `--effort high`. Receives structured digest + Haiku output, not raw JSONL.
-  Validates citations against retrieval layer.
+- **Haiku** (`claude-haiku-4-5`) — agentic classifier with Read and Grep tools
+  scoped to `~/.cabrero/raw/`. Receives the pre-parser digest as system context.
+  Classifies signals (goal inference, error classification, key turn selection,
+  skill/CLAUDE.md signal assessment, cross-session pattern assessment) and
+  verifies ambiguous signals by reading surrounding raw turns. Exercises judgment
+  about when to deep-read — the prompt provides guidance on situations that
+  benefit from raw turn inspection (near-threshold friction, ambiguous error
+  attribution, sparse sessions) but Haiku decides. Guardrails: max retrieval
+  calls per session, token budget for retrieved content, session timeout.
+  Produces enriched classification with higher-confidence triage, reducing false
+  positives passed to Sonnet and catching signals the pre-parser's structural
+  extraction missed.
+- **Sonnet** (`claude-sonnet-4-6`) — agentic evaluator with unrestricted Read and
+  Grep access (same filesystem access as the user). Receives
+  the digest + Haiku's enriched classification as system context. Reads current
+  versions of skills and instruction files to compare against what CC saw during
+  the session (captured in the raw transcript). Generates proposals including
+  `skill_scaffold` proposals for recurring patterns. Only runs on sessions Haiku
+  classified as worth evaluating — Haiku's improved triage reduces unnecessary
+  Sonnet invocations.
 - **Sonnet** — apply: blends approved changes into SKILL.md using the writing skill.
-  Runs on approval only — infrequent, quality-critical.
+  Runs on approval only — infrequent, quality-critical. Non-agentic (`--print`).
 - **Sonnet** — chat: interactive proposal interrogation in the Review App. Latency-
-  sensitive; Sonnet is fast enough to feel conversational.
+  sensitive; Sonnet is fast enough to feel conversational. Non-agentic (`--print`).
 
 ### Cross-Session Pattern Aggregation
 
@@ -302,48 +320,73 @@ the same project.
    from repetition alone
 
 **Context budget:** Aggregator output is ~200–500 tokens (pre-filtered in code, limited to
-top 5 patterns). Haiku classifies each pattern as "confirmed", "coincidental", or "resolved"
-(~300 tokens added to Haiku output). Sonnet sees Haiku's assessment, never the raw
-cross-session data.
+top 5 patterns). Included in Haiku's system context alongside the digest. Haiku classifies
+each pattern as "confirmed", "coincidental", or "resolved" — and can deep-read raw turns
+to verify patterns rather than classifying blind. Sonnet sees Haiku's assessment, never
+the raw cross-session data.
 
 **Graceful degradation:** No project metadata → aggregator skipped. Fewer than 3 sessions →
 returns nil. Aggregator error → non-fatal warning, pipeline continues without cross-session
 context.
 
-### Context Window Budget (known gap)
+### Context & Cost Budget
 
-LLM evaluators receive all data via stdin — no tool access, pure classification. Current
-worst-case input sizes (measured across ~60 digests):
+The agentic architecture changes the budget model. Instead of fitting everything into
+a single stdin payload, the digest is the starting context and evaluators pull
+additional data on demand via tool calls. This mitigates the unbounded digest problem
+— evaluators don't need everything upfront, they start with the digest map and drill
+into areas of interest.
 
-| Component | Haiku input | Sonnet input |
-|-----------|-------------|--------------|
+**Starting context** (system prompt, loaded once per session):
+
+| Component | Haiku | Sonnet |
+|-----------|-------|--------|
 | System prompt | ~1.5K tokens | ~1.1K tokens |
 | Digest | ~15K tokens (largest: 3923-entry session) | ~15K tokens |
 | Cross-session patterns | ~500 tokens | — |
 | Haiku output | — | ~2K tokens |
-| **Total** | **~17K tokens** | **~18K tokens** |
+| **Starting total** | **~17K tokens** | **~18K tokens** |
 
-Against a 200K context window this is comfortable (~10x headroom). However, digest size
-scales with session length and is currently unbounded. The two largest cost centers are:
+Against a 200K context window the starting context is comfortable (~10x headroom).
+Each tool call (Read/Grep on raw JSONL) adds context incrementally. The risk shifts
+from "digest too large for stdin" to "too many retrieval calls accumulating context."
 
-- **`toolCalls` section** (35% of largest digest) — friction signals are the main driver;
-  one session had 76 signals at 16KB. Grows linearly with session tool call count.
-- **`errors` section** (23% of largest digest) — snippets are capped at 200 chars each,
-  but error count is unbounded; one session had 32 errors.
+**Guardrails per agentic session:**
 
-**No safeguards exist yet.** A session with 10K+ entries or hundreds of errors could
-produce a digest that exceeds context limits. Needed:
+1. **Max turns** — cap agentic turns per invocation (default: Haiku 15, Sonnet 20).
+   Configurable in daemon config. Prevents runaway exploration.
+2. **Session timeout** — hard wall-clock limit (default: Haiku 2 min, Sonnet 5 min).
+   Configurable in daemon config. The daemon needs predictable throughput.
+3. **Digest size cap** — still needed for the starting context. Truncate or summarize
+   sections when total digest exceeds a configurable token budget (e.g. 50K tokens).
+   Less critical than before since evaluators can pull what the digest omitted.
+4. **Per-section limits** — cap friction signals (e.g. top 20 by severity), errors
+   (e.g. top 30, deduplicated), retry anomalies (e.g. top 10). These keep the
+   starting map readable rather than exhaustive.
 
-1. **Digest size cap** — truncate or summarize sections when total digest exceeds a
-   configurable token budget (e.g. 50K tokens). Priority for retention: shape > toolCalls
-   summary > errors (deduplicated) > friction signals (top N per type) > agents > skills.
-2. **Per-section limits** — cap friction signals (e.g. top 20 by severity), cap errors
-   (e.g. top 30, deduplicated by normalized snippet), cap retry anomalies (e.g. top 10).
-3. **Token estimation** — lightweight char-based estimate before invoking claude, with
-   a warning log and truncation fallback if over budget.
-4. **Sonnet double-input** — Sonnet receives both the digest and Haiku output, so its
-   budget is tighter. If digest truncation is needed, Sonnet's copy could be more
-   aggressively summarized since Haiku has already classified the key signals.
+**Cost model:** Haiku is cheap per call but agentic sessions use more tokens than
+`--print`. The cost guard is Haiku's triage quality — sessions classified as clean
+skip Sonnet entirely. If 60% of sessions are clean, agentic Haiku's higher per-session
+cost is offset by eliminating 60% of Sonnet invocations.
+
+### Smart Batching
+
+When multiple pending sessions belong to the same project, the daemon batches them
+to reduce Sonnet invocations and improve cross-session reasoning:
+
+1. Group pending sessions by project
+2. Run Haiku individually on each (cheap, independent triage)
+3. Collect sessions where `triage == "evaluate"`
+4. If 1 session: individual Sonnet call
+5. If 2+ sessions: batched Sonnet call with all digests + Haiku outputs
+
+The batching decision is pure code — no orchestrator agent needed. The only
+criterion is "same project," which is available from session metadata. Sonnet's
+max turns and timeout scale linearly with batch size (capped at reasonable
+maximums). Sessions without project metadata fall back to individual processing.
+
+`cabrero run <session_id>` always processes one session individually — batching
+only happens in the daemon when multiple sessions are pending.
 
 ### Human Approval Gate
 
