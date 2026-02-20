@@ -104,6 +104,19 @@ func Run(sessionID string, dryRun bool, cfg PipelineConfig) (*RunResult, error) 
 		len(haikuOutput.KeyTurns),
 		len(haikuOutput.SkillSignals))
 
+	// Triage gate: skip Sonnet if Haiku classified session as clean.
+	if haikuOutput.Triage == "clean" {
+		fmt.Println("  Haiku triage: clean session — skipping Sonnet evaluator")
+		if metaErr == nil {
+			meta.Status = "processed"
+			if err := store.WriteMetadata(store.RawDir(sessionID), meta); err != nil {
+				fmt.Printf("  Warning: failed to update session status: %v\n", err)
+			}
+		}
+		return result, nil
+	}
+	fmt.Println("  Haiku triage: session worth evaluating")
+
 	// Step 3: Sonnet evaluator.
 	fmt.Println("  Running Sonnet evaluator...")
 	sonnetOutput, err := RunSonnet(sessionID, digest, haikuOutput, cfg)

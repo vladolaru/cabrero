@@ -17,6 +17,7 @@ type HaikuOutput struct {
 	Version        int    `json:"version"`
 	SessionID      string `json:"sessionId"`
 	PromptVersion  string `json:"promptVersion"`
+	Triage         string `json:"triage"` // "evaluate" or "clean"
 
 	Goal                HaikuGoal                `json:"goal"`
 	ErrorClassification []HaikuErrorClass         `json:"errorClassification"`

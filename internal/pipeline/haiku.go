@@ -56,6 +56,11 @@ func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *pattern
 	output.SessionID = sessionID
 	output.PromptVersion = strings.TrimSuffix(haikuPromptFile, ".txt")
 
+	// Default empty triage to "evaluate" for backward compatibility with v2 prompt.
+	if output.Triage == "" {
+		output.Triage = "evaluate"
+	}
+
 	// Validate cited UUIDs.
 	if err := validateHaikuUUIDs(sessionID, output); err != nil {
 		return nil, err
