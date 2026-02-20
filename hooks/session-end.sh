@@ -32,32 +32,19 @@ fi
 SESSION_DIR="${CABRERO_ROOT}/raw/${SESSION_ID}"
 mkdir -p "$SESSION_DIR"
 
-# If pre-compact already captured this session, skip the copy but update metadata
-# with the session-end timestamp.
-if [ -f "${SESSION_DIR}/transcript.jsonl" ]; then
-  # Update existing metadata with session-end timestamp.
-  if [ -f "${SESSION_DIR}/metadata.json" ]; then
-    # Read existing metadata and add session_end_timestamp.
-    # Simple approach: rewrite with both triggers noted.
-    EXISTING_TRIGGER=$(sed -n 's/.*"capture_trigger"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${SESSION_DIR}/metadata.json")
-    CC_VERSION=$(sed -n 's/.*"cc_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${SESSION_DIR}/metadata.json")
-
-    cat > "${SESSION_DIR}/metadata.json" << METAEOF
-{
-  "session_id": "${SESSION_ID}",
-  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "capture_trigger": "${EXISTING_TRIGGER}+session-end",
-  "cc_version": "${CC_VERSION}",
-  "status": "pending"
-}
-METAEOF
-  fi
-  exit 0
-fi
-
-# No prior capture — copy transcript now.
+# Always copy transcript — the SessionEnd version is a strict superset of any
+# PreCompact capture (compaction appends a boundary, doesn't truncate).
 if [ -f "$TRANSCRIPT_PATH" ]; then
   cp "$TRANSCRIPT_PATH" "${SESSION_DIR}/transcript.jsonl"
+fi
+
+# Determine capture trigger (note if PreCompact already ran).
+CAPTURE_TRIGGER="session-end"
+if [ -f "${SESSION_DIR}/metadata.json" ]; then
+  EXISTING_TRIGGER=$(sed -n 's/.*"capture_trigger"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${SESSION_DIR}/metadata.json")
+  if [ -n "$EXISTING_TRIGGER" ]; then
+    CAPTURE_TRIGGER="${EXISTING_TRIGGER}+session-end"
+  fi
 fi
 
 # Get CC version.
@@ -70,7 +57,7 @@ cat > "${SESSION_DIR}/metadata.json" << METAEOF
 {
   "session_id": "${SESSION_ID}",
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "capture_trigger": "session-end",
+  "capture_trigger": "${CAPTURE_TRIGGER}",
   "cc_version": "${CC_VERSION}",
   "status": "pending"
 }
