@@ -318,3 +318,90 @@ func TestChangeEntries() []fitness.ChangeEntry {
 		},
 	}
 }
+
+// TestPipelineRun returns a pipeline run with sensible defaults.
+func TestPipelineRun(overrides ...func(*pipeline.PipelineRun)) pipeline.PipelineRun {
+	run := pipeline.PipelineRun{
+		SessionID:          "e7f2a103",
+		Project:            "woo-payments",
+		Timestamp:          time.Now().Add(-12 * time.Minute),
+		Status:             "processed",
+		HasDigest:          true,
+		HasClassifier:      true,
+		HasEvaluator:       true,
+		ParseDuration:      1200 * time.Millisecond,
+		ClassifierDuration: 8400 * time.Millisecond,
+		EvaluatorDuration:  12 * time.Second,
+		ProposalCount:      1,
+	}
+	for _, fn := range overrides {
+		fn(&run)
+	}
+	return run
+}
+
+// TestPipelineRuns returns a mixed set of pipeline runs for testing.
+func TestPipelineRuns() []pipeline.PipelineRun {
+	return []pipeline.PipelineRun{
+		TestPipelineRun(),
+		TestPipelineRun(func(r *pipeline.PipelineRun) {
+			r.SessionID = "3bc891ff"
+			r.Project = "cabrero"
+			r.Timestamp = time.Now().Add(-2 * time.Hour)
+			r.ParseDuration = 800 * time.Millisecond
+			r.ClassifierDuration = 6100 * time.Millisecond
+			r.EvaluatorDuration = 9 * time.Second
+			r.ProposalCount = 0
+		}),
+		TestPipelineRun(func(r *pipeline.PipelineRun) {
+			r.SessionID = "91cd02ab"
+			r.Project = "woo-payments"
+			r.Timestamp = time.Now().Add(-8 * time.Hour)
+			r.Status = "error"
+			r.HasClassifier = false
+			r.HasEvaluator = false
+			r.ParseDuration = 400 * time.Millisecond
+			r.ClassifierDuration = 0
+			r.EvaluatorDuration = 0
+			r.ProposalCount = 0
+			r.ErrorDetail = "classifier timeout after 2m"
+		}),
+		TestPipelineRun(func(r *pipeline.PipelineRun) {
+			r.SessionID = "7e0b1234"
+			r.Project = "woo-payments"
+			r.Timestamp = time.Now().Add(-24 * time.Hour)
+			r.Status = "pending"
+			r.HasDigest = false
+			r.HasClassifier = false
+			r.HasEvaluator = false
+			r.ParseDuration = 0
+			r.ClassifierDuration = 0
+			r.EvaluatorDuration = 0
+			r.ProposalCount = 0
+		}),
+	}
+}
+
+// TestPipelineStats returns realistic pipeline statistics.
+func TestPipelineStats() pipeline.PipelineStats {
+	return pipeline.PipelineStats{
+		SessionsCaptured:   18,
+		SessionsProcessed:  16,
+		SessionsPending:    1,
+		SessionsErrored:    1,
+		ProposalsGenerated: 5,
+		ProposalsApproved:  3,
+		ProposalsRejected:  1,
+		ProposalsPending:   1,
+		SessionsPerDay:     []int{3, 2, 1, 4, 2, 3, 3},
+	}
+}
+
+// TestPromptVersions returns prompt version fixtures.
+func TestPromptVersions() []pipeline.PromptVersion {
+	return []pipeline.PromptVersion{
+		{Name: "classifier", Version: "v3", LastUsed: time.Now().Add(-12 * time.Minute)},
+		{Name: "evaluator", Version: "v3", LastUsed: time.Now().Add(-12 * time.Minute)},
+		{Name: "apply", Version: "v1", LastUsed: time.Now().Add(-3 * 24 * time.Hour)},
+	}
+}
