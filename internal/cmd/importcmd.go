@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -104,6 +105,17 @@ func Import(args []string) error {
 			fmt.Fprintf(os.Stderr, "  Warning: failed to import %s: %v\n", sessionID, err)
 			return nil
 		}
+
+		// Run pre-parser to generate digest (cheap, no LLM).
+		digest, parseErr := parser.ParseSession(sessionID)
+		if parseErr != nil {
+			fmt.Fprintf(os.Stderr, "  Warning: pre-parser failed for %s: %v\n", sessionID, parseErr)
+		} else {
+			if writeErr := parser.WriteDigest(digest); writeErr != nil {
+				fmt.Fprintf(os.Stderr, "  Warning: writing digest for %s: %v\n", sessionID, writeErr)
+			}
+		}
+
 		imported++
 		return nil
 	})
@@ -113,9 +125,9 @@ func Import(args []string) error {
 
 	fmt.Println()
 	if *dryRun {
-		fmt.Printf("Would import %d sessions, skipped %d (already present).\n", imported, skipped)
+		fmt.Printf("Would import %d sessions (with pre-parsing), skipped %d (already present).\n", imported, skipped)
 	} else {
-		fmt.Printf("Imported %d sessions, skipped %d (already present).\n", imported, skipped)
+		fmt.Printf("Imported %d sessions (with digests), skipped %d (already present).\n", imported, skipped)
 	}
 	return nil
 }
