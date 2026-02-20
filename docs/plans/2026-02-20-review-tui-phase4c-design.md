@@ -315,3 +315,43 @@ Add to `integration_test.go`:
 | Project name         | 20 chars       | 15 chars           | 10 chars       |
 | Per-stage timing     | All 3 stages   | 2 stages           | Total only     |
 | Prompt versions      | Shown          | Shown              | Hidden         |
+
+## Known Simplifications
+
+The initial implementation intentionally defers the following items from the
+design. These are not bugs — they are scope cuts for the first pass.
+
+### Key binding overlaps
+
+`r` maps to both Reject (dashboard/detail) and Refresh (pipeline monitor).
+`/` maps to both Filter (dashboard) and Search (log viewer). Both are safe
+because each view only checks its own bindings in `handleKey`, but any future
+shared key handler or binding iterator would need to account for the overlap.
+
+### Missing pipeline monitor sections
+
+The design layout (lines 93-131) specifies Uptime, Poll/Stale/Delay intervals,
+and a Store section (path, session count, disk usage) that are not yet rendered.
+The daemon header currently shows only running status with PID and hook
+checkmarks. The two-column daemon/hooks/store layout is also stacked-only.
+
+### Search match highlighting
+
+The log viewer finds matches and supports n/N navigation, but does not
+highlight matched text in the viewport. The design (line 213) specifies accent
+color highlighting. Implementing this requires a rendering pass that wraps
+matched substrings with lipgloss styles before setting viewport content.
+
+### Two-stage Esc in log viewer
+
+The design (line 216) specifies that a second Esc clears highlights before
+navigating back. Currently Esc always triggers PopView via the root model's
+global key handler, bypassing the log viewer. Implementing this requires the
+log viewer to intercept Esc when matches are active, clear them on the first
+press, and only let the second Esc propagate.
+
+### Responsive layout
+
+The design (table above) specifies different behavior for wide (>=120),
+standard (80-119), and narrow (<80) terminals. The implementation uses a fixed
+layout regardless of terminal width.
