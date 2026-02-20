@@ -506,7 +506,7 @@ func (s *setupRunner) stepBackfillOffer(step, total int) error {
 
 	// Count pending sessions.
 	sessions, err := store.QuerySessions(store.SessionFilter{
-		Statuses: []string{"pending"},
+		Statuses: []string{"imported"},
 	})
 	if err != nil || len(sessions) == 0 {
 		fmt.Println("  No existing sessions to process.")
@@ -515,8 +515,8 @@ func (s *setupRunner) stepBackfillOffer(step, total int) error {
 
 	fmt.Printf("  Found %d session(s) ready for processing\n", len(sessions))
 
-	if !s.confirm("Process recent sessions through the pipeline?") {
-		fmt.Println("  — Skipped. Run 'cabrero backfill' later to process.")
+	if !s.confirm("Enqueue recent sessions for background processing?") {
+		fmt.Println("  — Skipped. Run 'cabrero backfill --enqueue' later to process.")
 		return nil
 	}
 
@@ -541,6 +541,7 @@ func (s *setupRunner) stepBackfillOffer(step, total int) error {
 
 	return Backfill([]string{
 		"--since", sinceDate.Format("2006-01-02"),
+		"--enqueue",
 		"--yes",
 	})
 }
