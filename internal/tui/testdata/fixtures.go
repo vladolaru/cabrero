@@ -206,6 +206,23 @@ func TestFitnessReport(overrides ...func(*fitness.Report)) *fitness.Report {
 	return r
 }
 
+// TestFitnessReports returns a set of fitness reports for dashboard testing.
+func TestFitnessReports() []fitness.Report {
+	r1 := TestFitnessReport()
+	r2 := TestFitnessReport(func(r *fitness.Report) {
+		r.ID = "fit-002"
+		r.SourceName = "csv-importer"
+		r.SourceOrigin = "plugin:some-third-party"
+		r.Assessment = fitness.Assessment{
+			Followed:     fitness.BucketStat{Count: 10, Percent: 62},
+			WorkedAround: fitness.BucketStat{Count: 4, Percent: 25},
+			Confused:     fitness.BucketStat{Count: 2, Percent: 13},
+		}
+		r.Verdict = "Generally followed but with some workarounds."
+	})
+	return []fitness.Report{*r1, *r2}
+}
+
 // TestSource returns a single source with sensible defaults.
 func TestSource(overrides ...func(*fitness.Source)) fitness.Source {
 	t := time.Now().Add(-7 * 24 * time.Hour)

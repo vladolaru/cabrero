@@ -67,7 +67,7 @@ func newReviewModel(proposals []pipeline.ProposalWithSession, stats message.Dash
 		proposals:    proposals,
 		sourceGroups: sourceGroups,
 		help:         help.New(),
-		dashboard:    dashboard.New(proposals, stats, &keys, cfg),
+		dashboard:    dashboard.New(proposals, nil, stats, &keys, cfg),
 	}
 
 	return m
@@ -328,10 +328,9 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 		}
 
 	case message.ViewFitnessDetail:
-		// Initialize fitness detail from the selected report.
-		// For now, ViewFitnessDetail is not reachable from the dashboard
-		// (that wiring comes in Task 9). Create with nil report as placeholder.
-		m.fitness = fitness_tui.New(nil, &m.keys, m.config)
+		// Initialize fitness detail from the dashboard's selected report.
+		report := m.dashboard.SelectedFitnessReport()
+		m.fitness = fitness_tui.New(report, &m.keys, m.config)
 		m.fitness.SetSize(m.width, m.height)
 
 	case message.ViewSourceManager:

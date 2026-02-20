@@ -3,8 +3,8 @@ package dashboard
 import (
 	"fmt"
 	"strings"
-	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/vladolaru/cabrero/internal/tui/components"
@@ -15,6 +15,7 @@ var (
 	headerStyle   = lipgloss.NewStyle().Bold(true)
 	mutedStyle    = lipgloss.NewStyle().Foreground(shared.ColorMuted)
 	accentStyle   = lipgloss.NewStyle().Foreground(shared.ColorAccent)
+	warningStyle  = lipgloss.NewStyle().Foreground(shared.ColorWarning)
 	successStyle  = lipgloss.NewStyle().Foreground(shared.ColorSuccess)
 	errorStyle    = lipgloss.NewStyle().Foreground(shared.ColorError)
 	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
@@ -23,6 +24,7 @@ var (
 // Type indicator characters.
 const (
 	indicatorProposal = "●"
+	indicatorFitness  = "◎"
 )
 
 // View renders the dashboard.
@@ -50,7 +52,7 @@ func (m Model) View() string {
 		b.WriteString("\n")
 		b.WriteString(headerStyle.Render("  PENDING REVIEW"))
 		b.WriteString("\n\n")
-		b.WriteString(m.renderProposalList())
+		b.WriteString(m.renderItemList())
 	}
 
 	// Fill remaining space.
@@ -75,8 +77,11 @@ func (m Model) View() string {
 func (m Model) renderHeader() string {
 	title := headerStyle.Render("  Cabrero Review")
 
-	stats := fmt.Sprintf("  %d proposals awaiting review  ·  %d approved  ·  %d rejected",
+	statsLine := fmt.Sprintf("  %d proposals awaiting review  ·  %d approved  ·  %d rejected",
 		m.stats.PendingCount, m.stats.ApprovedCount, m.stats.RejectedCount)
+	if m.stats.FitnessReportCount > 0 {
+		statsLine += fmt.Sprintf("  ·  %d fitness reports", m.stats.FitnessReportCount)
+	}
 
 	var daemonStatus string
 	if m.stats.DaemonRunning {
@@ -96,30 +101,37 @@ func (m Model) renderHeader() string {
 
 	if m.width >= 120 {
 		// Wide: stats on left, daemon/hooks on right.
-		left := title + "\n" + stats
+		left := title + "\n" + statsLine
 		right := fmt.Sprintf("Daemon: %s\n%s\n%s", daemonStatus, lastCapture, hooks)
 		rightRendered := mutedStyle.Render(right)
 		return lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", rightRendered)
 	}
 
 	// Standard/narrow: single-line header.
-	return title + "\n" + mutedStyle.Render(stats) + "\n" +
+	return title + "\n" + mutedStyle.Render(statsLine) + "\n" +
 		mutedStyle.Render(fmt.Sprintf("  Daemon: %s  │  %s  │  %s", daemonStatus, lastCapture, hooks))
 }
 
-func (m Model) renderProposalList() string {
+func (m Model) renderItemList() string {
 	var b strings.Builder
 
-	for i, p := range m.filtered {
+	for i, item := range m.filtered {
 		prefix := "  "
 		if i == m.cursor {
 			prefix = "> "
 		}
 
-		indicator := accentStyle.Render(indicatorProposal)
-		typeName := padRight(p.Proposal.Type, 18)
-		target := truncate(p.Proposal.Target, m.targetWidth())
-		confidence := mutedStyle.Render(p.Proposal.Confidence)
+		// Choose indicator style based on item type.
+		var indicator string
+		if item.IsProposal() {
+			indicator = accentStyle.Render(indicatorProposal)
+		} else {
+			indicator = warningStyle.Render(indicatorFitness)
+		}
+
+		typeName := padRight(item.TypeName(), 18)
+		target := truncate(item.Target(), m.targetWidth())
+		confidence := mutedStyle.Render(item.Confidence())
 
 		line := fmt.Sprintf("%s %s %s  %s  %s", prefix, indicator, typeName, target, confidence)
 
@@ -141,6 +153,16 @@ func (m Model) renderProposalList() string {
 
 func (m Model) renderStatusBar() string {
 	keys := m.keys
+
+	// Show different actions depending on the selected item type.
+	item := m.SelectedItem()
+	if item != nil && item.IsFitnessReport() {
+		bindings := []key.Binding{
+			keys.Up, keys.Down, keys.Open, keys.Sources, keys.Help,
+		}
+		return components.RenderStatusBar(bindings, "", m.width)
+	}
+
 	return components.RenderStatusBar(keys.ShortHelp(), "", m.width)
 }
 
@@ -159,20 +181,6 @@ func checkMark(ok bool) string {
 		return successStyle.Render("✓")
 	}
 	return errorStyle.Render("✗")
-}
-
-func timeAgo(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
 }
 
 func truncate(s string, maxLen int) string {

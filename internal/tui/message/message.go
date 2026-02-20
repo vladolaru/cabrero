@@ -50,9 +50,10 @@ type StatsLoaded struct {
 
 // DashboardStats holds counts and status for the dashboard header.
 type DashboardStats struct {
-	PendingCount  int
-	ApprovedCount int
-	RejectedCount int
+	PendingCount       int
+	ApprovedCount      int
+	RejectedCount      int
+	FitnessReportCount int
 
 	DaemonRunning bool
 	DaemonPID     int

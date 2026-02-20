@@ -52,12 +52,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Open):
-		if m.SelectedProposal() != nil {
+		item := m.SelectedItem()
+		if item == nil {
+			return m, nil
+		}
+		if item.IsFitnessReport() {
 			return m, func() tea.Msg {
-				return message.PushView{View: message.ViewProposalDetail}
+				return message.PushView{View: message.ViewFitnessDetail}
 			}
 		}
-		return m, nil
+		return m, func() tea.Msg {
+			return message.PushView{View: message.ViewProposalDetail}
+		}
 
 	case key.Matches(msg, m.keys.Sort):
 		m.CycleSortOrder()
@@ -67,6 +73,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.filterActive = true
 		m.filterInput.Focus()
 		return m, nil
+
+	case key.Matches(msg, m.keys.Sources):
+		return m, func() tea.Msg {
+			return message.PushView{View: message.ViewSourceManager}
+		}
 
 	case key.Matches(msg, m.keys.Approve):
 		if m.SelectedProposal() != nil {
@@ -119,4 +130,3 @@ func (m Model) updateFilter(msg tea.Msg) (Model, tea.Cmd) {
 	m.filterInput, cmd = m.filterInput.Update(msg)
 	return m, cmd
 }
-

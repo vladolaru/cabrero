@@ -2,14 +2,18 @@
 package dashboard
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/charmbracelet/bubbles/textinput"
 
+	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-// Sort orders for the proposal list.
+// Sort orders for the item list.
 const (
 	SortNewest     = "newest"
 	SortOldest     = "oldest"
@@ -19,10 +23,68 @@ const (
 
 var sortOrders = []string{SortNewest, SortOldest, SortConfidence, SortType}
 
+// DashboardItem wraps either a proposal or a fitness report for the unified list.
+type DashboardItem struct {
+	Proposal      *pipeline.ProposalWithSession
+	FitnessReport *fitness.Report
+}
+
+// IsProposal returns true if this item wraps a proposal.
+func (d DashboardItem) IsProposal() bool {
+	return d.Proposal != nil
+}
+
+// IsFitnessReport returns true if this item wraps a fitness report.
+func (d DashboardItem) IsFitnessReport() bool {
+	return d.FitnessReport != nil
+}
+
+// TypeIndicator returns "●" for proposals or "◎" for fitness reports.
+func (d DashboardItem) TypeIndicator() string {
+	if d.IsProposal() {
+		return indicatorProposal
+	}
+	return indicatorFitness
+}
+
+// TypeName returns a human-readable type name for the item.
+func (d DashboardItem) TypeName() string {
+	if d.IsProposal() {
+		return d.Proposal.Proposal.Type
+	}
+	return "fitness_report"
+}
+
+// Target returns the target name for the item.
+func (d DashboardItem) Target() string {
+	if d.IsProposal() {
+		return d.Proposal.Proposal.Target
+	}
+	return d.FitnessReport.SourceName
+}
+
+// Age returns a human-readable age string for the item.
+func (d DashboardItem) Age() string {
+	if d.IsFitnessReport() {
+		return timeAgo(d.FitnessReport.GeneratedAt)
+	}
+	// Proposals don't carry a timestamp on the struct, so return empty.
+	return ""
+}
+
+// Confidence returns the confidence level for proposals, or a health summary for reports.
+func (d DashboardItem) Confidence() string {
+	if d.IsProposal() {
+		return d.Proposal.Proposal.Confidence
+	}
+	// For fitness reports, show the followed percentage as a health indicator.
+	return fmt.Sprintf("%d%% health", int(d.FitnessReport.Assessment.Followed.Percent))
+}
+
 // Model is the dashboard view model.
 type Model struct {
-	proposals    []pipeline.ProposalWithSession
-	filtered     []pipeline.ProposalWithSession // after filter applied
+	items        []DashboardItem
+	filtered     []DashboardItem // after filter applied
 	cursor       int
 	stats        message.DashboardStats
 	filterInput  textinput.Model
@@ -36,7 +98,9 @@ type Model struct {
 }
 
 // New creates a dashboard model with loaded data.
-func New(proposals []pipeline.ProposalWithSession, stats message.DashboardStats, keys *shared.KeyMap, cfg *shared.Config) Model {
+func New(proposals []pipeline.ProposalWithSession, reports []fitness.Report,
+	stats message.DashboardStats, keys *shared.KeyMap, cfg *shared.Config) Model {
+
 	fi := textinput.New()
 	fi.Placeholder = "type:skill target:docx or free text..."
 	fi.Prompt = "/ "
@@ -46,8 +110,17 @@ func New(proposals []pipeline.ProposalWithSession, stats message.DashboardStats,
 		sortOrder = SortNewest
 	}
 
+	// Build the unified item list: proposals first, then fitness reports.
+	items := make([]DashboardItem, 0, len(proposals)+len(reports))
+	for i := range proposals {
+		items = append(items, DashboardItem{Proposal: &proposals[i]})
+	}
+	for i := range reports {
+		items = append(items, DashboardItem{FitnessReport: &reports[i]})
+	}
+
 	m := Model{
-		proposals:   proposals,
+		items:       items,
 		cursor:      0,
 		stats:       stats,
 		filterInput: fi,
@@ -59,13 +132,33 @@ func New(proposals []pipeline.ProposalWithSession, stats message.DashboardStats,
 	return m
 }
 
-// SelectedProposal returns the proposal at the current cursor position.
-func (m Model) SelectedProposal() *pipeline.ProposalWithSession {
+// SelectedItem returns the DashboardItem at the current cursor position.
+func (m Model) SelectedItem() *DashboardItem {
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
 		return nil
 	}
-	p := m.filtered[m.cursor]
-	return &p
+	item := m.filtered[m.cursor]
+	return &item
+}
+
+// SelectedProposal returns the proposal at the current cursor position, or nil
+// if the cursor is on a fitness report or the list is empty.
+func (m Model) SelectedProposal() *pipeline.ProposalWithSession {
+	item := m.SelectedItem()
+	if item == nil || !item.IsProposal() {
+		return nil
+	}
+	return item.Proposal
+}
+
+// SelectedFitnessReport returns the fitness report at the current cursor position,
+// or nil if the cursor is on a proposal or the list is empty.
+func (m Model) SelectedFitnessReport() *fitness.Report {
+	item := m.SelectedItem()
+	if item == nil || !item.IsFitnessReport() {
+		return nil
+	}
+	return item.FitnessReport
 }
 
 // CycleSortOrder advances to the next sort order.
@@ -82,10 +175,24 @@ func (m *Model) CycleSortOrder() {
 }
 
 func (m *Model) applyFilter() {
-	m.filtered = m.proposals
+	m.filtered = m.items
 	// Future: implement actual filtering by type/target/text.
-	// For now, show all proposals.
+	// For now, show all items.
 	if m.cursor >= len(m.filtered) {
 		m.cursor = max(0, len(m.filtered)-1)
+	}
+}
+
+func timeAgo(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 	}
 }
