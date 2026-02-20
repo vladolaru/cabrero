@@ -187,7 +187,8 @@ func bucketSessionsByDay(timestamps []time.Time, days int) []int {
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	for _, ts := range timestamps {
-		tsDay := time.Date(ts.Year(), ts.Month(), ts.Day(), 0, 0, 0, 0, ts.Location())
+		local := ts.In(now.Location())
+		tsDay := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, now.Location())
 		dayOffset := int(todayStart.Sub(tsDay).Hours() / 24)
 		if dayOffset >= 0 && dayOffset < days {
 			buckets[dayOffset]++
