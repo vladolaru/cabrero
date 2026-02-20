@@ -409,6 +409,10 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (5 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
+- **Smart batching** — groups pending sessions by project, runs Haiku individually (cheap
+  triage), then batches "evaluate" sessions into a single Sonnet call per project
+- **Evaluator tuning** — turn budgets and timeouts configurable via CLI flags
+  (`--haiku-max-turns`, `--sonnet-max-turns`, `--haiku-timeout`, `--sonnet-timeout`)
 
 LaunchAgent plist template at `launchd/com.cabrero.daemon.plist` with `KeepAlive`,
 `RunAtLoad`, low-priority I/O, and `Nice: 10`.
@@ -558,6 +562,11 @@ Lives at `~/.cabrero/bin/cabrero`, added to PATH on install.
 
 ```
 cabrero run <session_id>        Run the full pipeline on a session
+  --dry-run                       Run only the pre-parser, skip LLM invocations
+  --haiku-max-turns <int>         Max agentic turns for Haiku (default 15)
+  --sonnet-max-turns <int>        Max agentic turns for Sonnet (default 20)
+  --haiku-timeout <duration>      Timeout for Haiku classifier (default 2m)
+  --sonnet-timeout <duration>     Timeout for Sonnet evaluator (default 5m)
 cabrero sessions                List captured sessions with status (processed/pending/error)
 cabrero status                  Show pipeline health: sessions, daemon, hooks
 cabrero proposals               List pending proposals
@@ -569,6 +578,10 @@ cabrero daemon                  Run background session processor (for launchd)
   --poll <duration>               Pending session check interval (default 2m)
   --stale <duration>              Stale session scan interval (default 30m)
   --delay <duration>              Pause between processing sessions (default 30s)
+  --haiku-max-turns <int>         Max agentic turns for Haiku (default 15)
+  --sonnet-max-turns <int>        Max agentic turns for Sonnet (default 20)
+  --haiku-timeout <duration>      Timeout for Haiku classifier (default 2m)
+  --sonnet-timeout <duration>     Timeout for Sonnet evaluator (default 5m)
 cabrero replay                  Re-run pipeline with a different prompt against a past session
   --session <id>
   --prompt <path>
