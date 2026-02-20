@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -34,6 +35,11 @@ type BatchProcessor struct {
 	Config       PipelineConfig
 	MaxBatchSize int // 0 means DefaultMaxBatchSize
 	OnStatus     func(sessionID string, event BatchEvent)
+
+	// Testing hooks — when nil, package-level functions are used.
+	ClassifyFunc  func(sessionID string, cfg PipelineConfig) (*ClassifierResult, error)
+	EvalFunc      func(sessionID string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, error)
+	EvalBatchFunc func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, error)
 }
 
 func (bp *BatchProcessor) maxBatch() int {
@@ -47,6 +53,27 @@ func (bp *BatchProcessor) emit(sessionID string, event BatchEvent) {
 	if bp.OnStatus != nil {
 		bp.OnStatus(sessionID, event)
 	}
+}
+
+func (bp *BatchProcessor) classify(sessionID string) (*ClassifierResult, error) {
+	if bp.ClassifyFunc != nil {
+		return bp.ClassifyFunc(sessionID, bp.Config)
+	}
+	return RunThroughClassifier(sessionID, bp.Config)
+}
+
+func (bp *BatchProcessor) evalOne(sessionID string, digest *parser.Digest, co *ClassifierOutput) (*EvaluatorOutput, error) {
+	if bp.EvalFunc != nil {
+		return bp.EvalFunc(sessionID, digest, co, bp.Config)
+	}
+	return RunEvaluator(sessionID, digest, co, bp.Config)
+}
+
+func (bp *BatchProcessor) evalMany(sessions []BatchSession) (*EvaluatorOutput, error) {
+	if bp.EvalBatchFunc != nil {
+		return bp.EvalBatchFunc(sessions, bp.Config)
+	}
+	return RunEvaluatorBatch(sessions, bp.Config)
 }
 
 // ProcessGroup runs all sessions through the Classifier, then batches "evaluate"
@@ -73,7 +100,7 @@ func (bp *BatchProcessor) ProcessGroup(ctx context.Context, sessions []BatchSess
 		default:
 		}
 
-		classifierResult, err := RunThroughClassifier(s.SessionID, bp.Config)
+		classifierResult, err := bp.classify(s.SessionID)
 		if err != nil {
 			results[i].Status = "error"
 			results[i].Error = err
@@ -143,7 +170,7 @@ func (bp *BatchProcessor) ProcessGroup(ctx context.Context, sessions []BatchSess
 func (bp *BatchProcessor) evalSingle(s BatchSession, results []BatchResult, indexByID map[string]int) {
 	idx := indexByID[s.SessionID]
 
-	evaluatorOutput, err := RunEvaluator(s.SessionID, s.Digest, s.ClassifierOutput, bp.Config)
+	evaluatorOutput, err := bp.evalOne(s.SessionID, s.Digest, s.ClassifierOutput)
 	if err != nil {
 		results[idx].Status = "error"
 		results[idx].Error = err
@@ -165,7 +192,7 @@ func (bp *BatchProcessor) evalSingle(s BatchSession, results []BatchResult, inde
 }
 
 func (bp *BatchProcessor) evalBatch(chunk []BatchSession, results []BatchResult, indexByID map[string]int) {
-	evaluatorOutput, err := RunEvaluatorBatch(chunk, bp.Config)
+	evaluatorOutput, err := bp.evalMany(chunk)
 	if err != nil {
 		// Mark all sessions in the chunk as errors.
 		for _, s := range chunk {
