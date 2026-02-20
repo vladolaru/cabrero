@@ -5,10 +5,35 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-02-21
 
 ### Added
 
+- **`cabrero review`** — interactive Bubble Tea TUI for reviewing proposals.
+  Dashboard shows proposal list with type indicators, confidence, and sort/filter.
+  Detail view renders colored unified diffs, rationale, and citation chains.
+  Stack-based navigation with configurable arrow or vim keybinding modes.
+- **AI chat panel** — streaming Evaluator integration via `claude` CLI for
+  interrogating proposals before deciding. Question chips for common queries,
+  revision detection via ` ```revision ` fenced blocks.
+- **`cabrero approve`** — non-interactive CLI command that reads a proposal,
+  invokes Claude to blend the change into the target file, shows a before/after
+  diff, and writes the file on confirmation.
+- **`cabrero reject`** — non-interactive CLI command that archives a proposal
+  with an optional rejection reason (`--reason "text"`).
+- **Fitness Report Detail view** — assessment bars showing three-bucket health
+  breakdown (followed/worked around/confused), expandable session evidence grouped
+  by category, dismiss and jump-to-sources actions. Fitness reports appear in the
+  dashboard with `◎` indicator alongside proposals.
+- **Source Manager** — grouped source list organized by origin (user, project,
+  plugin) with collapsible sections. Ownership classification, iterate/evaluate
+  approach toggles with confirmation gates, change history detail with rollback
+  support. Adaptive column layout for different terminal widths.
+- **Dashboard mixed item list** — unified list showing both proposals and fitness
+  reports. `s` keyboard shortcut opens Source Manager from dashboard.
+- **TUI configuration** — `~/.cabrero/config.json` with navigation mode,
+  theme, dashboard sort order, chat panel width, personality flavor text,
+  and per-action confirmation toggles. Partial configs merge with defaults.
 - **Pipeline monitor view** — daemon health, recent runs with per-stage timing
   breakdown (parse/classifier/evaluator), sparkline activity chart, prompt
   version listing, inline run detail expansion, and retry flow with
@@ -34,6 +59,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Pipeline monitor responsive layout** — three-tier layout (wide/standard/narrow)
   adapts daemon header density, activity stats format, sparkline visibility,
   run row detail level, and prompt section visibility to terminal width.
+
+### Fixed
+
+- Chat panel now streams tokens in real-time instead of buffering.
+- Chat panel renders alongside detail view in wide terminals.
+- Dashboard approve/reject/defer navigates to detail view first.
+- Reject and defer actions respect per-action confirmation config toggles.
+- Personality flavor text from config is now honored in TUI messages.
+- Review flow subprocess isolation hardened to prevent Bubble Tea contract
+  violations.
+- Fire-and-forget archive goroutines replaced with proper `tea.Cmd` to prevent
+  races.
+- Config saves no longer strip the `pipeline` section from `config.json`.
+- Sparkline bucketing normalizes timestamps to local timezone for correct day
+  boundaries.
+
+### Changed
+
+- Log viewer uses incremental reading in follow mode for lower I/O overhead.
+- Pipeline monitor deduplicates redundant store reads per tick.
+- Consolidated duplicated TUI utilities, styles, and dead code.
 
 ## [0.7.0] - 2026-02-20
 
@@ -98,49 +144,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **`cabrero review`** — interactive Bubble Tea TUI for reviewing proposals.
-  Dashboard shows proposal list with type indicators, confidence, and sort/filter.
-  Detail view renders colored unified diffs, rationale, and citation chains.
-  Stack-based navigation with configurable arrow or vim keybinding modes.
-
-- **AI chat panel** — streaming Evaluator integration via `claude` CLI for
-  interrogating proposals before deciding. Question chips for common queries,
-  revision detection via ` ```revision ` fenced blocks.
-
-- **`cabrero approve`** — non-interactive CLI command that reads a proposal,
-  invokes Claude to blend the change into the target file, shows a before/after
-  diff, and writes the file on confirmation.
-
-- **`cabrero reject`** — non-interactive CLI command that archives a proposal
-  with an optional rejection reason (`--reason "text"`).
-
-- **Fitness Report Detail view** — assessment bars showing three-bucket health
-  breakdown (followed/worked around/confused), expandable session evidence grouped
-  by category, dismiss and jump-to-sources actions. Fitness reports appear in the
-  dashboard with `◎` indicator alongside proposals.
-
-- **Source Manager** — grouped source list organized by origin (user, project,
-  plugin) with collapsible sections. Ownership classification, iterate/evaluate
-  approach toggles with confirmation gates, change history detail with rollback
-  support. Adaptive column layout for different terminal widths.
-
-- **Dashboard mixed item list** — unified list showing both proposals and fitness
-  reports. `s` keyboard shortcut opens Source Manager from dashboard.
-
-- **TUI configuration** — `~/.cabrero/config.json` with navigation mode,
-  theme, dashboard sort order, chat panel width, personality flavor text,
-  and per-action confirmation toggles. Partial configs merge with defaults.
-
 - **CLI flags** — `--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`,
   `--evaluator-timeout` on both `cabrero daemon` and `cabrero run` for tuning
   agentic evaluator limits.
-
 - **`cabrero uninstall`** — clean removal command that reverses setup: stops
   daemon, removes LaunchAgent, unregisters Claude Code hooks, deletes hook
   scripts and binary. Prompts whether to keep `~/.cabrero` data for
   reinstallation or remove everything. `--yes` skips confirmations,
   `--keep-data`/`--remove-data` control data directory without prompting.
-
 - **`cabrero doctor`** — comprehensive diagnostic command that checks store,
   hook scripts, Claude Code integration, LaunchAgent, daemon, PATH, and
   pipeline health. Reports issues with severity (pass/warn/fail) and offers
@@ -192,6 +203,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.8.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.0
 [0.7.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.7.0
 [0.6.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.6.0
 [0.5.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.5.0
