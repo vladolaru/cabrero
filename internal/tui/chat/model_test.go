@@ -53,7 +53,7 @@ func TestChat_ChipsHideAfterManualInput(t *testing.T) {
 	}
 
 	// Focus input and type a message.
-	m.Focus()
+	m.input.Focus()
 	m.input.SetValue("my question")
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 

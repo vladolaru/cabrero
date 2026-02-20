@@ -37,12 +37,6 @@ type ChangeEntry struct {
 	FilePath        string    `json:"filePath"`
 }
 
-// ListSources returns all known sources. For now, returns empty slice.
-// Future: reads from ~/.cabrero/sources.json.
-func ListSources() ([]Source, error) {
-	return nil, nil
-}
-
 // originOrder returns a sort key for origin-based group ordering.
 // "user" first, then "project:*", then "plugin:*".
 func originOrder(origin string) int {
@@ -122,7 +116,3 @@ func ListSourceGroups(sources []Source) []SourceGroup {
 	return groups
 }
 
-// ListChanges returns change history for a source. For now, returns empty slice.
-func ListChanges(_ string) ([]ChangeEntry, error) {
-	return nil, nil
-}

@@ -63,46 +63,6 @@ func ConfirmDefer() string {
 	return "Back of the line, little goat."
 }
 
-// EmptyErrors returns the empty-state message for no errors.
-func EmptyErrors() string {
-	if !flavorEnabled {
-		return "No errors."
-	}
-	return "All goats accounted for. No errors."
-}
-
-// EmptyFitnessEvidence returns the message when no evidence entries exist.
-func EmptyFitnessEvidence() string {
-	if !flavorEnabled {
-		return "No evidence entries."
-	}
-	return "No sessions witnessed. The goat was never observed."
-}
-
-// EmptySources returns the message when no sources are tracked.
-func EmptySources() string {
-	if !flavorEnabled {
-		return "No sources tracked."
-	}
-	return "No artifacts tracked yet. The flock is empty."
-}
-
-// AllClassified returns the message when all sources are classified.
-func AllClassified() string {
-	if !flavorEnabled {
-		return "All sources classified."
-	}
-	return "Every goat has a name."
-}
-
-// ConfirmDismiss returns the status bar message after dismissing a fitness report.
-func ConfirmDismiss() string {
-	if !flavorEnabled {
-		return "Report dismissed."
-	}
-	return "Report acknowledged. The goatherd moves on."
-}
-
 // ConfirmRollback returns the status bar message after rolling back a change.
 func ConfirmRollback() string {
 	if !flavorEnabled {

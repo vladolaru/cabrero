@@ -27,27 +27,6 @@ type PushView struct {
 // PopView pops the current view, returning to the previous one.
 type PopView struct{}
 
-// Data loading messages.
-
-// ProposalsLoaded carries the result of loading proposals from the store.
-type ProposalsLoaded struct {
-	Proposals []ProposalRef
-	Err       error
-}
-
-// ProposalRef is a minimal reference to a proposal for message passing.
-// The full pipeline.ProposalWithSession is used in the actual models.
-type ProposalRef struct {
-	ProposalID string
-	SessionID  string
-}
-
-// StatsLoaded carries dashboard statistics.
-type StatsLoaded struct {
-	Stats DashboardStats
-	Err   error
-}
-
 // DashboardStats holds counts and status for the dashboard header.
 type DashboardStats struct {
 	PendingCount       int
@@ -63,11 +42,6 @@ type DashboardStats struct {
 
 	LastCaptureTime *time.Time
 }
-
-// Store change messages.
-
-// StoreChanged signals that a watched store directory was modified.
-type StoreChanged struct{ Dir string }
 
 // Review action messages.
 
@@ -103,9 +77,6 @@ type DeferFinished struct {
 }
 
 // AI chat messages.
-
-// ChatStreamToken carries a single streaming token from the claude CLI.
-type ChatStreamToken struct{ Token string }
 
 // ChatStreamDone signals that streaming is complete.
 type ChatStreamDone struct{ FullResponse string }

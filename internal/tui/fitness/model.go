@@ -85,7 +85,3 @@ func (m *Model) SetSize(width, height int) {
 	m.viewport.SetContent(m.renderViewportContent())
 }
 
-// HasChatFocus returns true if the chat pane has focus.
-func (m Model) HasChatFocus() bool {
-	return m.focus == FocusChat
-}

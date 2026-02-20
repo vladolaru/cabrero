@@ -66,29 +66,9 @@ func (m *Model) SetSize(width, height int) {
 	m.input.SetWidth(width - 4)
 }
 
-// Focus gives keyboard focus to the input area.
-func (m *Model) Focus() {
-	m.input.Focus()
-}
-
-// Blur removes keyboard focus from the input area.
-func (m *Model) Blur() {
-	m.input.Blur()
-}
-
-// Focused returns true if the input area has focus.
-func (m Model) Focused() bool {
-	return m.input.Focused()
-}
-
 // HasRevision returns true if the last assistant response contained a revision.
 func (m Model) HasRevision() bool {
 	return m.revision != nil
-}
-
-// Revision returns the last parsed revision, or nil.
-func (m Model) Revision() *string {
-	return m.revision
 }
 
 // addMessage appends a message and updates the viewport.
