@@ -14,32 +14,59 @@ var loadingMessages = []string{
 	"One goat at a time...",
 }
 
-// LoadingMessage returns a random pirategoat loading message.
+// flavorEnabled controls whether pirategoat flavor text is used.
+// Set via SetFlavorEnabled at TUI startup from config.
+var flavorEnabled = true
+
+// SetFlavorEnabled configures whether flavor text is shown.
+func SetFlavorEnabled(enabled bool) {
+	flavorEnabled = enabled
+}
+
+// LoadingMessage returns a loading message.
 func LoadingMessage() string {
+	if !flavorEnabled {
+		return "Loading..."
+	}
 	return loadingMessages[rand.Intn(len(loadingMessages))]
 }
 
 // EmptyProposals returns the empty-state message for no proposals.
 func EmptyProposals() string {
+	if !flavorEnabled {
+		return "No proposals pending."
+	}
 	return "The flock is calm. No proposals pending."
 }
 
 // ConfirmApprove returns the status bar message after approving.
 func ConfirmApprove() string {
+	if !flavorEnabled {
+		return "Change applied."
+	}
 	return "Change landed. The flock grows stronger."
 }
 
 // ConfirmReject returns the status bar message after rejecting.
 func ConfirmReject() string {
+	if !flavorEnabled {
+		return "Proposal rejected."
+	}
 	return "Noted. The goatherd remembers."
 }
 
 // ConfirmDefer returns the status bar message after deferring.
 func ConfirmDefer() string {
+	if !flavorEnabled {
+		return "Proposal deferred."
+	}
 	return "Back of the line, little goat."
 }
 
 // EmptyErrors returns the empty-state message for no errors.
 func EmptyErrors() string {
+	if !flavorEnabled {
+		return "No errors."
+	}
 	return "All goats accounted for. No errors."
 }

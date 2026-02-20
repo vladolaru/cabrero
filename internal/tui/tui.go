@@ -13,6 +13,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
+	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 )
 
@@ -22,6 +23,8 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
+
+	components.SetFlavorEnabled(cfg.Personality.FlavorText)
 
 	proposals, err := pipeline.ListProposals()
 	if err != nil {
