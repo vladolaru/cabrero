@@ -80,8 +80,8 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		// Global keys handled first.
-		if cmd := m.handleGlobalKey(msg); cmd != nil {
-			return m, cmd
+		if m2, cmd, handled := m.handleGlobalKey(msg); handled {
+			return m2, cmd
 		}
 
 	case message.PushView:
@@ -176,34 +176,34 @@ func (m reviewModel) View() string {
 	return content
 }
 
-func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) tea.Cmd {
+func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool) {
 	switch {
 	case key.Matches(msg, m.keys.ForceQuit):
-		return tea.Quit
+		return m, tea.Quit, true
 
 	case key.Matches(msg, m.keys.Quit):
 		// Only quit from dashboard.
 		if m.state == message.ViewDashboard {
-			return tea.Quit
+			return m, tea.Quit, true
 		}
-		return nil
+		return m, nil, false
 
 	case key.Matches(msg, m.keys.Help):
 		m.helpOpen = !m.helpOpen
-		return nil
+		return m, nil, true
 
 	case key.Matches(msg, m.keys.Back):
 		if m.helpOpen {
 			m.helpOpen = false
-			return nil
+			return m, nil, true
 		}
 		if m.state != message.ViewDashboard {
-			return func() tea.Msg { return message.PopView{} }
+			return m, func() tea.Msg { return message.PopView{} }, true
 		}
-		return nil
+		return m, nil, false
 	}
 
-	return nil
+	return m, nil, false
 }
 
 func (m reviewModel) pushView(view message.ViewState) (tea.Model, tea.Cmd) {
