@@ -14,10 +14,11 @@ import (
 
 func newTestRoot() reviewModel {
 	proposals := testdata.TestProposals()
+	reports := testdata.TestFitnessReports()
 	stats := testdata.TestDashboardStats()
 	sourceGroups := testdata.TestSourceGroups()
 	cfg := testdata.TestConfig()
-	return newReviewModel(proposals, stats, sourceGroups, cfg)
+	return newReviewModel(proposals, reports, stats, sourceGroups, cfg)
 }
 
 // update is a helper that calls Update and returns the concrete reviewModel.
@@ -201,5 +202,160 @@ func TestViewStackPreservation(t *testing.T) {
 	m, _ = update(m, message.PopView{})
 	if m.state != message.ViewDashboard {
 		t.Errorf("state after extra pop = %d, want ViewDashboard", m.state)
+	}
+}
+
+// Phase 4b integration tests.
+
+func TestDashboardToFitnessAndBack(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Navigate to a fitness report item (proposals are first, reports after).
+	// Our test data has 3 proposals then 2 fitness reports, so cursor 3 = first report.
+	for i := 0; i < 3; i++ {
+		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	// Press Enter to open fitness detail.
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter on fitness report should produce cmd")
+	}
+	pushMsg := cmd()
+	push, ok := pushMsg.(message.PushView)
+	if !ok {
+		t.Fatalf("expected PushView, got %T", pushMsg)
+	}
+	if push.View != message.ViewFitnessDetail {
+		t.Errorf("PushView = %d, want ViewFitnessDetail", push.View)
+	}
+
+	// Process the push.
+	m, _ = update(m, push)
+	if m.state != message.ViewFitnessDetail {
+		t.Errorf("state = %d, want ViewFitnessDetail", m.state)
+	}
+
+	// Fitness view should render.
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "docx-helper") {
+		t.Error("fitness view should contain source name")
+	}
+
+	// Press Esc to go back.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		popMsg := cmd()
+		m, _ = update(m, popMsg)
+	}
+	if m.state != message.ViewDashboard {
+		t.Errorf("state after pop = %d, want ViewDashboard", m.state)
+	}
+}
+
+func TestDashboardToSourceManager(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Press 's' to open source manager.
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Fatal("s should produce cmd")
+	}
+	pushMsg := cmd()
+	push, ok := pushMsg.(message.PushView)
+	if !ok {
+		t.Fatalf("expected PushView, got %T", pushMsg)
+	}
+	if push.View != message.ViewSourceManager {
+		t.Errorf("PushView = %d, want ViewSourceManager", push.View)
+	}
+
+	// Process the push.
+	m, _ = update(m, push)
+	if m.state != message.ViewSourceManager {
+		t.Errorf("state = %d, want ViewSourceManager", m.state)
+	}
+
+	// Source manager should render.
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "SOURCE") {
+		t.Error("source manager view should contain column header")
+	}
+
+	// Press Esc to go back.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		msg := cmd()
+		m, _ = update(m, msg)
+	}
+	if m.state != message.ViewDashboard {
+		t.Errorf("state after pop = %d, want ViewDashboard", m.state)
+	}
+}
+
+func TestFitnessJumpToSources(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Navigate to a fitness report (3 proposals, then fitness reports).
+	for i := 0; i < 3; i++ {
+		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	// Push to fitness detail via Enter.
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter should produce cmd")
+	}
+	m, _ = update(m, cmd())
+	if m.state != message.ViewFitnessDetail {
+		t.Fatal("should be in fitness detail")
+	}
+
+	// Press 's' to jump to sources.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Fatal("s in fitness view should produce cmd")
+	}
+
+	// The fitness model emits JumpToSources which the root handles.
+	jumpMsg := cmd()
+	jump, ok := jumpMsg.(message.JumpToSources)
+	if !ok {
+		t.Fatalf("expected JumpToSources, got %T", jumpMsg)
+	}
+
+	// Process the jump.
+	m, _ = update(m, jump)
+	if m.state != message.ViewSourceManager {
+		t.Errorf("state = %d, want ViewSourceManager", m.state)
+	}
+	if len(m.viewStack) != 2 {
+		t.Errorf("viewStack len = %d, want 2 (dashboard + fitness)", len(m.viewStack))
+	}
+}
+
+func TestSourceManagerGroupCollapse(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Push to source manager.
+	m, _ = update(m, message.PushView{View: message.ViewSourceManager})
+	if m.state != message.ViewSourceManager {
+		t.Fatal("should be in source manager")
+	}
+
+	// Get initial view.
+	viewBefore := ansi.Strip(m.View())
+
+	// Press Left to collapse current group.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+
+	// View should change (group collapsed, fewer lines).
+	viewAfter := ansi.Strip(m.View())
+	if viewBefore == viewAfter {
+		t.Error("collapsing group should change the view")
 	}
 }

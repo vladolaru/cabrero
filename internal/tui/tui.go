@@ -34,10 +34,13 @@ func Run() error {
 
 	stats := gatherStats()
 
+	// Future: reports := fitness.ListReports()
+	var reports []fitness.Report
+
 	// Future: sourceGroups := fitness.ListSourceGroups(sources)
 	sourceGroups := []fitness.SourceGroup{}
 
-	m := newReviewModel(proposals, stats, sourceGroups, cfg)
+	m := newReviewModel(proposals, reports, stats, sourceGroups, cfg)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

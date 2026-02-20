@@ -55,7 +55,7 @@ type reviewModel struct {
 }
 
 // newReviewModel creates the root model with loaded data.
-func newReviewModel(proposals []pipeline.ProposalWithSession, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, cfg *shared.Config) reviewModel {
+func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, cfg *shared.Config) reviewModel {
 	keys := shared.NewKeyMap(cfg.Navigation)
 	styles := shared.ThemeFromConfig(cfg)
 
@@ -67,7 +67,7 @@ func newReviewModel(proposals []pipeline.ProposalWithSession, stats message.Dash
 		proposals:    proposals,
 		sourceGroups: sourceGroups,
 		help:         help.New(),
-		dashboard:    dashboard.New(proposals, nil, stats, &keys, cfg),
+		dashboard:    dashboard.New(proposals, reports, stats, &keys, cfg),
 	}
 
 	return m
