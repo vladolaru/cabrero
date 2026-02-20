@@ -7,14 +7,16 @@ import (
 	"strings"
 
 	"github.com/vladolaru/cabrero/internal/parser"
+	"github.com/vladolaru/cabrero/internal/patterns"
 	"github.com/vladolaru/cabrero/internal/retrieval"
 )
 
-const haikuPromptFile = "haiku-classifier-v1.txt"
+const haikuPromptFile = "haiku-classifier-v2.txt"
 
 // RunHaiku constructs the prompt, invokes the Haiku classifier via the claude CLI,
 // validates the output, and returns the parsed result.
-func RunHaiku(sessionID string, digest *parser.Digest) (*HaikuOutput, error) {
+// The patterns parameter is optional cross-session aggregator output; pass nil if unavailable.
+func RunHaiku(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput) (*HaikuOutput, error) {
 	systemPrompt, err := readPromptTemplate(haikuPromptFile)
 	if err != nil {
 		return nil, fmt.Errorf("reading haiku prompt: %w", err)
@@ -27,6 +29,14 @@ func RunHaiku(sessionID string, digest *parser.Digest) (*HaikuOutput, error) {
 
 	// System prompt goes via --system-prompt flag; data goes via stdin.
 	data := "<session_digest>\n" + string(digestJSON) + "\n</session_digest>"
+
+	// Conditionally append cross-session patterns.
+	if aggregatorOutput != nil && len(aggregatorOutput.Patterns) > 0 {
+		patternsJSON, err := json.MarshalIndent(aggregatorOutput, "", "  ")
+		if err == nil {
+			data += "\n\n<cross_session_patterns>\n" + string(patternsJSON) + "\n</cross_session_patterns>"
+		}
+	}
 
 	stdout, err := invokeClaude(claudeConfig{
 		Model:        "claude-haiku-4-5",

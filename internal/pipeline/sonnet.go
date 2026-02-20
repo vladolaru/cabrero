@@ -10,7 +10,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/retrieval"
 )
 
-const sonnetPromptFile = "sonnet-evaluator-v1.txt"
+const sonnetPromptFile = "sonnet-evaluator-v2.txt"
 
 // RunSonnet constructs the prompt, invokes the Sonnet evaluator via the claude CLI,
 // validates the output, and returns the parsed result.
@@ -109,6 +109,12 @@ func validateSonnetOutput(sessionID string, output *SonnetOutput, haikuOutput *H
 		// Filter out low-confidence.
 		if p.Confidence == "low" {
 			fmt.Fprintf(os.Stderr, "  Warning: dropping low-confidence proposal: %s\n", p.ID)
+			continue
+		}
+
+		// Validate skill_scaffold proposals must have ScaffoldSkillName.
+		if p.Type == "skill_scaffold" && (p.ScaffoldSkillName == nil || *p.ScaffoldSkillName == "") {
+			fmt.Fprintf(os.Stderr, "  Warning: dropping skill_scaffold proposal without scaffoldSkillName: %s\n", p.ID)
 			continue
 		}
 

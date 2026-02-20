@@ -19,6 +19,7 @@ func EnsurePrompts() error {
 	prompts := map[string]string{
 		haikuPromptFile:  defaultHaikuPrompt,
 		sonnetPromptFile: defaultSonnetPrompt,
+		// v1 files are no longer written but remain on disk if they exist.
 	}
 
 	for filename, content := range prompts {
@@ -47,7 +48,7 @@ Output ONLY valid JSON. No markdown fences, no preamble, no explanation. Just th
 {
   "version": 1,
   "sessionId": "string (copy from digest)",
-  "promptVersion": "haiku-classifier-v1",
+  "promptVersion": "haiku-classifier-v2",
 
   "goal": {
     "summary": "string (1-2 sentence description of what the user was trying to accomplish)",
@@ -89,8 +90,38 @@ Output ONLY valid JSON. No markdown fences, no preamble, no explanation. Just th
       "evidence": "string (brief explanation citing specific digest data)",
       "confidence": "high|medium|low"
     }
+  ],
+
+  "patternAssessments": [
+    {
+      "patternType": "string (matches the recurring pattern type: correction_pattern or error_prone_sequence)",
+      "toolName": "string (the tool involved in the pattern)",
+      "assessment": "confirmed|coincidental|resolved",
+      "evidence": "string (brief explanation citing current session data)",
+      "confidence": "high|medium|low"
+    }
   ]
 }
+
+## Friction signals
+
+The digest may contain a frictionSignals array in toolCalls alongside errors[] and retryAnomalies. These capture soft failures — situations that aren't hard errors but indicate inefficiency:
+
+- **empty_search** — a Grep or Glob search that returned no results. A few empty searches are normal; clusters suggest the model is hunting.
+- **search_fumble** — 3+ consecutive same-tool searches with different inputs within 60 seconds. Indicates the model is guessing rather than knowing where to look.
+- **backtrack** — returning to a file after accessing 3+ other files in between. May indicate the model lost context or is navigating inefficiently.
+
+These complement errors[] and retryAnomalies. Consider them when classifying errors (severity: "friction") and selecting key turns.
+
+## Cross-session patterns
+
+The input may include an optional <cross_session_patterns> section containing recurring patterns detected across recent sessions in the same project. If present, assess each pattern against the CURRENT session:
+
+- **confirmed** — this session shows the same pattern (e.g., the same tool errors recur, similar friction signals appear)
+- **coincidental** — the pattern exists historically but is NOT present in the current session
+- **resolved** — the pattern was previously observed but this session shows improvement (e.g., the error no longer occurs, fewer friction signals)
+
+Output your assessments in the patternAssessments array. Only include patterns you can assess with at least medium confidence. If no <cross_session_patterns> section is present, omit the patternAssessments array entirely.
 
 ## Important: CLAUDE.md is always present
 
@@ -104,7 +135,7 @@ Even if claudeMd.interactions[] is empty, the CLAUDE.md content in claudeMd.load
 
 2. Prefer fewer high-confidence signals over many speculative ones. If you cannot determine a field with confidence, use "low" confidence or omit the entry entirely.
 
-3. For errorClassification, only include errors that are clearly visible in the digest data (non-zero error counts in toolCalls, entries in errors[], retry anomalies).
+3. For errorClassification, only include errors that are clearly visible in the digest data (non-zero error counts in toolCalls, entries in errors[], retry anomalies, friction signals).
 
 4. For skillSignals, only assess skills that appear in the digest's skills[] array. Base your assessment on the chronological relationship between skill loading and subsequent tool usage patterns.
 
@@ -132,25 +163,28 @@ Output ONLY valid JSON. No markdown fences, no preamble, no explanation. Just th
 {
   "version": 1,
   "sessionId": "string (copy from digest)",
-  "promptVersion": "sonnet-evaluator-v1",
+  "promptVersion": "sonnet-evaluator-v2",
   "haikuPromptVersion": "string (copy from haiku output)",
 
   "proposals": [
     {
       "id": "string (format: prop-{first 6 chars of sessionId}-{index starting at 1})",
-      "type": "skill_improvement|claude_review|claude_addition",
+      "type": "skill_improvement|claude_review|claude_addition|skill_scaffold",
       "confidence": "high|medium",
 
       "target": "string (file path — the skill file path or CLAUDE.md path to modify)",
 
-      "change": "string or null (precise description of proposed change — for skill_improvement and claude_addition)",
+      "change": "string or null (precise description of proposed change — for skill_improvement, claude_addition, and skill_scaffold)",
       "flaggedEntry": "string or null (the specific CLAUDE.md entry that needs review — for claude_review)",
       "assessmentSummary": "string or null (why this entry needs review — for claude_review)",
 
       "rationale": "string (citing specific Haiku signals and turn UUIDs that justify this proposal)",
       "citedUuids": ["string (UUIDs from the Haiku output that support this proposal)"],
       "citedSkillSignals": ["string (skill names from Haiku skillSignals that support this)"],
-      "citedClaudeMdSignals": ["string (CLAUDE.md paths from Haiku claudeMdSignals that support this)"]
+      "citedClaudeMdSignals": ["string (CLAUDE.md paths from Haiku claudeMdSignals that support this)"],
+
+      "scaffoldSkillName": "string or null (suggested skill name — for skill_scaffold only)",
+      "scaffoldTrigger": "string or null (when this skill should be invoked — for skill_scaffold only)"
     }
   ],
 
@@ -167,6 +201,9 @@ A CLAUDE.md entry may be causing friction or is being ignored. The "flaggedEntry
 
 ### claude_addition
 A new CLAUDE.md entry should be added based on a pattern observed in the session. The "change" field describes the new entry to add.
+
+### skill_scaffold
+A recurring error-prone pattern across sessions suggests creating a new skill. This type requires Haiku's patternAssessments to include at least one "confirmed" pattern. The "change" field describes what the skill should do. "scaffoldSkillName" suggests a name for the new skill. "scaffoldTrigger" describes when the skill should be invoked.
 
 ## Critical rules
 
@@ -185,4 +222,6 @@ A new CLAUDE.md entry should be added based on a pattern observed in the session
 7. Proposal IDs must be unique within the output. Format: prop-{first 6 chars of sessionId}-{1-based index}.
 
 8. The "target" field must be a plausible file path. For skills, use the skill name as referenced in the digest. For CLAUDE.md files, use the path from the digest's claudeMd.loaded[] or claudeMd.interactions[].
+
+9. For skill_scaffold proposals: only generate when Haiku's patternAssessments contains a "confirmed" pattern. The scaffoldSkillName field is required. Base the proposal on cross-session evidence, not single-session observations.
 `
