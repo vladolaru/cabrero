@@ -522,6 +522,60 @@ func TestPipelineRetryFlow(t *testing.T) {
 	}
 }
 
+func TestLogViewerTwoStageEsc(t *testing.T) {
+	m := newTestRoot()
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Push to pipeline, then to log viewer.
+	m, _ = update(m, message.PushView{View: message.ViewPipelineMonitor})
+	m, _ = update(m, message.PushView{View: message.ViewLogViewer})
+
+	if m.state != message.ViewLogViewer {
+		t.Fatal("should be in log viewer")
+	}
+
+	// Set log content with a searchable term.
+	m.logViewer.UpdateContent("line one\nerror line\nline three")
+	m.logViewer.SetSize(120, 37) // re-init viewport after content change
+
+	// Activate search.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+
+	// Type search term.
+	for _, r := range "error" {
+		m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// Press Enter to confirm search.
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if !m.logViewer.HasActiveSearch() {
+		t.Fatal("log viewer should have active search after searching")
+	}
+
+	// First Esc: should stay in log viewer (matches cleared).
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		// Process any command (should be nil, but handle gracefully).
+		m, _ = update(m, cmd())
+	}
+	if m.state != message.ViewLogViewer {
+		t.Errorf("first Esc should stay in log viewer, got state %d", m.state)
+	}
+	if m.logViewer.HasActiveSearch() {
+		t.Error("search should be cleared after first Esc")
+	}
+
+	// Second Esc: should pop to pipeline monitor.
+	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		m, _ = update(m, cmd())
+	}
+	if m.state != message.ViewPipelineMonitor {
+		t.Errorf("second Esc should pop to pipeline, got state %d", m.state)
+	}
+}
+
 func TestFullStackNavigation(t *testing.T) {
 	m := newTestRoot()
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})

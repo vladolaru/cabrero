@@ -27,6 +27,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	// Two-stage Esc: first clears search, second propagates to root for PopView.
+	if msg.Type == tea.KeyEsc && m.HasActiveSearch() {
+		m.searchTerm = ""
+		m.matches = nil
+		m.matchIdx = -1
+		m.refreshViewportContent()
+		return m, nil
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.Search):
 		m.searchActive = true

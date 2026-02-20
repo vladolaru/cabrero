@@ -146,3 +146,60 @@ func TestLogModelEscFromSearch(t *testing.T) {
 		t.Error("search should be closed after Esc")
 	}
 }
+
+func TestLogModelHasActiveSearch(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// No search yet.
+	if m.HasActiveSearch() {
+		t.Error("should not have active search initially")
+	}
+
+	// Perform search.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	for _, r := range "classifier" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if !m.HasActiveSearch() {
+		t.Error("should have active search after searching with matches")
+	}
+}
+
+func TestLogModelTwoStageEsc(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// Perform a search.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	for _, r := range "classifier" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if !m.HasActiveSearch() {
+		t.Fatal("should have active search after searching")
+	}
+
+	// First Esc: should clear matches, not propagate.
+	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.HasActiveSearch() {
+		t.Error("first Esc should clear active search")
+	}
+	if cmd != nil {
+		t.Error("first Esc should not produce a command (handled locally)")
+	}
+	// Search term and matches should be cleared.
+	if m.searchTerm != "" {
+		t.Errorf("searchTerm should be empty after Esc, got %q", m.searchTerm)
+	}
+	if len(m.matches) != 0 {
+		t.Errorf("matches should be empty after Esc, got %d", len(m.matches))
+	}
+
+	// Second Esc: log viewer has no matches, so it should NOT handle Esc.
+	// (The root model's global key handler will produce PopView.)
+	// Since we're testing the logview in isolation, Esc just falls through to viewport.
+}

@@ -119,6 +119,11 @@ func (m *Model) gotoMatch(idx int) {
 	m.viewport.SetYOffset(lineNum)
 }
 
+// HasActiveSearch reports whether the log viewer has active search matches.
+func (m Model) HasActiveSearch() bool {
+	return m.searchTerm != "" && len(m.matches) > 0
+}
+
 // highlightedContent returns the content with search matches wrapped in highlight style.
 func (m *Model) highlightedContent() string {
 	if m.searchTerm == "" || len(m.matches) == 0 {
