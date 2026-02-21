@@ -46,6 +46,33 @@ func TestDaemonPipelineLoggerAdapter(t *testing.T) {
 	}
 }
 
+func TestNewWiresRunner(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	logPath := filepath.Join(dir, "daemon.log")
+	cfg := Config{
+		LogPath:  logPath,
+		Pipeline: DefaultConfig().Pipeline,
+	}
+
+	d, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer d.log.Close()
+
+	if d.runner == nil {
+		t.Fatal("runner is nil after New()")
+	}
+	if d.runner.Config.Logger == nil {
+		t.Fatal("runner.Config.Logger is nil")
+	}
+}
+
 func TestNewWiresPipelineLogger(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)

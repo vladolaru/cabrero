@@ -39,6 +39,7 @@ func DefaultConfig() Config {
 type Daemon struct {
 	config Config
 	log    *Logger
+	runner *pipeline.Runner
 }
 
 // New creates a Daemon with the given configuration.
@@ -48,7 +49,8 @@ func New(cfg Config) (*Daemon, error) {
 		return nil, fmt.Errorf("creating logger: %w", err)
 	}
 	cfg.Pipeline.Logger = &daemonPipelineLogger{log: log}
-	return &Daemon{config: cfg, log: log}, nil
+	runner := pipeline.NewRunner(cfg.Pipeline)
+	return &Daemon{config: cfg, log: log, runner: runner}, nil
 }
 
 // daemonPipelineLogger adapts the daemon's file-based Logger to the
@@ -158,7 +160,7 @@ func (d *Daemon) processQueued(ctx context.Context) {
 				default:
 				}
 
-				d.processOne(s.SessionID)
+				d.processOne(ctx, s.SessionID)
 
 				// Rate limit between sessions within the group.
 				if i < len(sessions)-1 && d.config.InterSessionDelay > 0 {
@@ -191,21 +193,18 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 		batchSessions[i] = pipeline.BatchSession{SessionID: s.SessionID}
 	}
 
-	bp := &pipeline.BatchProcessor{
-		Config: d.config.Pipeline,
-		OnStatus: func(sessionID string, event pipeline.BatchEvent) {
-			switch event.Type {
-			case "classifier_done":
-				if event.Triage == "clean" {
-					d.log.Info("session %s triaged as clean", shortID(sessionID))
-				}
-			case "error":
-				d.log.Error("pipeline error for %s: %v", shortID(sessionID), event.Error)
+	d.runner.OnStatus = func(sessionID string, event pipeline.BatchEvent) {
+		switch event.Type {
+		case "classifier_done":
+			if event.Triage == "clean" {
+				d.log.Info("session %s triaged as clean", shortID(sessionID))
 			}
-		},
+		case "error":
+			d.log.Error("pipeline error for %s: %v", shortID(sessionID), event.Error)
+		}
 	}
 
-	results := bp.ProcessGroup(ctx, batchSessions)
+	results := d.runner.RunGroup(ctx, batchSessions)
 
 	totalProposals := 0
 	toEvalCount := 0
@@ -227,10 +226,10 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 	}
 }
 
-func (d *Daemon) processOne(sessionID string) {
+func (d *Daemon) processOne(ctx context.Context, sessionID string) {
 	d.log.Info("processing session %s", sessionID)
 
-	result, err := pipeline.Run(sessionID, false, d.config.Pipeline)
+	result, err := d.runner.RunOne(ctx, sessionID, false)
 	if err != nil {
 		d.log.Error("pipeline failed for %s: %v", sessionID, err)
 		if markErr := store.MarkError(sessionID); markErr != nil {
