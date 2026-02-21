@@ -6,6 +6,7 @@ build:
 install: build
 	mkdir -p $(HOME)/.cabrero/bin
 	cp cabrero $(HOME)/.cabrero/bin/cabrero
+	@codesign -s - $(HOME)/.cabrero/bin/cabrero 2>/dev/null || true
 	@echo "Installed to ~/.cabrero/bin/cabrero"
 	@ln -sf $(HOME)/.cabrero/bin/cabrero /usr/local/bin/cabrero 2>/dev/null \
 		&& echo "Symlinked to /usr/local/bin/cabrero" \
