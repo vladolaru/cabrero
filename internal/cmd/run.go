@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"flag"
 	"fmt"
 
@@ -33,7 +34,8 @@ func Run(args []string) error {
 	cfg.ClassifierTimeout = *classifierTimeout
 	cfg.EvaluatorTimeout = *evaluatorTimeout
 
-	result, err := pipeline.Run(sessionID, *dryRun, cfg)
+	runner := pipeline.NewRunner(cfg)
+	result, err := runner.RunOne(context.Background(), sessionID, *dryRun)
 	if err != nil {
 		return err
 	}
