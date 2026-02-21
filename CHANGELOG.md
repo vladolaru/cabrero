@@ -5,6 +5,32 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-02-21
+
+### Fixed
+
+- **Text wrapping** — fitness report verdict and proposal detail rationale now
+  word-wrap instead of truncating at the terminal edge. New `WrapIndent` helper
+  in `shared/format.go`.
+- **Dashboard empty state** — status bar no longer shows approve/reject/defer
+  keys when there are no items to act on.
+- **Fitness header overflow** — ownership/origin line splits onto two lines at
+  widths below 100 to prevent horizontal overflow.
+- **Dashboard narrow header** — daemon status and hooks now stack onto separate
+  lines in standard/narrow layout instead of overflowing.
+- **Evidence pluralization** — "(1 entries)" corrected to "(1 entry)".
+- **Pipeline status bar anchoring** — status bar now stays pinned to the bottom
+  of the terminal instead of floating after the last section.
+- **Tab toggle on hidden chat** — Tab key in detail view no longer toggles focus
+  to an invisible chat panel at narrow widths; messages are no longer forwarded
+  to the chat model when the panel is hidden.
+- **Detail status bar** — "tab next pane" hint hidden when chat panel is not
+  visible.
+- **Pipeline cursor preservation** — auto-refresh no longer resets cursor and
+  expansion state every 5 seconds.
+- **Snapshot CLI flag parsing** — flags now work after the view name
+  (e.g., `snapshot dashboard -w 80`).
+
 ## [0.8.1] - 2026-02-21
 
 ### Added
@@ -213,6 +239,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.8.2]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.2
 [0.8.1]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.1
 [0.8.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.0
 [0.7.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.7.0
