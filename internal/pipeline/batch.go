@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/vladolaru/cabrero/internal/parser"
@@ -40,6 +39,10 @@ type BatchProcessor struct {
 	ClassifyFunc  func(sessionID string, cfg PipelineConfig) (*ClassifierResult, error)
 	EvalFunc      func(sessionID string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, error)
 	EvalBatchFunc func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, error)
+}
+
+func (bp *BatchProcessor) log() Logger {
+	return bp.Config.logger()
 }
 
 func (bp *BatchProcessor) maxBatch() int {
@@ -181,7 +184,7 @@ func (bp *BatchProcessor) evalSingle(s BatchSession, results []BatchResult, inde
 		return
 	}
 
-	proposals := persistEvaluatorResults(s.SessionID, evaluatorOutput)
+	proposals := persistEvaluatorResults(s.SessionID, evaluatorOutput, bp.log())
 	results[idx].Status = "processed"
 	results[idx].Proposals = proposals
 	bp.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
@@ -217,7 +220,7 @@ func (bp *BatchProcessor) evalBatch(chunk []BatchSession, results []BatchResult,
 		filtered.SessionID = s.SessionID
 		totalMatched += len(filtered.Proposals)
 
-		proposals := persistEvaluatorResults(s.SessionID, filtered)
+		proposals := persistEvaluatorResults(s.SessionID, filtered, bp.log())
 		results[idx].Status = "processed"
 		results[idx].Proposals = proposals
 		bp.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
@@ -242,9 +245,9 @@ func (bp *BatchProcessor) evalBatch(chunk []BatchSession, results []BatchResult,
 
 // persistEvaluatorResults writes the evaluator output and proposals to the store.
 // Returns the number of proposals successfully written.
-func persistEvaluatorResults(sessionID string, output *EvaluatorOutput) int {
+func persistEvaluatorResults(sessionID string, output *EvaluatorOutput, log Logger) int {
 	if err := WriteEvaluatorOutput(sessionID, output); err != nil {
-		fmt.Fprintf(os.Stderr, "writing evaluator output for %s: %v\n", sessionID, err)
+		log.Error("writing evaluator output for %s: %v", sessionID, err)
 		return 0
 	}
 
@@ -252,7 +255,7 @@ func persistEvaluatorResults(sessionID string, output *EvaluatorOutput) int {
 	for i := range output.Proposals {
 		p := &output.Proposals[i]
 		if err := WriteProposal(p, sessionID); err != nil {
-			fmt.Fprintf(os.Stderr, "writing proposal %s: %v\n", p.ID, err)
+			log.Error("writing proposal %s: %v", p.ID, err)
 			continue
 		}
 		count++

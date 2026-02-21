@@ -3,7 +3,6 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -70,7 +69,7 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 	}
 
 	// Validate cited UUIDs.
-	if err := validateClassifierUUIDs(sessionID, output); err != nil {
+	if err := validateClassifierUUIDs(sessionID, output, cfg.logger()); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +88,7 @@ func parseClassifierOutput(raw string) (*ClassifierOutput, error) {
 
 // validateClassifierUUIDs checks that all cited UUIDs exist in the raw transcript.
 // Drops entries with invalid UUIDs and fails if >50% are invalid.
-func validateClassifierUUIDs(sessionID string, output *ClassifierOutput) error {
+func validateClassifierUUIDs(sessionID string, output *ClassifierOutput, log Logger) error {
 	allUUIDs := collectClassifierUUIDs(output)
 	if len(allUUIDs) == 0 {
 		return nil
@@ -105,7 +104,7 @@ func validateClassifierUUIDs(sessionID string, output *ClassifierOutput) error {
 		_, err := retrieval.GetEntry(sessionID, uuid)
 		if err != nil {
 			invalid++
-			fmt.Fprintf(os.Stderr, "  Warning: Classifier cited non-existent UUID: %s\n", uuid)
+			log.Error("  Warning: Classifier cited non-existent UUID: %s", uuid)
 		} else {
 			valid[uuid] = true
 		}

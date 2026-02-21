@@ -3,7 +3,6 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -70,7 +69,7 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 	output.PromptVersion = strings.TrimSuffix(evaluatorPromptFile, ".txt")
 	output.ClassifierPromptVersion = classifierOutput.PromptVersion
 
-	if err := validateEvaluatorOutput(sessionID, output, classifierOutput); err != nil {
+	if err := validateEvaluatorOutput(sessionID, output, classifierOutput, cfg.logger()); err != nil {
 		return nil, err
 	}
 
@@ -155,7 +154,7 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	output.ClassifierPromptVersion = sessions[0].ClassifierOutput.PromptVersion
 
 	// Validate: build combined skill set and UUID set from all sessions.
-	if err := validateEvaluatorBatchOutput(sessions, output); err != nil {
+	if err := validateEvaluatorBatchOutput(sessions, output, cfg.logger()); err != nil {
 		return nil, err
 	}
 
@@ -164,7 +163,7 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 
 // validateEvaluatorBatchOutput validates proposals against all sessions in the batch.
 // UUIDs are checked across all sessions. Skill signals are merged from all Classifier outputs.
-func validateEvaluatorBatchOutput(sessions []BatchSession, output *EvaluatorOutput) error {
+func validateEvaluatorBatchOutput(sessions []BatchSession, output *EvaluatorOutput, log Logger) error {
 	// Build combined set of skill names from all Classifier outputs.
 	allSkills := make(map[string]bool)
 	for _, s := range sessions {
@@ -203,10 +202,10 @@ func validateEvaluatorBatchOutput(sessions []BatchSession, output *EvaluatorOutp
 	}
 
 	for _, uuid := range unresolved {
-		fmt.Fprintf(os.Stderr, "  Warning: Evaluator batch cited non-existent UUID: %s\n", uuid)
+		log.Error("  Warning: Evaluator batch cited non-existent UUID: %s", uuid)
 	}
 
-	return filterAndValidateProposals(output, validUUIDs, allSkills)
+	return filterAndValidateProposals(output, validUUIDs, allSkills, log)
 }
 
 func parseEvaluatorOutput(raw string) (*EvaluatorOutput, error) {
@@ -221,7 +220,7 @@ func parseEvaluatorOutput(raw string) (*EvaluatorOutput, error) {
 
 // validateEvaluatorOutput checks proposals for valid UUIDs, skill references, uniqueness,
 // and filters out low-confidence proposals.
-func validateEvaluatorOutput(sessionID string, output *EvaluatorOutput, classifierOutput *ClassifierOutput) error {
+func validateEvaluatorOutput(sessionID string, output *EvaluatorOutput, classifierOutput *ClassifierOutput, log Logger) error {
 	// Build set of skill names from Classifier output for cross-reference.
 	classifierSkills := make(map[string]bool)
 	for _, ss := range classifierOutput.SkillSignals {
@@ -237,39 +236,39 @@ func validateEvaluatorOutput(sessionID string, output *EvaluatorOutput, classifi
 		}
 		_, err := retrieval.GetEntry(sessionID, uuid)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "  Warning: Evaluator cited non-existent UUID: %s\n", uuid)
+			log.Error("  Warning: Evaluator cited non-existent UUID: %s", uuid)
 		} else {
 			validUUIDs[uuid] = true
 		}
 	}
 
-	return filterAndValidateProposals(output, validUUIDs, classifierSkills)
+	return filterAndValidateProposals(output, validUUIDs, classifierSkills, log)
 }
 
 // filterAndValidateProposals validates proposals for duplicate IDs, low confidence,
 // valid skill_scaffold fields, UUID citations, and skill signal references.
 // Shared by both single-session and batch validation paths.
-func filterAndValidateProposals(output *EvaluatorOutput, validUUIDs map[string]bool, allSkills map[string]bool) error {
+func filterAndValidateProposals(output *EvaluatorOutput, validUUIDs map[string]bool, allSkills map[string]bool, log Logger) error {
 	seenIDs := make(map[string]bool)
 	var validProposals []Proposal
 
 	for _, p := range output.Proposals {
 		// Skip duplicates.
 		if seenIDs[p.ID] {
-			fmt.Fprintf(os.Stderr, "  Warning: duplicate proposal ID: %s\n", p.ID)
+			log.Error("  Warning: duplicate proposal ID: %s", p.ID)
 			continue
 		}
 		seenIDs[p.ID] = true
 
 		// Filter out low-confidence.
 		if p.Confidence == "low" {
-			fmt.Fprintf(os.Stderr, "  Warning: dropping low-confidence proposal: %s\n", p.ID)
+			log.Error("  Warning: dropping low-confidence proposal: %s", p.ID)
 			continue
 		}
 
 		// Validate skill_scaffold proposals must have ScaffoldSkillName.
 		if p.Type == "skill_scaffold" && (p.ScaffoldSkillName == nil || *p.ScaffoldSkillName == "") {
-			fmt.Fprintf(os.Stderr, "  Warning: dropping skill_scaffold proposal without scaffoldSkillName: %s\n", p.ID)
+			log.Error("  Warning: dropping skill_scaffold proposal without scaffoldSkillName: %s", p.ID)
 			continue
 		}
 
@@ -285,7 +284,7 @@ func filterAndValidateProposals(output *EvaluatorOutput, validUUIDs map[string]b
 		// Validate skill signal references.
 		for _, skill := range p.CitedSkillSignals {
 			if !allSkills[skill] {
-				fmt.Fprintf(os.Stderr, "  Warning: proposal %s cites skill '%s' not in Classifier output\n", p.ID, skill)
+				log.Error("  Warning: proposal %s cites skill '%s' not in Classifier output", p.ID, skill)
 			}
 		}
 
