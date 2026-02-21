@@ -971,23 +971,13 @@ func (d *doctorRunner) checkPath() []checkResult {
 		})
 	}
 
-	// Check PATH includes bin dir.
-	pathEnv := os.Getenv("PATH")
-	paths := filepath.SplitList(pathEnv)
-	inPath := false
-	for _, p := range paths {
-		if p == binDir {
-			inPath = true
-			break
-		}
-	}
-
+	// Check cabrero is reachable on PATH (covers symlinks like /usr/local/bin).
 	home, _ := os.UserHomeDir()
 	display := strings.Replace(binDir, home, "~", 1)
 
-	if inPath {
+	if _, err := exec.LookPath("cabrero"); err == nil {
 		results = append(results, checkResult{
-			name:     fmt.Sprintf("%s in PATH", display),
+			name:     fmt.Sprintf("%s reachable on PATH", display),
 			category: "PATH",
 			status:   checkPass,
 		})
@@ -996,14 +986,14 @@ func (d *doctorRunner) checkPath() []checkResult {
 		var hint string
 		switch shell {
 		case "zsh":
-			hint = fmt.Sprintf("Add to ~/.zshrc: export PATH=\"%s:$PATH\"", display)
+			hint = fmt.Sprintf("Add to ~/.zshrc: export PATH=\"$HOME/.cabrero/bin:$PATH\"")
 		case "bash":
-			hint = fmt.Sprintf("Add to ~/.bashrc: export PATH=\"%s:$PATH\"", display)
+			hint = fmt.Sprintf("Add to ~/.bashrc: export PATH=\"$HOME/.cabrero/bin:$PATH\"")
 		default:
-			hint = fmt.Sprintf("Add to shell profile: export PATH=\"%s:$PATH\"", display)
+			hint = fmt.Sprintf("Add to shell profile: export PATH=\"$HOME/.cabrero/bin:$PATH\"")
 		}
 		results = append(results, checkResult{
-			name:     fmt.Sprintf("%s in PATH", display),
+			name:     fmt.Sprintf("%s reachable on PATH", display),
 			category: "PATH",
 			status:   checkFail,
 			message:  hint,
