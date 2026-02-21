@@ -7,6 +7,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-02-21
+
 ### Added
 
 - **Pipeline Logger interface** — `pipeline.Logger` with `Info`/`Error` methods,
@@ -284,6 +286,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.9.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.0
 [0.8.2]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.2
 [0.8.1]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.1
 [0.8.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.0
