@@ -147,20 +147,18 @@ func TestRunImport(t *testing.T) {
 		}
 	})
 
-	t.Run("file in root has empty project", func(t *testing.T) {
+	t.Run("file in root is ignored", func(t *testing.T) {
 		setupImportStore(t)
 		src := t.TempDir()
 		sessionID := "noprojectsess123"
 		writeSessionFile(t, src, "", sessionID)
 
-		RunImport(src, false, true)
-
-		meta, err := store.ReadMetadata(sessionID)
+		result, err := RunImport(src, false, true)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if meta.Project != "" {
-			t.Errorf("Project = %q, want empty", meta.Project)
+		if result.Imported != 0 {
+			t.Errorf("Imported = %d, want 0 (root-level files should be ignored)", result.Imported)
 		}
 	})
 }
