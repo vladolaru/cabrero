@@ -7,6 +7,9 @@ install: build
 	mkdir -p $(HOME)/.cabrero/bin
 	cp cabrero $(HOME)/.cabrero/bin/cabrero
 	@echo "Installed to ~/.cabrero/bin/cabrero"
+	@ln -sf $(HOME)/.cabrero/bin/cabrero /usr/local/bin/cabrero 2>/dev/null \
+		&& echo "Symlinked to /usr/local/bin/cabrero" \
+		|| echo "Could not symlink to /usr/local/bin/cabrero (try: sudo ln -sf ~/.cabrero/bin/cabrero /usr/local/bin/cabrero)"
 	@echo "Run 'cabrero setup' to complete configuration."
 
 test:
