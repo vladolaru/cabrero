@@ -7,6 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-02-21
+
+### Fixed
+
+- **Daemon can't find claude CLI** — LaunchAgent PATH is now built dynamically
+  during setup, including the directory where the `claude` binary is installed
+  (e.g., `~/.local/bin`). Previously hardcoded to system paths only, causing all
+  pipeline runs to fail with "executable file not found in $PATH".
+- **macOS network volume access prompts** — session scanning (import and stale
+  recovery) replaced unbounded `filepath.Walk` with targeted `os.ReadDir` at the
+  two known levels where JSONL files exist. No longer descends into
+  `tool-results/` or other subdirectories that triggered macOS file provider
+  dialogs.
+
 ## [0.9.2] - 2026-02-21
 
 ### Added
@@ -330,6 +344,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.9.3]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.3
 [0.9.2]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.2
 [0.9.1]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.1
 [0.9.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.0
