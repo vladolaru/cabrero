@@ -1,3 +1,4 @@
 cabrero
 *.log
 .worktrees
+snapshots/
