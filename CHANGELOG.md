@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Runner struct** — unified `Run()` and `BatchProcessor` into a single `Runner`
+  struct with `RunOne()` and `RunGroup()` methods. Consistent status marking via
+  `store.MarkProcessed`/`MarkError`, context cancellation on all paths, and full
+  testability via hook fields.
+
+### Removed
+
+- `Run()`, `RunThroughClassifier()`, and `BatchProcessor` — replaced by `Runner`.
+
 ## [0.9.0] - 2026-02-21
 
 ### Added
