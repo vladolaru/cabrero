@@ -7,6 +7,37 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-02-21
+
+### Added
+
+- **CLI color output** — all CLI commands (setup, doctor, uninstall, status) now
+  use colored output via a shared `internal/cli` package with lipgloss adaptive
+  colors. Green checkmarks, orange warnings, red errors, purple accents, bold
+  labels, and muted metadata for a consistent visual vocabulary.
+- **`uninstall --dry-run`** — preview what uninstall would remove without
+  touching anything. Each step shows "Would ..." messages with purple arrows.
+- **`make install` symlink** — install target now symlinks the binary to
+  `/usr/local/bin/cabrero` for immediate PATH access without shell config
+  changes.
+
+### Fixed
+
+- **Binary killed on macOS** — `make install` now re-signs the binary with
+  `codesign -s -` after copying to `~/.cabrero/bin/`, preventing macOS
+  AppleSystemPolicy from killing the binary due to an invalidated ad-hoc
+  code signature.
+- **PATH check false negative** — setup and doctor PATH checks now use
+  `exec.LookPath` instead of scanning `$PATH` entries, correctly detecting
+  the binary when reachable via symlink (e.g., `/usr/local/bin/cabrero`).
+- **Tilde in export hint** — PATH suggestions now use `$HOME` instead of
+  literal `~` which doesn't expand inside quoted strings.
+
+### Changed
+
+- From-source install instructions in README expanded with PATH/symlink
+  guidance.
+
 ## [0.9.1] - 2026-02-21
 
 ### Changed
@@ -299,6 +330,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.9.2]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.2
 [0.9.1]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.1
 [0.9.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.0
 [0.8.2]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.2
