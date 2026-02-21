@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -15,20 +16,23 @@ import (
 // Status shows pipeline health and store overview.
 func Status(args []string) error {
 	root := store.Root()
-	fmt.Println("Cabrero status")
-	fmt.Println("──────────────")
+	fmt.Println()
+	fmt.Println(cli.Bold("Cabrero Status"))
+	fmt.Println(cli.Accent(strings.Repeat("─", 30)))
 
 	// Store path and status.
+	home, _ := os.UserHomeDir()
+	display := strings.Replace(root, home, "~", 1)
 	if _, err := os.Stat(root); err == nil {
-		fmt.Printf("Store:          %s (initialized)\n", root)
+		fmt.Printf("  %s  %s %s\n", cli.Bold("Store:"), display, cli.Success("(initialized)"))
 	} else {
-		fmt.Printf("Store:          %s (not initialized)\n", root)
+		fmt.Printf("  %s  %s %s\n", cli.Bold("Store:"), display, cli.Warn("(not initialized)"))
 	}
 
 	// Session counts.
 	sessions, err := store.ListSessions()
 	if err != nil {
-		fmt.Printf("Sessions:       error reading (%v)\n", err)
+		fmt.Printf("  %s  %s\n", cli.Bold("Sessions:"), cli.Error(fmt.Sprintf("error reading (%v)", err)))
 	} else {
 		queued := 0
 		imported := 0
@@ -43,50 +47,52 @@ func Status(args []string) error {
 				processed++
 			}
 		}
-		fmt.Printf("Sessions:       %d captured, %d queued, %d imported, %d processed\n", len(sessions), queued, imported, processed)
+		fmt.Printf("  %s  %d captured, %d queued, %d imported, %d processed\n",
+			cli.Bold("Sessions:"), len(sessions), queued, imported, processed)
 	}
 
 	// Blocklist count.
 	blCount := store.BlocklistLen()
-	fmt.Printf("Blocklist:      %d entries\n", blCount)
+	fmt.Printf("  %s  %d entries\n", cli.Bold("Blocklist:"), blCount)
 
 	// Last capture.
 	if len(sessions) > 0 {
 		latest := sessions[0]
 		ts, err := time.Parse(time.RFC3339, latest.Timestamp)
-		display := latest.Timestamp
+		capDisplay := latest.Timestamp
 		if err == nil {
-			display = ts.Local().Format("2006-01-02 15:04")
+			capDisplay = ts.Local().Format("2006-01-02 15:04")
 		}
 		shortID := latest.SessionID
 		if len(shortID) > 8 {
 			shortID = shortID[:8]
 		}
-		fmt.Printf("Last capture:   %s (session %s)\n", display, shortID)
+		fmt.Printf("  %s  %s %s\n", cli.Bold("Last capture:"), capDisplay, cli.Muted("(session "+shortID+")"))
 	} else {
-		fmt.Printf("Last capture:   none\n")
+		fmt.Printf("  %s  %s\n", cli.Bold("Last capture:"), cli.Muted("none"))
 	}
 
 	// Daemon status.
 	if pid, alive := daemon.IsDaemonRunning(); alive {
-		fmt.Printf("Daemon:         running (PID %d)\n", pid)
+		fmt.Printf("  %s  %s %s\n", cli.Bold("Daemon:"), cli.Success("running"), cli.Muted(fmt.Sprintf("(PID %d)", pid)))
 	} else {
-		fmt.Printf("Daemon:         not running\n")
+		fmt.Printf("  %s  %s\n", cli.Bold("Daemon:"), cli.Warn("not running"))
 	}
 
 	// Hook status.
 	preCompact, sessionEnd := checkHooks()
-	fmt.Printf("Hooks:          pre-compact %s   session-end %s\n",
-		hookStatus(preCompact), hookStatus(sessionEnd))
+	fmt.Printf("  %s  pre-compact %s   session-end %s\n",
+		cli.Bold("Hooks:"), hookStatus(preCompact), hookStatus(sessionEnd))
+	fmt.Println()
 
 	return nil
 }
 
 func hookStatus(installed bool) string {
 	if installed {
-		return "✓"
+		return cli.Success("✓")
 	}
-	return "✗"
+	return cli.Error("✗")
 }
 
 func checkHooks() (preCompact, sessionEnd bool) {

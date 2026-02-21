@@ -13,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -48,8 +49,8 @@ type uninstallRunner struct {
 
 func (u *uninstallRunner) run() error {
 	fmt.Println()
-	fmt.Println("Cabrero Uninstall")
-	fmt.Println(strings.Repeat("═", 40))
+	fmt.Println(cli.Bold("Cabrero Uninstall"))
+	fmt.Println(cli.Accent(strings.Repeat("═", 40)))
 	fmt.Println()
 
 	steps := []struct {
@@ -67,7 +68,7 @@ func (u *uninstallRunner) run() error {
 
 	total := len(steps)
 	for i, step := range steps {
-		fmt.Printf("Step %d/%d: %s\n", i+1, total, step.name)
+		fmt.Printf("%s %s\n", cli.Bold(fmt.Sprintf("Step %d/%d:", i+1, total)), step.name)
 		if err := step.fn(i+1, total); err != nil {
 			return fmt.Errorf("step %d (%s): %w", i+1, step.name, err)
 		}
@@ -90,8 +91,8 @@ func (u *uninstallRunner) run() error {
 		profile = "your shell profile"
 	}
 
-	fmt.Printf("If you added %s to your PATH, remove the export line from\n%s.\n\n", display, profile)
-	fmt.Println("Cabrero uninstalled.")
+	fmt.Printf("If you added %s to your PATH, remove the export line from\n%s.\n\n", cli.Bold(display), profile)
+	fmt.Println(cli.Success("Cabrero uninstalled."))
 	return nil
 }
 
@@ -113,22 +114,22 @@ func (u *uninstallRunner) stepStopDaemon(step, total int) error {
 	// Check if daemon is still running and kill it.
 	pid, alive := daemon.IsDaemonRunning()
 	if !alive {
-		fmt.Println("  ✓ Daemon not running (already stopped)")
+		fmt.Printf("  %s Daemon not running (already stopped)\n", cli.Success("✓"))
 		return nil
 	}
 
 	// Send SIGTERM.
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-		fmt.Printf("  ✓ Daemon not running (PID %d unreachable)\n", pid)
+		fmt.Printf("  %s Daemon not running (PID %d unreachable)\n", cli.Success("✓"), pid)
 		return nil
 	}
 
 	// Verify it stopped.
 	if _, still := daemon.IsDaemonRunning(); still {
-		fmt.Printf("  ! Daemon (PID %d) did not stop after SIGTERM\n", pid)
-		fmt.Println("    You may need to kill it manually: kill", pid)
+		fmt.Printf("  %s Daemon (PID %d) did not stop after SIGTERM\n", cli.Warn("!"), pid)
+		fmt.Printf("    You may need to kill it manually: %s\n", cli.Bold(fmt.Sprintf("kill %d", pid)))
 	} else {
-		fmt.Printf("  ✓ Daemon stopped (was PID %d)\n", pid)
+		fmt.Printf("  %s Daemon stopped (was PID %d)\n", cli.Success("✓"), pid)
 	}
 
 	// Clean up PID file.
@@ -141,7 +142,7 @@ func (u *uninstallRunner) stepStopDaemon(step, total int) error {
 // Step 2: Remove LaunchAgent plist.
 func (u *uninstallRunner) stepRemoveLaunchAgent(step, total int) error {
 	if runtime.GOOS != "darwin" {
-		fmt.Println("  — Skipped (not macOS)")
+		fmt.Printf("  %s\n", cli.Muted("— Skipped (not macOS)"))
 		return nil
 	}
 
@@ -152,7 +153,7 @@ func (u *uninstallRunner) stepRemoveLaunchAgent(step, total int) error {
 
 	plistPath := filepath.Join(home, "Library", "LaunchAgents", "com.cabrero.daemon.plist")
 	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
-		fmt.Println("  ✓ LaunchAgent not present (already removed)")
+		fmt.Printf("  %s LaunchAgent not present (already removed)\n", cli.Success("✓"))
 		return nil
 	}
 
@@ -161,7 +162,7 @@ func (u *uninstallRunner) stepRemoveLaunchAgent(step, total int) error {
 	}
 
 	display := strings.Replace(plistPath, home, "~", 1)
-	fmt.Printf("  ✓ Removed %s\n", display)
+	fmt.Printf("  %s Removed %s\n", cli.Success("✓"), display)
 	return nil
 }
 
@@ -177,10 +178,10 @@ func (u *uninstallRunner) stepRemoveDaemonLogs(step, total int) error {
 			continue
 		}
 		if err := os.Remove(path); err != nil {
-			fmt.Printf("  ! Could not remove %s: %v\n", path, err)
+			fmt.Printf("  %s Could not remove %s: %v\n", cli.Warn("!"), path, err)
 			continue
 		}
-		fmt.Printf("  ✓ Removed %s\n", path)
+		fmt.Printf("  %s Removed %s\n", cli.Success("✓"), path)
 	}
 
 	return nil
@@ -197,7 +198,7 @@ func (u *uninstallRunner) stepUnregisterHooks(step, total int) error {
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("  ✓ No settings.json found (nothing to unregister)")
+			fmt.Printf("  %s No settings.json found (nothing to unregister)\n", cli.Success("✓"))
 			return nil
 		}
 		return fmt.Errorf("reading settings: %w", err)
@@ -210,13 +211,13 @@ func (u *uninstallRunner) stepUnregisterHooks(step, total int) error {
 
 	hooksMap, _ := settings["hooks"].(map[string]interface{})
 	if hooksMap == nil {
-		fmt.Println("  ✓ No hooks registered (nothing to unregister)")
+		fmt.Printf("  %s No hooks registered (nothing to unregister)\n", cli.Success("✓"))
 		return nil
 	}
 
 	removed := filterCabreroHooks(hooksMap)
 	if len(removed) == 0 {
-		fmt.Println("  ✓ No cabrero hooks found (nothing to unregister)")
+		fmt.Printf("  %s No cabrero hooks found (nothing to unregister)\n", cli.Success("✓"))
 		return nil
 	}
 
@@ -231,7 +232,7 @@ func (u *uninstallRunner) stepUnregisterHooks(step, total int) error {
 	}
 
 	for _, name := range removed {
-		fmt.Printf("  ✓ Removed %s hook from settings.json\n", name)
+		fmt.Printf("  %s Removed %s hook from settings.json\n", cli.Success("✓"), name)
 	}
 	return nil
 }
@@ -277,7 +278,7 @@ func (u *uninstallRunner) stepRemoveHookScripts(step, total int) error {
 	hooksDir := filepath.Join(store.Root(), "hooks")
 
 	if _, err := os.Stat(hooksDir); os.IsNotExist(err) {
-		fmt.Println("  ✓ Hook scripts not present (already removed)")
+		fmt.Printf("  %s Hook scripts not present (already removed)\n", cli.Success("✓"))
 		return nil
 	}
 
@@ -287,7 +288,7 @@ func (u *uninstallRunner) stepRemoveHookScripts(step, total int) error {
 
 	home, _ := os.UserHomeDir()
 	display := strings.Replace(hooksDir, home, "~", 1)
-	fmt.Printf("  ✓ Removed %s/\n", display)
+	fmt.Printf("  %s Removed %s/\n", cli.Success("✓"), display)
 	return nil
 }
 
@@ -296,7 +297,7 @@ func (u *uninstallRunner) stepRemoveBinary(step, total int) error {
 	binDir := filepath.Join(store.Root(), "bin")
 
 	if _, err := os.Stat(binDir); os.IsNotExist(err) {
-		fmt.Println("  ✓ Binary not present (already removed)")
+		fmt.Printf("  %s Binary not present (already removed)\n", cli.Success("✓"))
 		return nil
 	}
 
@@ -306,7 +307,7 @@ func (u *uninstallRunner) stepRemoveBinary(step, total int) error {
 
 	home, _ := os.UserHomeDir()
 	display := strings.Replace(binDir, home, "~", 1)
-	fmt.Printf("  ✓ Removed %s/\n", display)
+	fmt.Printf("  %s Removed %s/\n", cli.Success("✓"), display)
 	return nil
 }
 
@@ -317,7 +318,7 @@ func (u *uninstallRunner) stepDataDirectory(step, total int) error {
 	display := strings.Replace(root, home, "~", 1)
 
 	if _, err := os.Stat(root); os.IsNotExist(err) {
-		fmt.Printf("  ✓ %s not present (already removed)\n", display)
+		fmt.Printf("  %s %s not present (already removed)\n", cli.Success("✓"), display)
 		return nil
 	}
 
@@ -338,10 +339,10 @@ func (u *uninstallRunner) stepDataDirectory(step, total int) error {
 		if err := os.RemoveAll(root); err != nil {
 			return fmt.Errorf("removing data directory: %w", err)
 		}
-		fmt.Printf("  ✓ Removed %s\n", display)
+		fmt.Printf("  %s Removed %s\n", cli.Success("✓"), display)
 	} else {
 		size := dirSize(root)
-		fmt.Printf("  ✓ Kept %s (%s)\n", display, formatBytes(size))
+		fmt.Printf("  %s Kept %s (%s)\n", cli.Success("✓"), display, cli.Muted(formatBytes(size)))
 	}
 
 	return nil
@@ -350,13 +351,13 @@ func (u *uninstallRunner) stepDataDirectory(step, total int) error {
 // promptDataChoice presents a numbered choice for the data directory.
 // Returns true if user chose to remove.
 func (u *uninstallRunner) promptDataChoice(display string) bool {
-	fmt.Printf("  %s contains session data, proposals, and prompts.\n", display)
+	fmt.Printf("  %s contains session data, proposals, and prompts.\n", cli.Bold(display))
 	fmt.Println("  Keep for reinstallation or remove everything?")
-	fmt.Println("    [1] Keep (can reinstall later)")
-	fmt.Println("    [2] Remove everything")
+	fmt.Printf("    %s Keep (can reinstall later)\n", cli.Bold("[1]"))
+	fmt.Printf("    %s Remove everything\n", cli.Bold("[2]"))
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("  Choice [1]: ")
+	fmt.Printf("  Choice %s: ", cli.Muted("[1]"))
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 

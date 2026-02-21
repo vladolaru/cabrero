@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -40,11 +41,11 @@ func (s checkStatus) String() string {
 func (s checkStatus) Icon() string {
 	switch s {
 	case checkPass:
-		return "✓"
+		return cli.Success("✓")
 	case checkWarn:
-		return "!"
+		return cli.Warn("!")
 	case checkFail:
-		return "✗"
+		return cli.Error("✗")
 	default:
 		return "?"
 	}
@@ -172,8 +173,8 @@ func (d *doctorRunner) outputHuman(results []checkResult, categories []struct {
 	checks func() []checkResult
 }) error {
 	fmt.Println()
-	fmt.Println("Cabrero Doctor")
-	fmt.Println(strings.Repeat("═", 40))
+	fmt.Println(cli.Bold("Cabrero Doctor"))
+	fmt.Println(cli.Accent(strings.Repeat("═", 40)))
 
 	// Group results by category for display.
 	resultsByCategory := make(map[string][]checkResult)
@@ -182,7 +183,7 @@ func (d *doctorRunner) outputHuman(results []checkResult, categories []struct {
 	}
 
 	for _, cat := range categories {
-		fmt.Printf("\n%s\n", cat.name)
+		fmt.Printf("\n%s\n", cli.Bold(cat.name))
 		for _, r := range resultsByCategory[cat.name] {
 			msg := r.name
 			if r.message != "" {
@@ -212,42 +213,42 @@ func (d *doctorRunner) outputHuman(results []checkResult, categories []struct {
 	}
 
 	fmt.Println()
-	fmt.Println(strings.Repeat("─", 40))
+	fmt.Println(cli.Accent(strings.Repeat("─", 40)))
 
 	if fails == 0 && warns == 0 {
-		fmt.Println("Result: all checks passed")
+		fmt.Printf("Result: %s\n", cli.Success("all checks passed"))
 		return nil
 	}
 
 	parts := []string{}
 	if fails > 0 {
-		parts = append(parts, fmt.Sprintf("%d issue(s)", fails))
+		parts = append(parts, cli.Error(fmt.Sprintf("%d issue(s)", fails)))
 	}
 	if warns > 0 {
-		parts = append(parts, fmt.Sprintf("%d warning(s)", warns))
+		parts = append(parts, cli.Warn(fmt.Sprintf("%d warning(s)", warns)))
 	}
 	fmt.Printf("Result: %s\n", strings.Join(parts, ", "))
 
 	// Fix flow.
 	fixed := 0
 	if len(fixable) > 0 {
-		fmt.Println("\nFixable issues:")
+		fmt.Printf("\n%s\n", cli.Bold("Fixable issues:"))
 		for i, r := range fixable {
 			fmt.Printf("  %d. %s\n", i+1, r.name)
 			if r.message != "" {
 				fmt.Printf("     %s\n", r.message)
 			}
-			fmt.Printf("     → %s\n", r.fixDesc)
+			fmt.Printf("     %s %s\n", cli.Accent("→"), r.fixDesc)
 
 			if d.autoFix || d.confirmFix(r.name) {
 				if err := r.fix(); err != nil {
-					fmt.Printf("     ✗ Fix failed: %v\n", err)
+					fmt.Printf("     %s Fix failed: %v\n", cli.Error("✗"), err)
 				} else {
-					fmt.Printf("     ✓ Fixed\n")
+					fmt.Printf("     %s Fixed\n", cli.Success("✓"))
 					fixed++
 				}
 			} else {
-				fmt.Printf("     — Skipped\n")
+				fmt.Printf("     %s\n", cli.Muted("— Skipped"))
 			}
 			fmt.Println()
 		}
@@ -262,33 +263,33 @@ func (d *doctorRunner) outputHuman(results []checkResult, categories []struct {
 	}
 
 	if len(advisories) > 0 || len(nonFixableFails) > 0 {
-		fmt.Println("Advisories:")
+		fmt.Printf("%s\n", cli.Bold("Advisories:"))
 		for _, r := range nonFixableFails {
 			msg := r.name
 			if r.message != "" {
 				msg += " — " + r.message
 			}
-			fmt.Printf("  ✗ %s\n", msg)
+			fmt.Printf("  %s %s\n", cli.Error("✗"), msg)
 		}
 		for _, r := range advisories {
 			msg := r.name
 			if r.message != "" {
 				msg += " — " + r.message
 			}
-			fmt.Printf("  ! %s\n", msg)
+			fmt.Printf("  %s %s\n", cli.Warn("!"), msg)
 		}
 		fmt.Println()
 	}
 
 	if fixed > 0 && fixed == len(fixable) {
-		fmt.Println("All fixable issues resolved.")
+		fmt.Println(cli.Success("All fixable issues resolved."))
 	}
 
 	return nil
 }
 
 func (d *doctorRunner) confirmFix(name string) bool {
-	fmt.Printf("     Fix? [Y/n] ")
+	fmt.Printf("     Fix? %s ", cli.Muted("[Y/n]"))
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
