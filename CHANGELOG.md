@@ -5,6 +5,37 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Proposal ID mismatch** — batch evaluator `shortID` now returns 6 chars to
+  match the evaluator prompt format. Added zero-match guard to detect silent
+  proposal drops during partitioning.
+- **Non-atomic store writes** — metadata, blocklist, proposals, evaluations, and
+  archive writes now use temp file + rename via `store.AtomicWrite` to prevent
+  partial writes on crash.
+- **Path traversal in proposals** — `ReadProposal` and `WriteProposal` now
+  validate proposal IDs against path separators and directory traversal.
+- **UTF-8 truncation** — `Truncate`, `TruncatePad`, `TruncateID`, and `PadRight`
+  now operate on runes instead of bytes, preventing mid-character splits.
+- **Blocklist I/O in loops** — `ScanQueued` and `ScanStale` now pre-load the
+  blocklist once instead of reading from disk per session.
+
+### Changed
+
+- `ScanStale` uses `filepath.WalkDir` instead of `filepath.Walk` for lower
+  allocation overhead.
+- `reject` command uses `flag.NewFlagSet` instead of manual flag parsing.
+- Session status strings replaced with typed constants (`store.StatusQueued`,
+  `store.StatusImported`, `store.StatusProcessed`, `store.StatusError`).
+- `ScanQueued` uses `slices.Reverse` instead of manual loop.
+
+### Removed
+
+- Dead functions: `GetAgentTranscript`, `GetSessionRange`, `ListPipelineRuns`,
+  `GatherPipelineStats`, `ListProjects`.
+
 ## [0.8.2] - 2026-02-21
 
 ### Fixed
