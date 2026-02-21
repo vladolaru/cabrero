@@ -260,34 +260,32 @@ func runBackfill(sessions []store.Metadata, cfg pipeline.PipelineConfig) error {
 		}
 
 		sessionCount := len(g.sessions)
-		bp := &pipeline.BatchProcessor{
-			Config: cfg,
-			OnStatus: func(sessionID string, event pipeline.BatchEvent) {
-				sid := sessionID
-				if len(sid) > 8 {
-					sid = sid[:8]
-				}
-				switch event.Type {
-				case "classifier_done":
-					idx := 0
-					for i, s := range g.sessions {
-						if s.SessionID == sessionID {
-							idx = i + 1
-							break
-						}
+		runner := pipeline.NewRunner(cfg)
+		runner.OnStatus = func(sessionID string, event pipeline.BatchEvent) {
+			sid := sessionID
+			if len(sid) > 8 {
+				sid = sid[:8]
+			}
+			switch event.Type {
+			case "classifier_done":
+				idx := 0
+				for i, s := range g.sessions {
+					if s.SessionID == sessionID {
+						idx = i + 1
+						break
 					}
-					fmt.Printf("    [%d/%d] %s — Classifier: %s", idx, sessionCount, sid, event.Triage)
-					if event.Triage == "clean" {
-						fmt.Print(" ✓")
-					}
-					fmt.Println()
-				case "error":
-					fmt.Printf("    %s -- Error: %v\n", sid, event.Error)
 				}
-			},
+				fmt.Printf("    [%d/%d] %s — Classifier: %s", idx, sessionCount, sid, event.Triage)
+				if event.Triage == "clean" {
+					fmt.Print(" ✓")
+				}
+				fmt.Println()
+			case "error":
+				fmt.Printf("    %s -- Error: %v\n", sid, event.Error)
+			}
 		}
 
-		results := bp.ProcessGroup(ctx, batchSessions)
+		results := runner.RunGroup(ctx, batchSessions)
 
 		// Tally results for this group.
 		groupProposals := 0
