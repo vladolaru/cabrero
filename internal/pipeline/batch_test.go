@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -454,4 +455,245 @@ func TestProcessGroup(t *testing.T) {
 			t.Errorf("expected 1 valid proposal, got %d", len(output.Proposals))
 		}
 	})
+}
+
+func TestFilterAndValidateProposals(t *testing.T) {
+	t.Run("skill_scaffold without name logs error", func(t *testing.T) {
+		spy := &spyLogger{}
+		output := &EvaluatorOutput{
+			Proposals: []Proposal{
+				{
+					ID:         "prop-scaffold-0",
+					Type:       "skill_scaffold",
+					Confidence: "high",
+					Rationale:  "test",
+					// ScaffoldSkillName intentionally nil
+				},
+			},
+		}
+
+		filterAndValidateProposals(output, map[string]bool{}, map[string]bool{}, spy)
+
+		if !spy.hasError("skill_scaffold proposal without scaffoldSkillName") {
+			t.Errorf("expected Error about missing scaffoldSkillName, got: %v", spy.errors)
+		}
+		if len(output.Proposals) != 0 {
+			t.Errorf("expected 0 proposals after filtering, got %d", len(output.Proposals))
+		}
+	})
+
+	t.Run("skill_scaffold with empty name logs error", func(t *testing.T) {
+		spy := &spyLogger{}
+		empty := ""
+		output := &EvaluatorOutput{
+			Proposals: []Proposal{
+				{
+					ID:                "prop-scaffold-1",
+					Type:              "skill_scaffold",
+					Confidence:        "high",
+					Rationale:         "test",
+					ScaffoldSkillName: &empty,
+				},
+			},
+		}
+
+		filterAndValidateProposals(output, map[string]bool{}, map[string]bool{}, spy)
+
+		if !spy.hasError("skill_scaffold proposal without scaffoldSkillName") {
+			t.Errorf("expected Error about missing scaffoldSkillName, got: %v", spy.errors)
+		}
+		if len(output.Proposals) != 0 {
+			t.Errorf("expected 0 proposals, got %d", len(output.Proposals))
+		}
+	})
+
+	t.Run("unknown skill signal logs warning", func(t *testing.T) {
+		spy := &spyLogger{}
+		output := &EvaluatorOutput{
+			Proposals: []Proposal{
+				{
+					ID:                "prop-skill-0",
+					Type:              "skill_improvement",
+					Confidence:        "high",
+					Rationale:         "test",
+					CitedSkillSignals: []string{"nonexistent-skill"},
+				},
+			},
+		}
+		knownSkills := map[string]bool{"real-skill": true}
+
+		filterAndValidateProposals(output, map[string]bool{}, knownSkills, spy)
+
+		if !spy.hasError("nonexistent-skill") {
+			t.Errorf("expected Error about unknown skill, got: %v", spy.errors)
+		}
+		// Proposal is kept (warning only, not dropped).
+		if len(output.Proposals) != 1 {
+			t.Errorf("expected 1 proposal (warning only), got %d", len(output.Proposals))
+		}
+	})
+
+	t.Run("invalid UUID citations are pruned", func(t *testing.T) {
+		spy := &spyLogger{}
+		output := &EvaluatorOutput{
+			Proposals: []Proposal{
+				{
+					ID:         "prop-uuid-0",
+					Type:       "skill_improvement",
+					Confidence: "high",
+					Rationale:  "test",
+					CitedUUIDs: []string{"valid-uuid", "invalid-uuid"},
+				},
+			},
+		}
+		validUUIDs := map[string]bool{"valid-uuid": true}
+
+		filterAndValidateProposals(output, validUUIDs, map[string]bool{}, spy)
+
+		if len(output.Proposals) != 1 {
+			t.Fatalf("expected 1 proposal, got %d", len(output.Proposals))
+		}
+		cited := output.Proposals[0].CitedUUIDs
+		if len(cited) != 1 || cited[0] != "valid-uuid" {
+			t.Errorf("expected [valid-uuid], got %v", cited)
+		}
+	})
+}
+
+func TestValidateClassifierUUIDs(t *testing.T) {
+	t.Run("invalid UUID logs error", func(t *testing.T) {
+		setupBatchStore(t)
+		sid := "classifieruuid01"
+		createBatchSession(t, sid)
+		// Write a transcript with one known UUID.
+		writeTranscript(t, sid, []string{"uuid-known-1"})
+
+		spy := &spyLogger{}
+		output := &ClassifierOutput{
+			KeyTurns: []ClassifierKeyTurn{
+				{UUID: "uuid-known-1", Reason: "test", Category: "test"},
+				{UUID: "uuid-missing", Reason: "test", Category: "test"},
+			},
+		}
+
+		err := validateClassifierUUIDs(sid, output, spy)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if !spy.hasError("non-existent UUID") {
+			t.Errorf("expected Error about non-existent UUID, got: %v", spy.errors)
+		}
+		// uuid-missing should be pruned from KeyTurns.
+		if len(output.KeyTurns) != 1 {
+			t.Errorf("expected 1 key turn after pruning, got %d", len(output.KeyTurns))
+		}
+		if output.KeyTurns[0].UUID != "uuid-known-1" {
+			t.Errorf("expected uuid-known-1, got %s", output.KeyTurns[0].UUID)
+		}
+	})
+
+	t.Run("all valid UUIDs no errors", func(t *testing.T) {
+		setupBatchStore(t)
+		sid := "classifieruuid02"
+		createBatchSession(t, sid)
+		writeTranscript(t, sid, []string{"uuid-a", "uuid-b"})
+
+		spy := &spyLogger{}
+		output := &ClassifierOutput{
+			KeyTurns: []ClassifierKeyTurn{
+				{UUID: "uuid-a", Reason: "test", Category: "test"},
+				{UUID: "uuid-b", Reason: "test2", Category: "test"},
+			},
+		}
+
+		err := validateClassifierUUIDs(sid, output, spy)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(spy.errors) != 0 {
+			t.Errorf("expected no errors, got: %v", spy.errors)
+		}
+		if len(output.KeyTurns) != 2 {
+			t.Errorf("expected 2 key turns, got %d", len(output.KeyTurns))
+		}
+	})
+
+	t.Run("majority invalid UUIDs returns error", func(t *testing.T) {
+		setupBatchStore(t)
+		sid := "classifieruuid03"
+		createBatchSession(t, sid)
+		writeTranscript(t, sid, []string{"uuid-only-valid"})
+
+		spy := &spyLogger{}
+		output := &ClassifierOutput{
+			KeyTurns: []ClassifierKeyTurn{
+				{UUID: "uuid-only-valid", Reason: "test", Category: "test"},
+				{UUID: "uuid-bad-1", Reason: "test", Category: "test"},
+				{UUID: "uuid-bad-2", Reason: "test", Category: "test"},
+			},
+		}
+
+		err := validateClassifierUUIDs(sid, output, spy)
+		if err == nil {
+			t.Fatal("expected error for >50% invalid UUIDs, got nil")
+		}
+		if !strings.Contains(err.Error(), "critical") {
+			t.Errorf("expected 'critical' in error, got: %v", err)
+		}
+	})
+}
+
+func TestValidateEvaluatorOutput(t *testing.T) {
+	t.Run("invalid UUID logs error and prunes", func(t *testing.T) {
+		setupBatchStore(t)
+		sid := "evaluatoruuid001"
+		createBatchSession(t, sid)
+		writeTranscript(t, sid, []string{"uuid-valid"})
+
+		spy := &spyLogger{}
+		output := &EvaluatorOutput{
+			SessionID: sid,
+			Proposals: []Proposal{
+				{
+					ID:         "prop-eval-0",
+					Type:       "skill_improvement",
+					Confidence: "high",
+					Rationale:  "test",
+					CitedUUIDs: []string{"uuid-valid", "uuid-gone"},
+				},
+			},
+		}
+		classifierOutput := &ClassifierOutput{}
+
+		err := validateEvaluatorOutput(sid, output, classifierOutput, spy)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if !spy.hasError("non-existent UUID") {
+			t.Errorf("expected Error about non-existent UUID, got: %v", spy.errors)
+		}
+		// uuid-gone should be pruned from CitedUUIDs.
+		if len(output.Proposals) != 1 {
+			t.Fatalf("expected 1 proposal, got %d", len(output.Proposals))
+		}
+		cited := output.Proposals[0].CitedUUIDs
+		if len(cited) != 1 || cited[0] != "uuid-valid" {
+			t.Errorf("expected [uuid-valid], got %v", cited)
+		}
+	})
+}
+
+// writeTranscript writes a minimal JSONL transcript with the given UUIDs.
+func writeTranscript(t *testing.T, sessionID string, uuids []string) {
+	t.Helper()
+	var lines string
+	for _, uuid := range uuids {
+		lines += fmt.Sprintf(`{"uuid":"%s","type":"assistant","message":{"content":"test"}}`, uuid) + "\n"
+	}
+	path := store.RawDir(sessionID) + "/transcript.jsonl"
+	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
