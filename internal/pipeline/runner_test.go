@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/vladolaru/cabrero/internal/parser"
@@ -281,5 +282,164 @@ func TestRunOne_LoggerReceivesMessages(t *testing.T) {
 
 	if len(spy.infos) == 0 {
 		t.Error("expected Info calls on spy logger")
+	}
+}
+
+func TestRunGroup_AllClean(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "rg-clean00000001")
+	s2 := createBatchSession(t, "rg-clean00000002")
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.ClassifyFunc = fakeClassifyClean
+	results := r.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	if len(results) != 2 {
+		t.Fatalf("got %d results, want 2", len(results))
+	}
+	for _, res := range results {
+		if res.Status != "processed" {
+			t.Errorf("%s: Status = %q, want 'processed'", res.SessionID, res.Status)
+		}
+		if res.Triage != "clean" {
+			t.Errorf("%s: Triage = %q, want 'clean'", res.SessionID, res.Triage)
+		}
+	}
+}
+
+func TestRunGroup_SingleEvalUsesEvalFunc(t *testing.T) {
+	setupBatchStore(t)
+	s := createBatchSession(t, "rg-single000001")
+
+	singleCalled := false
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.ClassifyFunc = fakeClassifyEvaluate
+	r.EvalFunc = func(sid string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, error) {
+		singleCalled = true
+		return &EvaluatorOutput{SessionID: sid, Proposals: []Proposal{}}, nil
+	}
+
+	results := r.RunGroup(context.Background(), []BatchSession{s})
+
+	if !singleCalled {
+		t.Error("EvalFunc not called")
+	}
+	if results[0].Status != "processed" {
+		t.Errorf("Status = %q, want 'processed'", results[0].Status)
+	}
+}
+
+func TestRunGroup_BatchEval(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "rg-batch00000001")
+	s2 := createBatchSession(t, "rg-batch00000002")
+
+	batchCalled := false
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.ClassifyFunc = fakeClassifyEvaluate
+	r.EvalBatchFunc = func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, error) {
+		batchCalled = true
+		return &EvaluatorOutput{Proposals: []Proposal{
+			{ID: "prop-rg-bat-0", Type: "skill_improvement", Confidence: "high", Rationale: "t"},
+		}}, nil
+	}
+
+	r.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	if !batchCalled {
+		t.Error("EvalBatchFunc not called")
+	}
+}
+
+func TestRunGroup_ClassifierError(t *testing.T) {
+	setupBatchStore(t)
+	s := createBatchSession(t, "rg-classerr00001")
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.ClassifyFunc = func(_ string, _ PipelineConfig) (*ClassifierResult, error) {
+		return nil, fmt.Errorf("classifier boom")
+	}
+
+	results := r.RunGroup(context.Background(), []BatchSession{s})
+	if results[0].Status != "error" {
+		t.Errorf("Status = %q, want 'error'", results[0].Status)
+	}
+	if results[0].Error == nil {
+		t.Error("Error is nil, want non-nil")
+	}
+}
+
+func TestRunGroup_ContextCancel(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "rg-cancel0000001")
+	s2 := createBatchSession(t, "rg-cancel0000002")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	callCount := 0
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.ClassifyFunc = func(sid string, cfg PipelineConfig) (*ClassifierResult, error) {
+		callCount++
+		if callCount == 1 {
+			cancel()
+		}
+		return fakeClassifyClean(sid, cfg)
+	}
+
+	results := r.RunGroup(ctx, []BatchSession{s1, s2})
+	if results[1].Status != "error" {
+		t.Errorf("s2 Status = %q, want 'error'", results[1].Status)
+	}
+}
+
+func TestRunGroup_OnStatusEmitsEvents(t *testing.T) {
+	setupBatchStore(t)
+	s := createBatchSession(t, "rg-events0000001")
+
+	var events []BatchEvent
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.ClassifyFunc = fakeClassifyEvaluate
+	r.EvalFunc = fakeEvalNoProposals
+	r.OnStatus = func(_ string, event BatchEvent) {
+		events = append(events, event)
+	}
+
+	r.RunGroup(context.Background(), []BatchSession{s})
+
+	hasClassifier := false
+	hasEvaluator := false
+	for _, e := range events {
+		if e.Type == "classifier_done" && e.Triage == "evaluate" {
+			hasClassifier = true
+		}
+		if e.Type == "evaluator_done" {
+			hasEvaluator = true
+		}
+	}
+	if !hasClassifier {
+		t.Error("missing classifier_done event")
+	}
+	if !hasEvaluator {
+		t.Error("missing evaluator_done event")
+	}
+}
+
+func TestRunGroup_MaxBatchSizeForcesSingleEval(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "rg-maxbatch00001")
+	s2 := createBatchSession(t, "rg-maxbatch00002")
+
+	singleCount := 0
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.MaxBatchSize = 1
+	r.ClassifyFunc = fakeClassifyEvaluate
+	r.EvalFunc = func(sid string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, error) {
+		singleCount++
+		return &EvaluatorOutput{SessionID: sid, Proposals: []Proposal{}}, nil
+	}
+
+	r.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	if singleCount != 2 {
+		t.Errorf("EvalFunc called %d times, want 2", singleCount)
 	}
 }

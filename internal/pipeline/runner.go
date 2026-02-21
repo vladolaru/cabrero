@@ -211,3 +211,167 @@ func (r *Runner) runPreParseAndAggregate(sessionID string) (*preParseResult, err
 		AggregatorOutput: aggregatorOutput,
 	}, nil
 }
+
+// RunGroup runs all sessions through the Classifier, then batches "evaluate"
+// sessions through the Evaluator. It returns one BatchResult per input session.
+func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchResult {
+	results := make([]BatchResult, len(sessions))
+	indexByID := make(map[string]int, len(sessions))
+	for i, s := range sessions {
+		results[i] = BatchResult{SessionID: s.SessionID}
+		indexByID[s.SessionID] = i
+	}
+
+	// Phase 1: Run Classifier individually on each session.
+	var toEvaluate []BatchSession
+	for i, s := range sessions {
+		select {
+		case <-ctx.Done():
+			// Mark remaining sessions as errors.
+			for j := i; j < len(sessions); j++ {
+				results[j].Status = "error"
+				results[j].Error = ctx.Err()
+			}
+			return results
+		default:
+		}
+
+		classifierResult, err := r.classify(s.SessionID)
+		if err != nil {
+			results[i].Status = "error"
+			results[i].Error = err
+			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+			if markErr := store.MarkError(s.SessionID); markErr != nil {
+				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
+			}
+			continue
+		}
+
+		triage := classifierResult.ClassifierOutput.Triage
+		results[i].Triage = triage
+
+		if triage == "clean" {
+			results[i].Status = "processed"
+			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "clean"})
+			if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
+			}
+			continue
+		}
+
+		// Session needs evaluation.
+		r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "evaluate"})
+		toEvaluate = append(toEvaluate, BatchSession{
+			SessionID:        s.SessionID,
+			Digest:           classifierResult.Digest,
+			ClassifierOutput: classifierResult.ClassifierOutput,
+		})
+	}
+
+	if len(toEvaluate) == 0 {
+		return results
+	}
+
+	// Phase 2: Chunk and run Evaluator.
+	maxBatch := r.maxBatch()
+	for chunkStart := 0; chunkStart < len(toEvaluate); chunkStart += maxBatch {
+		select {
+		case <-ctx.Done():
+			// Mark remaining evaluate-sessions as errors.
+			for j := chunkStart; j < len(toEvaluate); j++ {
+				idx := indexByID[toEvaluate[j].SessionID]
+				results[idx].Status = "error"
+				results[idx].Error = ctx.Err()
+			}
+			return results
+		default:
+		}
+
+		chunkEnd := chunkStart + maxBatch
+		if chunkEnd > len(toEvaluate) {
+			chunkEnd = len(toEvaluate)
+		}
+		chunk := toEvaluate[chunkStart:chunkEnd]
+
+		if len(chunk) == 1 {
+			r.runGroupEvalSingle(chunk[0], results, indexByID)
+		} else {
+			r.runGroupEvalBatch(chunk, results, indexByID)
+		}
+	}
+
+	return results
+}
+
+func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, indexByID map[string]int) {
+	idx := indexByID[s.SessionID]
+
+	evaluatorOutput, err := r.evalOne(s.SessionID, s.Digest, s.ClassifierOutput)
+	if err != nil {
+		results[idx].Status = "error"
+		results[idx].Error = err
+		r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+		if markErr := store.MarkError(s.SessionID); markErr != nil {
+			r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
+		}
+		return
+	}
+
+	proposals := persistEvaluatorResults(s.SessionID, evaluatorOutput, r.log())
+	results[idx].Status = "processed"
+	results[idx].Proposals = proposals
+	r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
+
+	if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+		r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
+	}
+}
+
+func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, indexByID map[string]int) {
+	evaluatorOutput, err := r.evalMany(chunk)
+	if err != nil {
+		// Mark all sessions in the chunk as errors.
+		for _, s := range chunk {
+			idx := indexByID[s.SessionID]
+			results[idx].Status = "error"
+			results[idx].Error = err
+			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+			if markErr := store.MarkError(s.SessionID); markErr != nil {
+				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
+			}
+		}
+		return
+	}
+
+	// Partition proposals by session: proposal IDs encode their session
+	// via the format "prop-{first 6 chars of sessionId}-{index}".
+	totalMatched := 0
+	for _, s := range chunk {
+		idx := indexByID[s.SessionID]
+		prefix := "prop-" + shortID(s.SessionID) + "-"
+		filtered := filterProposals(evaluatorOutput, prefix)
+		filtered.SessionID = s.SessionID
+		totalMatched += len(filtered.Proposals)
+
+		proposals := persistEvaluatorResults(s.SessionID, filtered, r.log())
+		results[idx].Status = "processed"
+		results[idx].Proposals = proposals
+		r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
+
+		if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+			r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
+		}
+	}
+
+	if totalMatched == 0 && len(evaluatorOutput.Proposals) > 0 {
+		err := fmt.Errorf("batch: all %d proposals dropped during partitioning (possible ID format mismatch)",
+			len(evaluatorOutput.Proposals))
+		for _, s := range chunk {
+			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+		}
+	} else if totalMatched != len(evaluatorOutput.Proposals) {
+		err := fmt.Errorf("batch: %d of %d proposals unmatched after partitioning",
+			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
+		r.emit(chunk[0].SessionID, BatchEvent{Type: "error", Error: err})
+	}
+}
