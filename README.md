@@ -65,8 +65,15 @@ Or build from source if that's more your speed:
 ```bash
 git clone https://github.com/vladolaru/cabrero.git
 cd cabrero
-make install
+make install    # builds + copies to ~/.cabrero/bin/ + symlinks to /usr/local/bin/
 cabrero setup
+```
+
+`make install` tries to symlink into `/usr/local/bin/` so `cabrero` is on your PATH. If that fails (permissions), either run `sudo ln -sf ~/.cabrero/bin/cabrero /usr/local/bin/cabrero` or add `~/.cabrero/bin` to your PATH:
+
+```bash
+echo 'export PATH="$HOME/.cabrero/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 ### Requirements
