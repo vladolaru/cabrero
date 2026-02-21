@@ -42,3 +42,38 @@ func (r *Runner) emit(sessionID string, event BatchEvent) {
 		r.OnStatus(sessionID, event)
 	}
 }
+
+func (r *Runner) classify(sessionID string) (*ClassifierResult, error) {
+	if r.ClassifyFunc != nil {
+		return r.ClassifyFunc(sessionID, r.Config)
+	}
+	return RunThroughClassifier(sessionID, r.Config)
+}
+
+func (r *Runner) evalOne(sessionID string, digest *parser.Digest, co *ClassifierOutput) (*EvaluatorOutput, error) {
+	if r.EvalFunc != nil {
+		return r.EvalFunc(sessionID, digest, co, r.Config)
+	}
+	return RunEvaluator(sessionID, digest, co, r.Config)
+}
+
+func (r *Runner) evalMany(sessions []BatchSession) (*EvaluatorOutput, error) {
+	if r.EvalBatchFunc != nil {
+		return r.EvalBatchFunc(sessions, r.Config)
+	}
+	return RunEvaluatorBatch(sessions, r.Config)
+}
+
+func (r *Runner) parseSession(sessionID string) (*parser.Digest, error) {
+	if r.ParseSessionFunc != nil {
+		return r.ParseSessionFunc(sessionID)
+	}
+	return parser.ParseSession(sessionID)
+}
+
+func (r *Runner) aggregate(sessionID, project string) (*patterns.AggregatorOutput, error) {
+	if r.AggregateFunc != nil {
+		return r.AggregateFunc(sessionID, project)
+	}
+	return patterns.Aggregate(sessionID, project)
+}
