@@ -48,7 +48,7 @@ Use the highest applicable bump. Check with `git log --oneline $(git describe --
 **Steps:**
 
 1. Review commits since last tag: `git log --oneline $(git describe --tags --abbrev=0)..HEAD`.
-2. Write changelog entries in `CHANGELOG.md` under a new `## [X.Y.Z] - YYYY-MM-DD` heading. Add the `[X.Y.Z]` comparison link at the bottom of the file.
+2. Update `CHANGELOG.md`: move any existing `[Unreleased]` entries and add new ones for commits not yet covered, all under a new `## [X.Y.Z] - YYYY-MM-DD` heading. Add the `[X.Y.Z]` comparison link at the bottom of the file.
 3. Commit: `chore: release vX.Y.Z`.
 4. Tag: `git tag vX.Y.Z`.
 5. Push both: `git push origin HEAD && git push origin vX.Y.Z`.
