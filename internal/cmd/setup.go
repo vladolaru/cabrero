@@ -448,35 +448,30 @@ func (s *setupRunner) stepStartDaemon(step, total int) error {
 
 // Step 7: PATH check.
 func (s *setupRunner) stepPathCheck(step, total int) error {
-	binDir := filepath.Join(store.Root(), "bin")
-	pathEnv := os.Getenv("PATH")
-	paths := filepath.SplitList(pathEnv)
-
-	for _, p := range paths {
-		if p == binDir {
-			fmt.Printf("  ✓ %s is in PATH\n", binDir)
-			return nil
-		}
+	// Check if "cabrero" resolves anywhere on PATH (covers symlinks in
+	// /usr/local/bin, ~/.cabrero/bin in PATH, etc.).
+	if path, err := exec.LookPath("cabrero"); err == nil {
+		fmt.Printf("  ✓ cabrero is on PATH (%s)\n", path)
+		return nil
 	}
 
-	// Expand ~ for display comparison.
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(binDir, home, "~", 1)
-
-	fmt.Printf("  ! %s is not in PATH\n", display)
+	fmt.Println("  ! cabrero is not on PATH")
 	fmt.Println()
+	fmt.Println("    Either symlink into /usr/local/bin:")
+	fmt.Println("      sudo ln -sf ~/.cabrero/bin/cabrero /usr/local/bin/cabrero")
+	fmt.Println()
+	fmt.Println("    Or add ~/.cabrero/bin to your PATH:")
 
 	shell := filepath.Base(os.Getenv("SHELL"))
 	switch shell {
 	case "zsh":
-		fmt.Printf("    Add to ~/.zshrc:\n")
-		fmt.Printf("      export PATH=\"%s:$PATH\"\n", display)
+		fmt.Println("      echo 'export PATH=\"$HOME/.cabrero/bin:$PATH\"' >> ~/.zshrc")
+		fmt.Println("      source ~/.zshrc")
 	case "bash":
-		fmt.Printf("    Add to ~/.bashrc or ~/.bash_profile:\n")
-		fmt.Printf("      export PATH=\"%s:$PATH\"\n", display)
+		fmt.Println("      echo 'export PATH=\"$HOME/.cabrero/bin:$PATH\"' >> ~/.bashrc")
+		fmt.Println("      source ~/.bashrc")
 	default:
-		fmt.Printf("    Add to your shell profile:\n")
-		fmt.Printf("      export PATH=\"%s:$PATH\"\n", display)
+		fmt.Println("      export PATH=\"$HOME/.cabrero/bin:$PATH\"")
 	}
 
 	return nil
