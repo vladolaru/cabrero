@@ -7,8 +7,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Pipeline Logger interface** — `pipeline.Logger` with `Info`/`Error` methods,
+  injectable via `PipelineConfig.Logger`. Defaults to `stdLogger` (stdout/stderr)
+  for backwards compatibility. Includes `discardLogger` for silent operation.
+- **Daemon pipeline log routing** — daemon now wires a `daemonPipelineLogger`
+  adapter so pipeline progress and warnings appear in `daemon.log` with
+  timestamps and `[INFO]`/`[ERROR]` prefixes instead of leaking to
+  stdout/stderr.
+
 ### Fixed
 
+- **Pipeline stdout/stderr leaks** — all 25 direct `fmt.Printf`/`Println`/
+  `Fprintf(os.Stderr)` calls in the pipeline package now route through the
+  Logger interface. Fixes output corruption when running under the daemon or
+  future TUI integration.
 - **Proposal ID mismatch** — batch evaluator `shortID` now returns 6 chars to
   match the evaluator prompt format. Added zero-match guard to detect silent
   proposal drops during partitioning.
