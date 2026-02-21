@@ -51,7 +51,42 @@ func (r *Runner) classify(sessionID string) (*ClassifierResult, error) {
 	if r.ClassifyFunc != nil {
 		return r.ClassifyFunc(sessionID, r.Config)
 	}
-	return RunThroughClassifier(sessionID, r.Config)
+
+	// Default: pre-parse, aggregate, then classify.
+	if !store.SessionExists(sessionID) {
+		return nil, fmt.Errorf("session %s not found in store", sessionID)
+	}
+	if err := EnsurePrompts(); err != nil {
+		return nil, fmt.Errorf("ensuring prompt files: %w", err)
+	}
+
+	log := r.log()
+
+	pre, err := r.runPreParseAndAggregate(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info("  Running Classifier...")
+	classifierOutput, err := RunClassifier(sessionID, pre.Digest, pre.AggregatorOutput, r.Config)
+	if err != nil {
+		return nil, fmt.Errorf("classifier failed: %w", err)
+	}
+	if err := WriteClassifierOutput(sessionID, classifierOutput); err != nil {
+		return nil, fmt.Errorf("writing classifier output: %w", err)
+	}
+	log.Info("  Classifier: goal=%q, %d errors, %d key turns, %d skill signals, triage=%s",
+		classifierOutput.Goal.Summary,
+		len(classifierOutput.ErrorClassification),
+		len(classifierOutput.KeyTurns),
+		len(classifierOutput.SkillSignals),
+		classifierOutput.Triage)
+
+	return &ClassifierResult{
+		Digest:           pre.Digest,
+		AggregatorOutput: pre.AggregatorOutput,
+		ClassifierOutput: classifierOutput,
+	}, nil
 }
 
 func (r *Runner) evalOne(sessionID string, digest *parser.Digest, co *ClassifierOutput) (*EvaluatorOutput, error) {
@@ -95,25 +130,26 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	log := r.log()
 	result := &RunResult{DryRun: dryRun}
 
-	// Check context before pre-parse.
+	// Check context before work begins.
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
 	}
 
-	pre, err := r.runPreParseAndAggregate(sessionID)
-	if err != nil {
-		return nil, err
-	}
-	result.Digest = pre.Digest
-	result.AggregatorOutput = pre.AggregatorOutput
-
 	if dryRun {
+		// Dry-run only needs pre-parse.
+		pre, err := r.runPreParseAndAggregate(sessionID)
+		if err != nil {
+			return nil, err
+		}
+		result.Digest = pre.Digest
+		result.AggregatorOutput = pre.AggregatorOutput
 		log.Info("  Dry run — stopping after pre-parser.")
 		return result, nil
 	}
 
+	// Full run: classify (includes pre-parse when no hook is set).
 	// Check context before classify.
 	select {
 	case <-ctx.Done():
