@@ -107,9 +107,14 @@ func (m Model) renderHeader() string {
 		return lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", rightRendered)
 	}
 
-	// Standard/narrow: single-line header.
+	// Standard/narrow: stacked header.
+	daemonLine := fmt.Sprintf("  Daemon: %s", daemonStatus)
+	if lastCapture != "" {
+		daemonLine += "  │  " + lastCapture
+	}
 	return title + "\n" + mutedStyle.Render(statsLine) + "\n" +
-		mutedStyle.Render(fmt.Sprintf("  Daemon: %s  │  %s  │  %s", daemonStatus, lastCapture, hooks))
+		mutedStyle.Render(daemonLine) + "\n" +
+		mutedStyle.Render("  "+hooks)
 }
 
 func (m Model) renderItemList() string {
@@ -153,6 +158,12 @@ func (m Model) renderItemList() string {
 
 func (m Model) renderStatusBar() string {
 	keys := m.keys
+
+	// Empty state: show only navigation keys that make sense.
+	if len(m.filtered) == 0 {
+		bindings := []key.Binding{keys.Sources, keys.Pipeline, keys.Help}
+		return components.RenderStatusBar(bindings, "", m.width)
+	}
 
 	// Show different actions depending on the selected item type.
 	item := m.SelectedItem()

@@ -1,6 +1,10 @@
 package shared
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Truncate shortens s to maxLen characters, appending "..." if truncated.
 // If maxLen is <= 0, returns empty. If maxLen <= 3, returns a raw slice.
@@ -55,4 +59,16 @@ func IndentBlock(s string, spaces int) string {
 		lines[i] = indent + line
 	}
 	return strings.Join(lines, "\n")
+}
+
+// WrapIndent word-wraps s to fit within the given total width, then indents
+// each line by the given number of spaces. The text portion is wrapped to
+// (width - indent) characters so that the final output fits within width.
+func WrapIndent(s string, width, indent int) string {
+	textWidth := width - indent
+	if textWidth < 10 {
+		textWidth = 10
+	}
+	wrapped := lipgloss.NewStyle().Width(textWidth).Render(s)
+	return IndentBlock(wrapped, indent)
 }

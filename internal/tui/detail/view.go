@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/vladolaru/cabrero/internal/tui/components"
@@ -51,7 +53,7 @@ func (m Model) View() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("─", 17))
 	b.WriteString("\n")
-	b.WriteString(shared.IndentBlock(p.Rationale, 2))
+	b.WriteString(shared.WrapIndent(p.Rationale, m.width, 2))
 	b.WriteString("\n\n")
 
 	// Citation chain.
@@ -101,8 +103,19 @@ func (m Model) View() string {
 		content += strings.Repeat("\n", remaining)
 	}
 
-	// Status bar.
-	content += components.RenderStatusBar(m.keys.DetailShortHelp(), "", m.width)
+	// Status bar — hide "tab" hint when chat panel isn't visible.
+	bindings := m.keys.DetailShortHelp()
+	if !m.isWideMode() || !m.config.Detail.ChatPanelOpen {
+		var filtered []key.Binding
+		for _, b := range bindings {
+			if key.Matches(tea.KeyMsg{Type: tea.KeyTab}, b) {
+				continue
+			}
+			filtered = append(filtered, b)
+		}
+		bindings = filtered
+	}
+	content += components.RenderStatusBar(bindings, "", m.width)
 
 	return content
 }

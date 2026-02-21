@@ -32,11 +32,20 @@ func (m Model) View() string {
 	r := m.report
 	b.WriteString(fitnessHeader.Render(fmt.Sprintf("  Fitness Report: %s", r.SourceName)))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Ownership: %s  |  Origin: %s  |  Observed: %d sessions (%d days)\n",
+	ownershipLine := fmt.Sprintf("  Ownership: %s  |  Origin: %s  |  Observed: %d sessions (%d days)",
 		fitnessAccent.Render(r.Ownership),
 		fitnessMuted.Render(r.SourceOrigin),
 		r.ObservedCount,
-		r.WindowDays))
+		r.WindowDays)
+	// Split ownership/origin onto separate lines when the combined line would overflow.
+	if m.width < 100 {
+		ownershipLine = fmt.Sprintf("  Ownership: %s  |  Origin: %s\n  Observed: %d sessions (%d days)",
+			fitnessAccent.Render(r.Ownership),
+			fitnessMuted.Render(r.SourceOrigin),
+			r.ObservedCount,
+			r.WindowDays)
+	}
+	b.WriteString(ownershipLine + "\n")
 	b.WriteString("\n")
 
 	// Viewport with assessment, verdict, and evidence.
@@ -84,7 +93,7 @@ func (m Model) renderViewportContent() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("\u2500", 17))
 	b.WriteString("\n")
-	b.WriteString(shared.IndentBlock(m.report.Verdict, 2))
+	b.WriteString(shared.WrapIndent(m.report.Verdict, m.viewport.Width, 2))
 	b.WriteString("\n\n")
 
 	// SESSION EVIDENCE section.
@@ -117,7 +126,11 @@ func (m Model) renderEvidence() string {
 		}
 
 		categoryLabel := formatCategory(eg.Category)
-		countLabel := fmt.Sprintf("(%d entries)", len(eg.Entries))
+		noun := "entries"
+		if len(eg.Entries) == 1 {
+			noun = "entry"
+		}
+		countLabel := fmt.Sprintf("(%d %s)", len(eg.Entries), noun)
 
 		b.WriteString(fmt.Sprintf("  %s%s %s %s\n",
 			prefix,

@@ -46,10 +46,11 @@ var views = []string{
 }
 
 func main() {
-	width := flag.Int("w", 0, "terminal width (0 = view default)")
-	height := flag.Int("h", 0, "terminal height (0 = view default)")
+	var w, h int
+	flag.IntVar(&w, "w", 0, "terminal width (0 = view default)")
+	flag.IntVar(&h, "h", 0, "terminal height (0 = view default)")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: snapshot [flags] <view>\n\nAvailable views:\n")
+		fmt.Fprintf(os.Stderr, "Usage: snapshot <view> [-w WIDTH] [-h HEIGHT]\n\nAvailable views:\n")
 		for _, v := range views {
 			fmt.Fprintf(os.Stderr, "  %s\n", v)
 		}
@@ -58,13 +59,24 @@ func main() {
 	}
 	flag.Parse()
 
-	if flag.NArg() < 1 {
+	args := flag.Args()
+	if len(args) < 1 {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	view := flag.Arg(0)
-	output, err := render(view, *width, *height)
+	view := args[0]
+
+	// Support flags after the view name (e.g., "snapshot dashboard -w 80").
+	// Go's flag package stops at the first non-flag arg, so re-parse trailing args.
+	if len(args) > 1 {
+		fs := flag.NewFlagSet("", flag.ContinueOnError)
+		fs.IntVar(&w, "w", w, "")
+		fs.IntVar(&h, "h", h, "")
+		_ = fs.Parse(args[1:])
+	}
+
+	output, err := render(view, w, h)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

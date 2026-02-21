@@ -290,8 +290,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case message.PipelineDataRefreshed:
 		m.pipelineRefreshing = false
-		m.pipelineMonitor = pipeline_tui.New(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats, &m.keys, m.config)
-		m.pipelineMonitor.SetSize(m.width, m.height)
+		m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats)
 		return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
 			return message.PipelineTickMsg{}
 		})
@@ -361,11 +360,13 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-		// Always forward to chat — it handles stream messages and input when focused.
-		var chatCmd tea.Cmd
-		m.chat, chatCmd = m.chat.Update(msg)
-		if chatCmd != nil {
-			cmds = append(cmds, chatCmd)
+		// Forward to chat only when the panel is visible (wide mode + enabled).
+		if m.width >= 120 && m.config.Detail.ChatPanelOpen {
+			var chatCmd tea.Cmd
+			m.chat, chatCmd = m.chat.Update(msg)
+			if chatCmd != nil {
+				cmds = append(cmds, chatCmd)
+			}
 		}
 	case message.ViewFitnessDetail:
 		var cmd tea.Cmd

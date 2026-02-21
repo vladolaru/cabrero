@@ -45,6 +45,21 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height
 }
 
+// Refresh updates the pipeline data while preserving cursor and expansion state.
+func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats) {
+	m.runs = runs
+	m.stats = stats
+	m.prompts = prompts
+	m.dashStats = dashStats
+	// Clamp cursor to the new data bounds.
+	if m.cursor >= len(m.runs) {
+		m.cursor = max(0, len(m.runs)-1)
+	}
+	if m.expandedIdx >= len(m.runs) {
+		m.expandedIdx = -1
+	}
+}
+
 // SelectedRun returns the run at the current cursor position, or nil.
 func (m Model) SelectedRun() *pl.PipelineRun {
 	if m.cursor < 0 || m.cursor >= len(m.runs) {

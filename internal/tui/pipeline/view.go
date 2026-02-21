@@ -72,6 +72,14 @@ func (m Model) View() string {
 
 	content := strings.Join(sections, "\n\n")
 
+	// Fill remaining space to anchor status bar to bottom.
+	lines := strings.Count(content, "\n")
+	statusBarHeight := 1
+	remaining := m.height - lines - statusBarHeight
+	if remaining > 0 {
+		content += strings.Repeat("\n", remaining)
+	}
+
 	// Status bar — 3 args: bindings, timedMsg, width.
 	statusBar := components.RenderStatusBar(m.keys.PipelineShortHelp(), "", m.width)
 
