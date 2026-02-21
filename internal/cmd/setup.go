@@ -48,9 +48,10 @@ func Setup(args []string, hooks EmbeddedHooks) error {
 }
 
 type setupRunner struct {
-	hooks   EmbeddedHooks
-	autoYes bool
-	dryRun  bool
+	hooks     EmbeddedHooks
+	autoYes   bool
+	dryRun    bool
+	claudeDir string // directory containing the claude CLI, discovered in step 1
 }
 
 func (s *setupRunner) run() error {
@@ -95,6 +96,7 @@ func (s *setupRunner) stepPrerequisites(step, total int) error {
 		fmt.Println("    Capture will work but pipeline execution requires the claude CLI.")
 		fmt.Println("    Install it from: https://docs.anthropic.com/en/docs/claude-code")
 	} else {
+		s.claudeDir = filepath.Dir(claudePath)
 		ver := "unknown"
 		out, err := exec.Command(claudePath, "--version").Output()
 		if err == nil {
@@ -311,7 +313,8 @@ func (s *setupRunner) stepInstallLaunchAgent(step, total int) error {
 		}
 	}
 
-	plistContent, err := renderPlist(binaryPath)
+	pathEnv := daemonPATH(s.claudeDir)
+	plistContent, err := renderPlist(binaryPath, pathEnv)
 	if err != nil {
 		return fmt.Errorf("generating plist: %w", err)
 	}
@@ -395,19 +398,51 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>
-		<string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+		<string>{{.PATH}}</string>
 	</dict>
 </dict>
 </plist>
 `
 
-func renderPlist(binaryPath string) (string, error) {
+// discoverClaudeDir returns the directory containing the claude CLI, or ""
+// if not found. Used by setup and doctor to build the LaunchAgent PATH.
+func discoverClaudeDir() string {
+	p, err := exec.LookPath("claude")
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(p)
+}
+
+// daemonPATH builds the PATH for the LaunchAgent. It starts with common
+// system directories and appends extraDirs (e.g., the directory containing
+// the claude CLI) if they aren't already present.
+func daemonPATH(extraDirs ...string) string {
+	base := []string{"/usr/local/bin", "/usr/bin", "/bin", "/opt/homebrew/bin"}
+	seen := make(map[string]bool, len(base))
+	for _, d := range base {
+		seen[d] = true
+	}
+	for _, d := range extraDirs {
+		if d != "" && !seen[d] {
+			base = append(base, d)
+			seen[d] = true
+		}
+	}
+	return strings.Join(base, ":")
+}
+
+func renderPlist(binaryPath, pathEnv string) (string, error) {
 	tmpl, err := template.New("plist").Parse(plistTemplate)
 	if err != nil {
 		return "", err
 	}
 	var buf strings.Builder
-	if err := tmpl.Execute(&buf, struct{ BinaryPath string }{binaryPath}); err != nil {
+	data := struct {
+		BinaryPath string
+		PATH       string
+	}{binaryPath, pathEnv}
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

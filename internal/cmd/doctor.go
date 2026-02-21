@@ -775,7 +775,7 @@ func (d *doctorRunner) checkLaunchAgent() []checkResult {
 
 	// Check plist content matches expected.
 	expectedBinary := d.determineBinaryPath()
-	expectedContent, err := renderPlist(expectedBinary)
+	expectedContent, err := renderPlist(expectedBinary, daemonPATH(discoverClaudeDir()))
 	if err == nil && string(plistData) != expectedContent {
 		results = append(results, checkResult{
 			name:     "Plist content current",
@@ -845,7 +845,7 @@ func (d *doctorRunner) determineBinaryPath() string {
 func (d *doctorRunner) makeInstallPlistFix(plistPath string) func() error {
 	return func() error {
 		binaryPath := d.determineBinaryPath()
-		content, err := renderPlist(binaryPath)
+		content, err := renderPlist(binaryPath, daemonPATH(discoverClaudeDir()))
 		if err != nil {
 			return fmt.Errorf("generating plist: %w", err)
 		}
