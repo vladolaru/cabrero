@@ -13,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -54,8 +55,8 @@ type setupRunner struct {
 
 func (s *setupRunner) run() error {
 	fmt.Println()
-	fmt.Println("Cabrero Setup")
-	fmt.Println(strings.Repeat("═", 40))
+	fmt.Println(cli.Bold("Cabrero Setup"))
+	fmt.Println(cli.Accent(strings.Repeat("═", 40)))
 	fmt.Println()
 
 	steps := []struct {
@@ -74,14 +75,14 @@ func (s *setupRunner) run() error {
 
 	total := len(steps)
 	for i, step := range steps {
-		fmt.Printf("Step %d/%d: %s\n", i+1, total, step.name)
+		fmt.Printf("%s %s\n", cli.Bold(fmt.Sprintf("Step %d/%d:", i+1, total)), step.name)
 		if err := step.fn(i+1, total); err != nil {
 			return fmt.Errorf("step %d (%s): %w", i+1, step.name, err)
 		}
 		fmt.Println()
 	}
 
-	fmt.Println("Setup complete.")
+	fmt.Println(cli.Success("Setup complete."))
 	return nil
 }
 
@@ -90,7 +91,7 @@ func (s *setupRunner) stepPrerequisites(step, total int) error {
 	// Check claude CLI.
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
-		fmt.Println("  ! claude CLI not found in PATH")
+		fmt.Printf("  %s claude CLI not found in PATH\n", cli.Warn("!"))
 		fmt.Println("    Capture will work but pipeline execution requires the claude CLI.")
 		fmt.Println("    Install it from: https://docs.anthropic.com/en/docs/claude-code")
 	} else {
@@ -99,14 +100,14 @@ func (s *setupRunner) stepPrerequisites(step, total int) error {
 		if err == nil {
 			ver = strings.TrimSpace(string(out))
 		}
-		fmt.Printf("  ✓ claude CLI found (%s)\n", ver)
+		fmt.Printf("  %s claude CLI found (%s)\n", cli.Success("✓"), ver)
 	}
 
 	// Check macOS.
 	if runtime.GOOS == "darwin" {
-		fmt.Println("  ✓ macOS detected")
+		fmt.Printf("  %s macOS detected\n", cli.Success("✓"))
 	} else {
-		fmt.Printf("  ! %s detected — LaunchAgent setup will be skipped\n", runtime.GOOS)
+		fmt.Printf("  %s %s detected — LaunchAgent setup will be skipped\n", cli.Warn("!"), runtime.GOOS)
 	}
 
 	return nil
@@ -115,13 +116,13 @@ func (s *setupRunner) stepPrerequisites(step, total int) error {
 // Step 2: Initialize store.
 func (s *setupRunner) stepInitStore(step, total int) error {
 	if s.dryRun {
-		fmt.Printf("  → Would initialize store at %s\n", store.Root())
+		fmt.Printf("  %s Would initialize store at %s\n", cli.Accent("→"), cli.Bold(store.Root()))
 		return nil
 	}
 	if err := store.Init(); err != nil {
 		return err
 	}
-	fmt.Printf("  ✓ Store initialized at %s\n", store.Root())
+	fmt.Printf("  %s Store initialized at %s\n", cli.Success("✓"), cli.Bold(store.Root()))
 	return nil
 }
 
@@ -130,8 +131,8 @@ func (s *setupRunner) stepInstallHookScripts(step, total int) error {
 	hooksDir := filepath.Join(store.Root(), "hooks")
 
 	if s.dryRun {
-		fmt.Printf("  → Would write %s/pre-compact-backup.sh\n", hooksDir)
-		fmt.Printf("  → Would write %s/session-end.sh\n", hooksDir)
+		fmt.Printf("  %s Would write %s/pre-compact-backup.sh\n", cli.Accent("→"), hooksDir)
+		fmt.Printf("  %s Would write %s/session-end.sh\n", cli.Accent("→"), hooksDir)
 		return nil
 	}
 
@@ -151,17 +152,17 @@ func (s *setupRunner) stepInstallHookScripts(step, total int) error {
 		path := filepath.Join(hooksDir, script.name)
 		existing, err := os.ReadFile(path)
 		if err == nil && string(existing) == script.content {
-			fmt.Printf("  ✓ %s already installed\n", script.name)
+			fmt.Printf("  %s %s already installed\n", cli.Success("✓"), script.name)
 			continue
 		}
 
-		fmt.Printf("  → Writing %s\n", path)
+		fmt.Printf("  %s Writing %s\n", cli.Accent("→"), cli.Bold(path))
 		if err := os.WriteFile(path, []byte(script.content), 0o755); err != nil {
 			return fmt.Errorf("writing %s: %w", script.name, err)
 		}
 	}
 
-	fmt.Println("  ✓ Hook scripts installed")
+	fmt.Printf("  %s Hook scripts installed\n", cli.Success("✓"))
 	return nil
 }
 
@@ -179,7 +180,7 @@ func (s *setupRunner) stepRegisterHooks(step, total int) error {
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("  ! Claude Code settings not found — skipping hook registration")
+			fmt.Printf("  %s Claude Code settings not found — skipping hook registration\n", cli.Warn("!"))
 			fmt.Printf("    Expected: %s\n", settingsPath)
 			return nil
 		}
@@ -204,26 +205,26 @@ func (s *setupRunner) stepRegisterHooks(step, total int) error {
 	sessionEndRegistered := hookGroupContainsCabrero(hooksMap["SessionEnd"])
 
 	if preCompactRegistered && sessionEndRegistered {
-		fmt.Println("  ✓ Hooks already registered")
+		fmt.Printf("  %s Hooks already registered\n", cli.Success("✓"))
 		return nil
 	}
 
 	// Show what will be done.
-	fmt.Printf("  Claude Code settings: %s\n", settingsPath)
+	fmt.Printf("  Claude Code settings: %s\n", cli.Bold(settingsPath))
 	if !preCompactRegistered {
-		fmt.Printf("  Will add: PreCompact hook → %s\n", preCompactPath)
+		fmt.Printf("  Will add: PreCompact hook %s %s\n", cli.Accent("→"), cli.Bold(preCompactPath))
 	}
 	if !sessionEndRegistered {
-		fmt.Printf("  Will add: SessionEnd hook → %s\n", sessionEndPath)
+		fmt.Printf("  Will add: SessionEnd hook %s %s\n", cli.Accent("→"), cli.Bold(sessionEndPath))
 	}
 
 	if s.dryRun {
-		fmt.Println("  → Would register hooks (dry-run)")
+		fmt.Printf("  %s Would register hooks (dry-run)\n", cli.Accent("→"))
 		return nil
 	}
 
 	if !s.confirm("Register hooks?") {
-		fmt.Println("  — Skipped")
+		fmt.Printf("  %s\n", cli.Muted("— Skipped"))
 		return nil
 	}
 
@@ -267,7 +268,7 @@ func (s *setupRunner) stepRegisterHooks(step, total int) error {
 		return fmt.Errorf("writing settings: %w", err)
 	}
 
-	fmt.Println("  ✓ Hooks registered")
+	fmt.Printf("  %s Hooks registered\n", cli.Success("✓"))
 	return nil
 }
 
@@ -284,7 +285,7 @@ func hookGroupContainsCabrero(v interface{}) bool {
 // Step 5: Install LaunchAgent.
 func (s *setupRunner) stepInstallLaunchAgent(step, total int) error {
 	if runtime.GOOS != "darwin" {
-		fmt.Println("  — Skipped (not macOS)")
+		fmt.Printf("  %s\n", cli.Muted("— Skipped (not macOS)"))
 		return nil
 	}
 
@@ -318,20 +319,20 @@ func (s *setupRunner) stepInstallLaunchAgent(step, total int) error {
 	// Check if already installed and matches.
 	existing, readErr := os.ReadFile(plistPath)
 	if readErr == nil && string(existing) == plistContent {
-		fmt.Println("  ✓ LaunchAgent already installed")
+		fmt.Printf("  %s LaunchAgent already installed\n", cli.Success("✓"))
 		return nil
 	}
 
-	fmt.Printf("  Will install: %s\n", plistPath)
-	fmt.Printf("  Binary path:  %s\n", binaryPath)
+	fmt.Printf("  Will install: %s\n", cli.Bold(plistPath))
+	fmt.Printf("  Binary path:  %s\n", cli.Bold(binaryPath))
 
 	if s.dryRun {
-		fmt.Println("  → Would install LaunchAgent (dry-run)")
+		fmt.Printf("  %s Would install LaunchAgent (dry-run)\n", cli.Accent("→"))
 		return nil
 	}
 
 	if !s.confirm("Install LaunchAgent for background processing?") {
-		fmt.Println("  — Skipped")
+		fmt.Printf("  %s\n", cli.Muted("— Skipped"))
 		return nil
 	}
 
@@ -353,7 +354,7 @@ func (s *setupRunner) stepInstallLaunchAgent(step, total int) error {
 		return fmt.Errorf("loading LaunchAgent: %w", err)
 	}
 
-	fmt.Println("  ✓ LaunchAgent installed and loaded")
+	fmt.Printf("  %s LaunchAgent installed and loaded\n", cli.Success("✓"))
 	return nil
 }
 
@@ -415,12 +416,12 @@ func renderPlist(binaryPath string) (string, error) {
 // Step 6: Start daemon.
 func (s *setupRunner) stepStartDaemon(step, total int) error {
 	if s.dryRun {
-		fmt.Println("  → Would check/start daemon (dry-run)")
+		fmt.Printf("  %s Would check/start daemon (dry-run)\n", cli.Accent("→"))
 		return nil
 	}
 
 	if pid, alive := daemon.IsDaemonRunning(); alive {
-		fmt.Printf("  ✓ Daemon running (PID %d)\n", pid)
+		fmt.Printf("  %s Daemon running (PID %d)\n", cli.Success("✓"), pid)
 		return nil
 	}
 
@@ -435,14 +436,14 @@ func (s *setupRunner) stepStartDaemon(step, total int) error {
 
 			// Brief wait and recheck.
 			if pid, alive := daemon.IsDaemonRunning(); alive {
-				fmt.Printf("  ✓ Daemon running (PID %d)\n", pid)
+				fmt.Printf("  %s Daemon running (PID %d)\n", cli.Success("✓"), pid)
 				return nil
 			}
 		}
 	}
 
-	fmt.Println("  ! Daemon not running")
-	fmt.Println("    Start manually with: cabrero daemon")
+	fmt.Printf("  %s Daemon not running\n", cli.Warn("!"))
+	fmt.Printf("    Start manually with: %s\n", cli.Bold("cabrero daemon"))
 	return nil
 }
 
@@ -451,27 +452,27 @@ func (s *setupRunner) stepPathCheck(step, total int) error {
 	// Check if "cabrero" resolves anywhere on PATH (covers symlinks in
 	// /usr/local/bin, ~/.cabrero/bin in PATH, etc.).
 	if path, err := exec.LookPath("cabrero"); err == nil {
-		fmt.Printf("  ✓ cabrero is on PATH (%s)\n", path)
+		fmt.Printf("  %s cabrero is on PATH (%s)\n", cli.Success("✓"), path)
 		return nil
 	}
 
-	fmt.Println("  ! cabrero is not on PATH")
+	fmt.Printf("  %s cabrero is not on PATH\n", cli.Warn("!"))
 	fmt.Println()
 	fmt.Println("    Either symlink into /usr/local/bin:")
-	fmt.Println("      sudo ln -sf ~/.cabrero/bin/cabrero /usr/local/bin/cabrero")
+	fmt.Printf("      %s\n", cli.Muted("sudo ln -sf ~/.cabrero/bin/cabrero /usr/local/bin/cabrero"))
 	fmt.Println()
 	fmt.Println("    Or add ~/.cabrero/bin to your PATH:")
 
 	shell := filepath.Base(os.Getenv("SHELL"))
 	switch shell {
 	case "zsh":
-		fmt.Println("      echo 'export PATH=\"$HOME/.cabrero/bin:$PATH\"' >> ~/.zshrc")
-		fmt.Println("      source ~/.zshrc")
+		fmt.Printf("      %s\n", cli.Muted(`echo 'export PATH="$HOME/.cabrero/bin:$PATH"' >> ~/.zshrc`))
+		fmt.Printf("      %s\n", cli.Muted("source ~/.zshrc"))
 	case "bash":
-		fmt.Println("      echo 'export PATH=\"$HOME/.cabrero/bin:$PATH\"' >> ~/.bashrc")
-		fmt.Println("      source ~/.bashrc")
+		fmt.Printf("      %s\n", cli.Muted(`echo 'export PATH="$HOME/.cabrero/bin:$PATH"' >> ~/.bashrc`))
+		fmt.Printf("      %s\n", cli.Muted("source ~/.bashrc"))
 	default:
-		fmt.Println("      export PATH=\"$HOME/.cabrero/bin:$PATH\"")
+		fmt.Printf("      %s\n", cli.Muted(`export PATH="$HOME/.cabrero/bin:$PATH"`))
 	}
 
 	return nil
@@ -480,7 +481,7 @@ func (s *setupRunner) stepPathCheck(step, total int) error {
 // Step 8: Offer to import and process existing sessions.
 func (s *setupRunner) stepBackfillOffer(step, total int) error {
 	if s.dryRun {
-		fmt.Println("  → Would offer to import and process existing sessions (dry-run)")
+		fmt.Printf("  %s Would offer to import and process existing sessions (dry-run)\n", cli.Accent("→"))
 		return nil
 	}
 
@@ -488,15 +489,15 @@ func (s *setupRunner) stepBackfillOffer(step, total int) error {
 	fmt.Println("  Scanning for existing CC sessions...")
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Printf("  Warning: cannot determine home directory: %v\n", err)
+		fmt.Printf("  %s cannot determine home directory: %v\n", cli.Warn("Warning:"), err)
 		return nil
 	}
 	from := filepath.Join(home, ".claude", "projects")
 	result, importErr := RunImport(from, false, true)
 	if importErr != nil {
-		fmt.Printf("  Warning: import scan failed: %v\n", importErr)
+		fmt.Printf("  %s import scan failed: %v\n", cli.Warn("Warning:"), importErr)
 	} else if result.Imported > 0 {
-		fmt.Printf("  Imported %d session(s) (%d already present)\n", result.Imported, result.Skipped)
+		fmt.Printf("  Imported %s session(s) (%d already present)\n", cli.Bold(fmt.Sprintf("%d", result.Imported)), result.Skipped)
 	}
 
 	// Count pending sessions.
@@ -508,10 +509,10 @@ func (s *setupRunner) stepBackfillOffer(step, total int) error {
 		return nil
 	}
 
-	fmt.Printf("  Found %d session(s) ready for processing\n", len(sessions))
+	fmt.Printf("  Found %s session(s) ready for processing\n", cli.Bold(fmt.Sprintf("%d", len(sessions))))
 
 	if !s.confirm("Enqueue recent sessions for background processing?") {
-		fmt.Println("  — Skipped. Run 'cabrero backfill --enqueue' later to process.")
+		fmt.Printf("  %s Run %s later to process.\n", cli.Muted("— Skipped."), cli.Bold("cabrero backfill --enqueue"))
 		return nil
 	}
 
@@ -525,7 +526,7 @@ func (s *setupRunner) stepBackfillOffer(step, total int) error {
 		if input != "" {
 			t, err := time.Parse("2006-01-02", input)
 			if err != nil {
-				fmt.Printf("  Could not parse date %q, using default (1 month)\n", input)
+				fmt.Printf("  %s Could not parse date %q, using default (1 month)\n", cli.Warn("!"), input)
 			} else {
 				sinceDate = t
 			}
@@ -544,11 +545,11 @@ func (s *setupRunner) stepBackfillOffer(step, total int) error {
 // confirm prompts the user for Y/n. Returns true on Y or empty input.
 func (s *setupRunner) confirm(prompt string) bool {
 	if s.autoYes {
-		fmt.Printf("  %s [Y/n] y (--yes)\n", prompt)
+		fmt.Printf("  %s %s y %s\n", prompt, cli.Muted("[Y/n]"), cli.Muted("(--yes)"))
 		return true
 	}
 
-	fmt.Printf("  %s [Y/n] ", prompt)
+	fmt.Printf("  %s %s ", prompt, cli.Muted("[Y/n]"))
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
