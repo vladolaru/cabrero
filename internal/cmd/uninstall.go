@@ -22,6 +22,7 @@ import (
 func Uninstall(args []string) error {
 	fs := flag.NewFlagSet("uninstall", flag.ExitOnError)
 	autoYes := fs.Bool("yes", false, "skip all confirmations")
+	dryRun := fs.Bool("dry-run", false, "show what would be done without doing it")
 	keepData := fs.Bool("keep-data", false, "keep ~/.cabrero data directory")
 	removeData := fs.Bool("remove-data", false, "remove ~/.cabrero data directory")
 	if err := fs.Parse(args); err != nil {
@@ -34,6 +35,7 @@ func Uninstall(args []string) error {
 
 	u := &uninstallRunner{
 		autoYes:    *autoYes,
+		dryRun:     *dryRun,
 		keepData:   *keepData,
 		removeData: *removeData,
 	}
@@ -43,13 +45,18 @@ func Uninstall(args []string) error {
 
 type uninstallRunner struct {
 	autoYes    bool
+	dryRun     bool
 	keepData   bool
 	removeData bool
 }
 
 func (u *uninstallRunner) run() error {
 	fmt.Println()
-	fmt.Println(cli.Bold("Cabrero Uninstall"))
+	if u.dryRun {
+		fmt.Println(cli.Bold("Cabrero Uninstall") + "  " + cli.Muted("(dry-run)"))
+	} else {
+		fmt.Println(cli.Bold("Cabrero Uninstall"))
+	}
 	fmt.Println(cli.Accent(strings.Repeat("═", 40)))
 	fmt.Println()
 
@@ -91,13 +98,28 @@ func (u *uninstallRunner) run() error {
 		profile = "your shell profile"
 	}
 
-	fmt.Printf("If you added %s to your PATH, remove the export line from\n%s.\n\n", cli.Bold(display), profile)
-	fmt.Println(cli.Success("Cabrero uninstalled."))
+	if u.dryRun {
+		fmt.Println(cli.Muted("No changes made (dry-run)."))
+	} else {
+		fmt.Printf("If you added %s to your PATH, remove the export line from\n%s.\n\n", cli.Bold(display), profile)
+		fmt.Println(cli.Success("Cabrero uninstalled."))
+	}
 	return nil
 }
 
 // Step 1: Stop daemon.
 func (u *uninstallRunner) stepStopDaemon(step, total int) error {
+	pid, alive := daemon.IsDaemonRunning()
+	if !alive {
+		fmt.Printf("  %s Daemon not running (already stopped)\n", cli.Success("✓"))
+		return nil
+	}
+
+	if u.dryRun {
+		fmt.Printf("  %s Would stop daemon (PID %d)\n", cli.Accent("→"), pid)
+		return nil
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -109,13 +131,6 @@ func (u *uninstallRunner) stepStopDaemon(step, total int) error {
 		if _, err := os.Stat(plistPath); err == nil {
 			exec.Command("launchctl", "unload", plistPath).Run() // ignore error
 		}
-	}
-
-	// Check if daemon is still running and kill it.
-	pid, alive := daemon.IsDaemonRunning()
-	if !alive {
-		fmt.Printf("  %s Daemon not running (already stopped)\n", cli.Success("✓"))
-		return nil
 	}
 
 	// Send SIGTERM.
@@ -157,11 +172,17 @@ func (u *uninstallRunner) stepRemoveLaunchAgent(step, total int) error {
 		return nil
 	}
 
+	display := strings.Replace(plistPath, home, "~", 1)
+
+	if u.dryRun {
+		fmt.Printf("  %s Would remove %s\n", cli.Accent("→"), display)
+		return nil
+	}
+
 	if err := os.Remove(plistPath); err != nil {
 		return fmt.Errorf("removing plist: %w", err)
 	}
 
-	display := strings.Replace(plistPath, home, "~", 1)
 	fmt.Printf("  %s Removed %s\n", cli.Success("✓"), display)
 	return nil
 }
@@ -175,6 +196,10 @@ func (u *uninstallRunner) stepRemoveDaemonLogs(step, total int) error {
 
 	for _, path := range logs {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
+		if u.dryRun {
+			fmt.Printf("  %s Would remove %s\n", cli.Accent("→"), path)
 			continue
 		}
 		if err := os.Remove(path); err != nil {
@@ -215,13 +240,36 @@ func (u *uninstallRunner) stepUnregisterHooks(step, total int) error {
 		return nil
 	}
 
-	removed := filterCabreroHooks(hooksMap)
-	if len(removed) == 0 {
+	// Identify which hook groups contain cabrero entries.
+	var cabreroGroups []string
+	for groupName, v := range hooksMap {
+		groups, ok := v.([]interface{})
+		if !ok {
+			continue
+		}
+		for _, g := range groups {
+			raw, _ := json.Marshal(g)
+			if strings.Contains(string(raw), "cabrero") {
+				cabreroGroups = append(cabreroGroups, groupName)
+				break
+			}
+		}
+	}
+
+	if len(cabreroGroups) == 0 {
 		fmt.Printf("  %s No cabrero hooks found (nothing to unregister)\n", cli.Success("✓"))
 		return nil
 	}
 
-	// Write back settings without cabrero hooks.
+	if u.dryRun {
+		for _, name := range cabreroGroups {
+			fmt.Printf("  %s Would remove %s hook from settings.json\n", cli.Accent("→"), name)
+		}
+		return nil
+	}
+
+	// Actually remove cabrero hooks from the map and write back.
+	removed := filterCabreroHooks(hooksMap)
 	settings["hooks"] = hooksMap
 	out, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
@@ -282,12 +330,18 @@ func (u *uninstallRunner) stepRemoveHookScripts(step, total int) error {
 		return nil
 	}
 
+	home, _ := os.UserHomeDir()
+	display := strings.Replace(hooksDir, home, "~", 1)
+
+	if u.dryRun {
+		fmt.Printf("  %s Would remove %s/\n", cli.Accent("→"), display)
+		return nil
+	}
+
 	if err := os.RemoveAll(hooksDir); err != nil {
 		return fmt.Errorf("removing hooks directory: %w", err)
 	}
 
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(hooksDir, home, "~", 1)
 	fmt.Printf("  %s Removed %s/\n", cli.Success("✓"), display)
 	return nil
 }
@@ -301,12 +355,18 @@ func (u *uninstallRunner) stepRemoveBinary(step, total int) error {
 		return nil
 	}
 
+	home, _ := os.UserHomeDir()
+	display := strings.Replace(binDir, home, "~", 1)
+
+	if u.dryRun {
+		fmt.Printf("  %s Would remove %s/\n", cli.Accent("→"), display)
+		return nil
+	}
+
 	if err := os.RemoveAll(binDir); err != nil {
 		return fmt.Errorf("removing bin directory: %w", err)
 	}
 
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(binDir, home, "~", 1)
 	fmt.Printf("  %s Removed %s/\n", cli.Success("✓"), display)
 	return nil
 }
@@ -333,6 +393,16 @@ func (u *uninstallRunner) stepDataDirectory(step, total int) error {
 		remove = false
 	} else {
 		remove = u.promptDataChoice(display)
+	}
+
+	if u.dryRun {
+		if remove {
+			fmt.Printf("  %s Would remove %s\n", cli.Accent("→"), display)
+		} else {
+			size := dirSize(root)
+			fmt.Printf("  %s Would keep %s (%s)\n", cli.Accent("→"), display, cli.Muted(formatBytes(size)))
+		}
+		return nil
 	}
 
 	if remove {
