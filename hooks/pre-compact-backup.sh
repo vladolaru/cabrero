@@ -16,6 +16,7 @@ PAYLOAD=$(cat)
 # CC payloads are simple flat JSON, so this is reliable for single string values.
 SESSION_ID=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+SESSION_CWD=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 
 if [ -z "$SESSION_ID" ] || [ -z "$TRANSCRIPT_PATH" ]; then
   exit 0
@@ -53,6 +54,7 @@ cat > "${SESSION_DIR}/metadata.json" << METAEOF
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "capture_trigger": "pre-compact",
   "cc_version": "${CC_VERSION}",
+  "work_dir": "${SESSION_CWD}",
   "status": "queued"
 }
 METAEOF

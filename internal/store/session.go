@@ -26,6 +26,7 @@ type Metadata struct {
 	CCVersion      string `json:"cc_version,omitempty"`
 	Status         string `json:"status"`              // "queued", "imported", "processed", or "error"
 	Project        string `json:"project,omitempty"`    // CC project slug (parent dir name)
+	WorkDir        string `json:"work_dir,omitempty"`   // working directory from CC hook payload
 }
 
 // SessionExists returns true if a raw backup already exists for the session.

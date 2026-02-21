@@ -7,6 +7,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Working directory in session metadata** — hook scripts now extract the `cwd`
+  field from Claude Code's JSON payload and store it as `work_dir` in
+  `metadata.json`. This records the actual filesystem path the session ran in,
+  providing more reliable project identification than the CC project slug alone.
+
 ## [0.9.3] - 2026-02-21
 
 ### Fixed
