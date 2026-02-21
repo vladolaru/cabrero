@@ -47,7 +47,22 @@ func New(cfg Config) (*Daemon, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating logger: %w", err)
 	}
+	cfg.Pipeline.Logger = &daemonPipelineLogger{log: log}
 	return &Daemon{config: cfg, log: log}, nil
+}
+
+// daemonPipelineLogger adapts the daemon's file-based Logger to the
+// pipeline.Logger interface so pipeline output routes to the daemon log.
+type daemonPipelineLogger struct {
+	log *Logger
+}
+
+func (d *daemonPipelineLogger) Info(format string, args ...any) {
+	d.log.Info(format, args...)
+}
+
+func (d *daemonPipelineLogger) Error(format string, args ...any) {
+	d.log.Error(format, args...)
 }
 
 // Run starts the daemon loop. It blocks until ctx is cancelled.
