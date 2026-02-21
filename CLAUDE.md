@@ -31,6 +31,27 @@ Available views: `dashboard`, `dashboard-narrow`, `dashboard-empty`, `proposal-d
 
 When adding a new TUI view, add a render function in `cmd/snapshot/main.go` and register the view name in both the `views` slice and the `SNAPSHOT_VIEWS` Makefile variable.
 
+## Releasing
+
+Version is derived from `git describe --tags` at build time (see `Makefile`). There is no version constant to update manually.
+
+**Determine the next version** from the latest tag using semver and the commits since that tag:
+
+| Commits contain | Bump | Example |
+|-----------------|------|---------|
+| `feat!:` or `BREAKING CHANGE:` | MAJOR | 0.8.1 → 1.0.0 |
+| `feat:` | MINOR | 0.8.1 → 0.9.0 |
+| `fix:`, `perf:`, `refactor:`, `docs:`, etc. | PATCH | 0.8.1 → 0.8.2 |
+
+Use the highest applicable bump. Check with `git log --oneline $(git describe --tags --abbrev=0)..HEAD`.
+
+**Steps:**
+
+1. Move any `[Unreleased]` entries in `CHANGELOG.md` under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add the comparison link at the bottom of the file.
+2. Commit as `chore: release vX.Y.Z`.
+3. Tag: `git tag vX.Y.Z`.
+4. Push commit and tag: `git push origin HEAD && git push origin vX.Y.Z`.
+
 ## Git
 
 - Remote: `git@github.com:vladolaru/cabrero.git`

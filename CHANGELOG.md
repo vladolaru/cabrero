@@ -5,6 +5,16 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-02-21
+
+### Added
+
+- **TUI snapshot pipeline** — `cmd/snapshot` renders all TUI views to ANSI
+  stdout. Pipe through [freeze](https://github.com/charmbracelet/freeze) via
+  `make snapshots` (all views) or `make snapshot VIEW=<name>` (single view)
+  to produce SVG and PNG files with catppuccin-mocha styling. PNGs capped at
+  1200px width.
+
 ## [0.8.0] - 2026-02-21
 
 ### Added
@@ -203,6 +213,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.8.1]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.1
 [0.8.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.8.0
 [0.7.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.7.0
 [0.6.0]: https://github.com/vladolaru/cabrero/releases/tag/v0.6.0
