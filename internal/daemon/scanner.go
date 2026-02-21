@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"slices"
+
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -18,12 +20,17 @@ func ScanQueued() ([]QueuedSession, error) {
 		return nil, err
 	}
 
+	blocked, err := store.ReadBlocklist()
+	if err != nil {
+		return nil, err
+	}
+
 	var ready []QueuedSession
 	for _, s := range sessions {
-		if s.Status != "queued" {
+		if s.Status != store.StatusQueued {
 			continue
 		}
-		if store.IsBlocked(s.SessionID) {
+		if blocked[s.SessionID] {
 			continue
 		}
 		ready = append(ready, QueuedSession{
@@ -33,9 +40,7 @@ func ScanQueued() ([]QueuedSession, error) {
 	}
 
 	// ListSessions returns newest-first; reverse for oldest-first processing.
-	for i, j := 0, len(ready)-1; i < j; i, j = i+1, j-1 {
-		ready[i], ready[j] = ready[j], ready[i]
-	}
+	slices.Reverse(ready)
 
 	return ready, nil
 }

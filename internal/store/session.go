@@ -10,6 +10,14 @@ import (
 	"time"
 )
 
+// Session status values.
+const (
+	StatusQueued    = "queued"
+	StatusImported  = "imported"
+	StatusProcessed = "processed"
+	StatusError     = "error"
+)
+
 // Metadata stored alongside each raw session backup.
 type Metadata struct {
 	SessionID      string `json:"session_id"`
@@ -50,7 +58,7 @@ func WriteSession(sessionID, transcriptSrc, trigger, ccVersion string, ts time.T
 		Timestamp:      ts.UTC().Format(time.RFC3339),
 		CaptureTrigger: trigger,
 		CCVersion:      ccVersion,
-		Status:         "imported",
+		Status:         StatusImported,
 		Project:        project,
 	}
 	return WriteMetadata(dir, meta)
@@ -62,7 +70,7 @@ func WriteMetadata(dir string, meta Metadata) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "metadata.json"), data, 0o644)
+	return AtomicWrite(filepath.Join(dir, "metadata.json"), data, 0o644)
 }
 
 // ReadMetadata reads metadata.json from a session's raw directory.
@@ -85,7 +93,7 @@ func MarkProcessed(sessionID string) error {
 	if err != nil {
 		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
 	}
-	meta.Status = "processed"
+	meta.Status = StatusProcessed
 	return WriteMetadata(RawDir(sessionID), meta)
 }
 
@@ -95,7 +103,7 @@ func MarkQueued(sessionID string) error {
 	if err != nil {
 		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
 	}
-	meta.Status = "queued"
+	meta.Status = StatusQueued
 	return WriteMetadata(RawDir(sessionID), meta)
 }
 
@@ -105,7 +113,7 @@ func MarkError(sessionID string) error {
 	if err != nil {
 		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
 	}
-	meta.Status = "error"
+	meta.Status = StatusError
 	return WriteMetadata(RawDir(sessionID), meta)
 }
 
@@ -174,20 +182,3 @@ func ProjectDisplayName(slug string) string {
 	return slug
 }
 
-// ListProjects returns a sorted list of unique project slugs from the store.
-func ListProjects() ([]string, error) {
-	sessions, err := ListSessions()
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[string]bool)
-	var projects []string
-	for _, s := range sessions {
-		if s.Project != "" && !seen[s.Project] {
-			seen[s.Project] = true
-			projects = append(projects, s.Project)
-		}
-	}
-	sort.Strings(projects)
-	return projects, nil
-}

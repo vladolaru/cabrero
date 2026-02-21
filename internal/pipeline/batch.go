@@ -208,7 +208,7 @@ func (bp *BatchProcessor) evalBatch(chunk []BatchSession, results []BatchResult,
 	}
 
 	// Partition proposals by session: proposal IDs encode their session
-	// via the format "prop-{first 8 chars of sessionId}-{index}".
+	// via the format "prop-{first 6 chars of sessionId}-{index}".
 	totalMatched := 0
 	for _, s := range chunk {
 		idx := indexByID[s.SessionID]
@@ -227,7 +227,13 @@ func (bp *BatchProcessor) evalBatch(chunk []BatchSession, results []BatchResult,
 		}
 	}
 
-	if totalMatched != len(evaluatorOutput.Proposals) {
+	if totalMatched == 0 && len(evaluatorOutput.Proposals) > 0 {
+		err := fmt.Errorf("batch: all %d proposals dropped during partitioning (possible ID format mismatch)",
+			len(evaluatorOutput.Proposals))
+		for _, s := range chunk {
+			bp.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+		}
+	} else if totalMatched != len(evaluatorOutput.Proposals) {
 		err := fmt.Errorf("batch: %d of %d proposals unmatched after partitioning",
 			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
 		bp.emit(chunk[0].SessionID, BatchEvent{Type: "error", Error: err})
@@ -267,10 +273,11 @@ func filterProposals(output *EvaluatorOutput, prefix string) *EvaluatorOutput {
 	return &filtered
 }
 
-// shortID truncates a session ID to 8 characters.
+// shortID truncates a session ID to 6 characters.
+// Must match the evaluator prompt format: "prop-{first 6 chars of sessionId}-{index}".
 func shortID(id string) string {
-	if len(id) > 8 {
-		return id[:8]
+	if len(id) > 6 {
+		return id[:6]
 	}
 	return id
 }

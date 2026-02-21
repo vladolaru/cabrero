@@ -62,16 +62,23 @@ trigger: when working with git
 	result := RenderDiff(ptr(content), nil, "skill_scaffold", 80)
 	stripped := ansi.Strip(result)
 
-	// All lines should have + prefix (additions).
-	for _, line := range strings.Split(stripped, "\n") {
+	// All non-empty lines should contain the addition marker "+".
+	// Scaffold lines are rendered as "  N + content" where N is the line number.
+	lines := strings.Split(stripped, "\n")
+	nonEmpty := 0
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		// Lines should have line numbers and + prefix.
+		nonEmpty++
+		// Each line should have a numeric prefix followed by "+"
 		if !strings.Contains(line, "+") {
-			t.Errorf("scaffold line missing + prefix: %q", line)
+			t.Errorf("scaffold line missing '+' marker: %q", line)
 		}
+	}
+	if nonEmpty == 0 {
+		t.Error("scaffold rendered no lines")
 	}
 }
 

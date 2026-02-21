@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,21 +27,26 @@ func ScanStale(log *Logger) (int, error) {
 		return 0, nil
 	}
 
+	blocked, err := store.ReadBlocklist()
+	if err != nil {
+		return 0, err
+	}
+
 	recovered := 0
 	now := time.Now()
 
-	err = filepath.Walk(projectsDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(projectsDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil // skip inaccessible files
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
-		if !strings.HasSuffix(info.Name(), ".jsonl") {
+		if !strings.HasSuffix(d.Name(), ".jsonl") {
 			return nil
 		}
 
-		sessionID := strings.TrimSuffix(info.Name(), ".jsonl")
+		sessionID := strings.TrimSuffix(d.Name(), ".jsonl")
 		if sessionID == "" || len(sessionID) < 8 {
 			return nil
 		}
@@ -49,7 +55,12 @@ func ScanStale(log *Logger) (int, error) {
 		if store.SessionExists(sessionID) {
 			return nil
 		}
-		if store.IsBlocked(sessionID) {
+		if blocked[sessionID] {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
 			return nil
 		}
 

@@ -51,18 +51,8 @@ type PromptVersion struct {
 	LastUsed time.Time
 }
 
-// ListPipelineRuns returns recent pipeline runs, sorted newest first.
-// It reconstructs run data from session metadata and evaluation file existence.
-func ListPipelineRuns(limit int) ([]PipelineRun, error) {
-	sessions, err := store.ListSessions()
-	if err != nil {
-		return nil, err
-	}
-	return ListPipelineRunsFromSessions(sessions, limit)
-}
-
-// ListPipelineRunsFromSessions is like ListPipelineRuns but accepts pre-loaded sessions
-// to avoid redundant I/O when multiple functions need the same session list.
+// ListPipelineRunsFromSessions reconstructs run data from pre-loaded session
+// metadata and evaluation file existence. Pass limit=0 for no limit.
 func ListPipelineRunsFromSessions(sessions []store.Metadata, limit int) ([]PipelineRun, error) {
 	var runs []PipelineRun
 	for i, meta := range sessions {
@@ -134,23 +124,8 @@ func ListPipelineRunsFromSessions(sessions []store.Metadata, limit int) ([]Pipel
 	return runs, nil
 }
 
-// GatherPipelineStats aggregates pipeline statistics over the given number of days.
-func GatherPipelineStats(days int) (PipelineStats, error) {
-	sessions, err := store.ListSessions()
-	if err != nil {
-		return PipelineStats{}, err
-	}
-	// Build runs to avoid separate evaluator file reads.
-	runs, err := ListPipelineRunsFromSessions(sessions, 0)
-	if err != nil {
-		return PipelineStats{}, err
-	}
-	return GatherPipelineStatsFromSessions(sessions, runs, days)
-}
-
-// GatherPipelineStatsFromSessions is like GatherPipelineStats but accepts pre-loaded sessions
-// and runs to avoid redundant I/O. Pass runs from ListPipelineRunsFromSessions to reuse
-// the already-read evaluator data for ProposalsGenerated counts.
+// GatherPipelineStatsFromSessions aggregates pipeline statistics over the given
+// number of days using pre-loaded sessions and runs to avoid redundant I/O.
 func GatherPipelineStatsFromSessions(sessions []store.Metadata, runs []PipelineRun, days int) (PipelineStats, error) {
 	cutoff := time.Now().AddDate(0, 0, -days)
 	stats := PipelineStats{}
@@ -166,11 +141,11 @@ func GatherPipelineStatsFromSessions(sessions []store.Metadata, runs []PipelineR
 		timestamps = append(timestamps, ts)
 
 		switch meta.Status {
-		case "processed":
+		case store.StatusProcessed:
 			stats.SessionsProcessed++
-		case "queued":
+		case store.StatusQueued:
 			stats.SessionsQueued++
-		case "error":
+		case store.StatusError:
 			stats.SessionsErrored++
 		}
 	}

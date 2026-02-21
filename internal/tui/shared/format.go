@@ -6,49 +6,53 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Truncate shortens s to maxLen characters, appending "..." if truncated.
+// Truncate shortens s to maxLen runes, appending "..." if truncated.
 // If maxLen is <= 0, returns empty. If maxLen <= 3, returns a raw slice.
 func Truncate(s string, maxLen int) string {
 	if maxLen <= 0 {
 		return ""
 	}
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
-		return s[:maxLen]
+		return string(runes[:maxLen])
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
-// TruncatePad shortens s to maxLen (with "...") or pads with spaces to fill maxLen.
+// TruncatePad shortens s to maxLen runes (with "...") or pads with spaces to fill maxLen.
 func TruncatePad(s string, maxLen int) string {
 	if maxLen <= 0 {
 		return ""
 	}
-	if len(s) > maxLen {
+	runes := []rune(s)
+	if len(runes) > maxLen {
 		if maxLen <= 3 {
-			return s[:maxLen]
+			return string(runes[:maxLen])
 		}
-		return s[:maxLen-3] + "..."
+		return string(runes[:maxLen-3]) + "..."
 	}
 	return PadRight(s, maxLen)
 }
 
 // TruncateID shortens an ID string without ellipsis (raw slice).
 func TruncateID(id string, maxLen int) string {
-	if len(id) <= maxLen {
+	runes := []rune(id)
+	if len(runes) <= maxLen {
 		return id
 	}
-	return id[:maxLen]
+	return string(runes[:maxLen])
 }
 
-// PadRight pads s with spaces to the given width.
+// PadRight pads s with spaces to the given width (measured in runes).
 func PadRight(s string, width int) string {
-	if width <= 0 || len(s) >= width {
+	runeLen := len([]rune(s))
+	if width <= 0 || runeLen >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-runeLen)
 }
 
 // IndentBlock indents every line of s by the given number of spaces.

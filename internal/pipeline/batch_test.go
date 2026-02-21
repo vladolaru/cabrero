@@ -17,9 +17,9 @@ func TestShortID(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"longer than 8 truncates", "abcdef1234567890", "abcdef12"},
-		{"exactly 8 unchanged", "abcdef12", "abcdef12"},
-		{"shorter than 8 unchanged", "abc", "abc"},
+		{"longer than 6 truncates", "abcdef1234567890", "abcdef"},
+		{"exactly 6 unchanged", "abcdef", "abcdef"},
+		{"shorter than 6 unchanged", "abc", "abc"},
 		{"empty string", "", ""},
 	}
 	for _, tc := range tests {
@@ -278,10 +278,10 @@ func TestProcessGroup(t *testing.T) {
 			},
 			EvalBatchFunc: func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, error) {
 				batchCalled = true
-				// Return proposals with correctly-prefixed IDs.
+				// Return proposals with correctly-prefixed IDs (first 6 chars of session ID).
 				return &EvaluatorOutput{Proposals: []Proposal{
-					{ID: "prop-batcheva-0", Type: "skill_improvement", Confidence: "high", Rationale: "t"},
-					{ID: "prop-batcheva-1", Type: "skill_improvement", Confidence: "high", Rationale: "t"},
+					{ID: "prop-batche-0", Type: "skill_improvement", Confidence: "high", Rationale: "t"},
+					{ID: "prop-batche-1", Type: "skill_improvement", Confidence: "high", Rationale: "t"},
 				}}, nil
 			},
 		}

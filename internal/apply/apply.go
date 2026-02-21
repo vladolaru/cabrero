@@ -91,9 +91,8 @@ func Commit(proposal *pipeline.Proposal, blendedContent string) error {
 
 // Archive moves a proposal from proposals/ to proposals/archived/.
 func Archive(proposalID string, reason string) error {
-	// Reject IDs with path separators or directory traversal components.
-	if strings.ContainsAny(proposalID, "/\\") || proposalID == ".." || strings.Contains(proposalID, "..") {
-		return fmt.Errorf("invalid proposal ID: %q", proposalID)
+	if err := pipeline.ValidateProposalID(proposalID); err != nil {
+		return err
 	}
 
 	srcDir := filepath.Join(store.Root(), "proposals")
@@ -127,7 +126,7 @@ func Archive(proposalID string, reason string) error {
 		return fmt.Errorf("marshaling archived proposal: %w", err)
 	}
 
-	if err := os.WriteFile(dst, annotated, 0o644); err != nil {
+	if err := store.AtomicWrite(dst, annotated, 0o644); err != nil {
 		return fmt.Errorf("writing archived proposal: %w", err)
 	}
 

@@ -6,9 +6,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vladolaru/cabrero/internal/store"
 )
+
+// ValidateProposalID rejects IDs containing path separators or directory
+// traversal components to prevent path traversal attacks.
+func ValidateProposalID(id string) error {
+	if strings.ContainsAny(id, "/\\") || strings.Contains(id, "..") {
+		return fmt.Errorf("invalid proposal ID: %q", id)
+	}
+	return nil
+}
 
 // --- Classifier output types ---
 
@@ -147,6 +157,9 @@ func ReadEvaluatorOutput(sessionID string) (*EvaluatorOutput, error) {
 
 // WriteProposal writes a single proposal to the proposals directory.
 func WriteProposal(p *Proposal, sessionID string) error {
+	if err := ValidateProposalID(p.ID); err != nil {
+		return err
+	}
 	dir := filepath.Join(store.Root(), "proposals")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -166,7 +179,7 @@ func WriteProposal(p *Proposal, sessionID string) error {
 	}
 
 	path := filepath.Join(dir, p.ID+".json")
-	return os.WriteFile(path, data, 0o644)
+	return store.AtomicWrite(path, data, 0o644)
 }
 
 // ListProposals returns all proposal files from the proposals directory.
@@ -207,6 +220,9 @@ type ProposalWithSession struct {
 
 // ReadProposal reads a single proposal by ID.
 func ReadProposal(proposalID string) (*ProposalWithSession, error) {
+	if err := ValidateProposalID(proposalID); err != nil {
+		return nil, err
+	}
 	path := filepath.Join(store.Root(), "proposals", proposalID+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -228,7 +244,7 @@ func writeEvaluation(filename string, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, filename), data, 0o644)
+	return store.AtomicWrite(filepath.Join(dir, filename), data, 0o644)
 }
 
 func evaluationPath(filename string) string {

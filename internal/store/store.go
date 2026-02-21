@@ -55,12 +55,50 @@ func RawDir(sessionID string) string {
 	return filepath.Join(Root(), "raw", sessionID)
 }
 
+// AtomicWrite writes data to path using a temp file + rename to prevent
+// partial writes on crash. The temp file is created in the same directory
+// as path to ensure the rename is atomic (same filesystem).
+func AtomicWrite(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("writing temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("closing temp file: %w", err)
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("setting permissions: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("renaming temp file: %w", err)
+	}
+	return nil
+}
+
 // --- blocklist --------------------------------------------------------
 
 var blocklistMu sync.Mutex
 
 func blocklistPath() string {
 	return filepath.Join(Root(), "blocklist.json")
+}
+
+// ReadBlocklist returns the set of blocked session IDs.
+// Callers can use the returned map to batch-check multiple sessions without
+// repeated disk reads.
+func ReadBlocklist() (map[string]bool, error) {
+	return readBlocklist()
 }
 
 func readBlocklist() (map[string]bool, error) {
@@ -92,7 +130,7 @@ func writeBlocklist(m map[string]bool) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(blocklistPath(), data, 0o644)
+	return AtomicWrite(blocklistPath(), data, 0o644)
 }
 
 // BlockSession adds a session ID to the blocklist so Cabrero never
