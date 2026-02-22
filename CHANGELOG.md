@@ -5,6 +5,25 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `cabrero prompts` — list prompt files with name, version, last-modified time,
+  and path to the prompt file on disk.
+- `cabrero replay` — re-run pipeline on past sessions with alternate prompt files.
+  Supports `--stage` (classifier/evaluator, inferred from filename), `--compare`
+  for diffing against original decisions, `--calibration` for batch regression
+  testing against the calibration set, and model/timeout overrides.
+- `cabrero calibrate` — manage calibration set for prompt regression testing.
+  Subcommands: `tag` (with `--label approve|reject` and optional `--note`),
+  `untag`, and `list`.
+- `~/.cabrero/replays/` directory for replay output persistence (meta.json,
+  classifier.json, evaluator.json per replay).
+- `~/.cabrero/calibration.json` for calibration set storage.
+- `RunClassifierWithPrompt` / `RunEvaluatorWithPrompt` pipeline helpers for
+  prompt override without code duplication.
+
 ## [0.12.1] - 2026-02-22
 
 ### Added

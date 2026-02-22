@@ -164,6 +164,12 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
   prompts/
     classifier-v3.txt        # Classifier stage prompt (v3: agentic with Read/Grep, triage, turn budget)
     evaluator-v3.txt         # Evaluator stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
+  replays/
+    {replayId}/
+      meta.json              # replay metadata (session, stage, prompt, original decision)
+      classifier.json        # classifier output (when classifier was replayed)
+      evaluator.json         # evaluator output (when evaluator was replayed)
+  calibration.json           # calibration set: sessions tagged as ground-truth examples
   config.json                # TUI and daemon settings (debug toggle, navigation, theme, model overrides, etc.)
   blocklist.json             # session IDs to never process (loop prevention)
   run_history.jsonl          # append-only pipeline run history (one JSON object per line)
@@ -708,9 +714,24 @@ cabrero daemon                  Run background session processor (for launchd)
   --classifier-timeout <duration> Timeout for Classifier (default 2m)
   --evaluator-timeout <duration>  Timeout for Evaluator (default 5m)
 cabrero replay                  Re-run pipeline with a different prompt against a past session
-  --session <id>
-  --prompt <path>
-  --compare                     Diff new output against original and show your decision
+  --session <id>                  Session to replay (required unless --calibration)
+  --prompt <path>                 Path to alternate prompt file (required)
+  --stage classifier|evaluator    Override stage (default: infer from prompt filename)
+  --compare                       Diff new output against original decision
+  --calibration                   Replay against all sessions in calibration set
+  --debug                         Persist CC sessions for inspection
+  --classifier-model <model>      Override classifier model
+  --evaluator-model <model>       Override evaluator model
+  --classifier-max-turns <int>    Max agentic turns for Classifier
+  --evaluator-max-turns <int>     Max agentic turns for Evaluator
+  --classifier-timeout <duration> Timeout for Classifier
+  --evaluator-timeout <duration>  Timeout for Evaluator
+cabrero calibrate               Manage calibration set for prompt regression testing
+  tag <session_id>                Tag a session as calibration example
+    --label approve|reject          Expected outcome (required)
+    --note "text"                   Optional note
+  untag <session_id>              Remove from calibration set
+  list                            List calibration entries
 cabrero prompts                 List prompt files with current versions
 cabrero doctor                  Diagnose issues and auto-fix problems
   --fix                           Auto-fix all fixable issues without prompting
@@ -1021,9 +1042,13 @@ for the full design specification.
 18. **Log viewer** — full-screen scrollable log with search, follow mode,
     auto-refresh via polling
 
-**Phase 5 — Iteration tooling**
+**Phase 5 — Iteration tooling** ✓
 
-19. **`cabrero replay`** — re-run pipeline against past session with alternate prompt,
-    compare against original output and recorded decision
-20. **Calibration set tagging** — mark proposals as canonical examples for regression
-    testing new prompt versions
+19. **`cabrero prompts`** — lists prompt files with name, version, last-modified time, and path
+20. **`cabrero replay`** — re-runs pipeline on past sessions with alternate prompts,
+    `--compare` mode for diffing against original decisions, `--calibration` mode for
+    batch regression testing against the calibration set. Refactored Classifier and Evaluator
+    to support prompt overrides via `RunClassifierWithPrompt` / `RunEvaluatorWithPrompt`.
+21. **`cabrero calibrate`** — manages calibration set: tag/untag sessions as ground-truth
+    examples (approve/reject labels with optional notes) for prompt regression testing.
+    Stored at `~/.cabrero/calibration.json`.
