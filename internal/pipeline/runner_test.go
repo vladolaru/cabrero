@@ -537,7 +537,9 @@ func TestRunOne_Evaluate_WritesHistory(t *testing.T) {
 	sid := "hist-eval00000001"
 	createBatchSession(t, sid)
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	cfg := DefaultPipelineConfig()
+	cfg.Logger = &discardLogger{}
+	r := NewRunner(cfg)
 	r.Source = "daemon"
 	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
 		return &parser.Digest{SessionID: sessionID}, nil

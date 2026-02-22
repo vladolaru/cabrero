@@ -56,7 +56,7 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 	allowedTools := evaluatorAllowedTools(digest.Shape.Cwd)
 
 	cr, err := invokeClaude(claudeConfig{
-		Model:          DefaultEvaluatorModel,
+		Model:          cfg.EvaluatorModel,
 		SystemPrompt:   systemPrompt,
 		Effort:         "high",
 		Agentic:        true,
@@ -148,7 +148,7 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	allowedTools := evaluatorAllowedTools(sessions[0].Digest.Shape.Cwd)
 
 	cr, err := invokeClaude(claudeConfig{
-		Model:          DefaultEvaluatorModel,
+		Model:          cfg.EvaluatorModel,
 		SystemPrompt:   systemPrompt,
 		Effort:         "high",
 		Agentic:        true,

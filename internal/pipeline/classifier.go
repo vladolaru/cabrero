@@ -51,7 +51,7 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 	allowedTools := fmt.Sprintf("Read(//%s/**),Grep(//%s/**)", cabreroRoot, cabreroRoot)
 
 	cr, err := invokeClaude(claudeConfig{
-		Model:          DefaultClassifierModel,
+		Model:          cfg.ClassifierModel,
 		SystemPrompt:   systemPrompt,
 		Agentic:        true,
 		Prompt:         data,
