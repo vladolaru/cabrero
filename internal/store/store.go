@@ -27,6 +27,7 @@ var subdirs = []string{
 	"prompts",
 	"evaluations",
 	"proposals",
+	"replays",
 }
 
 // Init creates the ~/.cabrero/ directory tree if it doesn't exist.
@@ -53,6 +54,16 @@ func Init() error {
 // RawDir returns the path to a session's raw backup directory.
 func RawDir(sessionID string) string {
 	return filepath.Join(Root(), "raw", sessionID)
+}
+
+// ReplayDir returns the path to the replays directory.
+func ReplayDir() string {
+	return filepath.Join(Root(), "replays")
+}
+
+// ArchivedProposalsDir returns the path to the archived proposals directory.
+func ArchivedProposalsDir() string {
+	return filepath.Join(Root(), "proposals", "archived")
 }
 
 // AtomicWrite writes data to path using a temp file + rename to prevent
