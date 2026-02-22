@@ -187,9 +187,11 @@ func (d *Daemon) processQueued(ctx context.Context) {
 		d.processProjectBatch(ctx, project, sessions)
 	}
 
-	// Notify when queue is fully drained.
-	if err := Notify("Cabrero", "Queue processing complete"); err != nil {
-		d.log.Error("queue-drain notification failed: %v", err)
+	// Re-scan before notifying — new sessions may have arrived during processing.
+	if remaining, err := ScanQueued(); err == nil && len(remaining) == 0 {
+		if err := Notify("Cabrero", "Queue processing complete"); err != nil {
+			d.log.Error("queue-drain notification failed: %v", err)
+		}
 	}
 }
 
