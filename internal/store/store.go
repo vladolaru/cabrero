@@ -177,6 +177,26 @@ func ReadDebugFlag() bool {
 	return cfg.Debug
 }
 
+// ModelConfig holds optional model overrides from config.json.
+type ModelConfig struct {
+	ClassifierModel string `json:"classifierModel"`
+	EvaluatorModel  string `json:"evaluatorModel"`
+}
+
+// ReadModelConfig reads model overrides from ~/.cabrero/config.json.
+// Returns zero-value fields for missing file, malformed JSON, or absent keys.
+func ReadModelConfig() ModelConfig {
+	data, err := os.ReadFile(filepath.Join(Root(), "config.json"))
+	if err != nil {
+		return ModelConfig{}
+	}
+	var cfg ModelConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return ModelConfig{}
+	}
+	return cfg
+}
+
 // BlocklistLen returns the number of entries in the blocklist.
 func BlocklistLen() int {
 	blocklistMu.Lock()

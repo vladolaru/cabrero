@@ -7,6 +7,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/patterns"
+	"github.com/vladolaru/cabrero/internal/store"
 )
 
 // Logger receives pipeline progress and diagnostic messages.
@@ -35,6 +36,8 @@ func (discardLogger) Error(string, ...any) {}
 
 // PipelineConfig controls LLM invocation parameters.
 type PipelineConfig struct {
+	ClassifierModel    string
+	EvaluatorModel     string
 	ClassifierMaxTurns int
 	EvaluatorMaxTurns  int
 	ClassifierTimeout  time.Duration
@@ -52,8 +55,20 @@ func (c PipelineConfig) logger() Logger {
 }
 
 // DefaultPipelineConfig returns production defaults.
+// Model names are resolved: config.json override → compile-time default.
 func DefaultPipelineConfig() PipelineConfig {
+	models := store.ReadModelConfig()
+	classifierModel := DefaultClassifierModel
+	if models.ClassifierModel != "" {
+		classifierModel = models.ClassifierModel
+	}
+	evaluatorModel := DefaultEvaluatorModel
+	if models.EvaluatorModel != "" {
+		evaluatorModel = models.EvaluatorModel
+	}
 	return PipelineConfig{
+		ClassifierModel:    classifierModel,
+		EvaluatorModel:     evaluatorModel,
 		ClassifierMaxTurns: 15,
 		EvaluatorMaxTurns:  20,
 		ClassifierTimeout:  2 * time.Minute,
