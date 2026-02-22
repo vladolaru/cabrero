@@ -242,6 +242,82 @@ func TestBuildClaudeArgs_FullIsolation(t *testing.T) {
 	assertHasFlag(t, args, "--no-session-persistence")
 }
 
+// --- cleanLLMJSON tests ---
+
+func TestCleanLLMJSON_PlainJSON(t *testing.T) {
+	input := `{"triage": "evaluate"}`
+	got := cleanLLMJSON(input)
+	if got != input {
+		t.Errorf("cleanLLMJSON(%q) = %q, want %q", input, got, input)
+	}
+}
+
+func TestCleanLLMJSON_MarkdownFence(t *testing.T) {
+	input := "```json\n{\"triage\": \"evaluate\"}\n```"
+	want := `{"triage": "evaluate"}`
+	got := cleanLLMJSON(input)
+	if got != want {
+		t.Errorf("cleanLLMJSON = %q, want %q", got, want)
+	}
+}
+
+func TestCleanLLMJSON_ProseBeforeJSON(t *testing.T) {
+	input := "Based on my analysis of the session, here is my classification:\n\n{\"triage\": \"evaluate\", \"version\": 2}"
+	want := `{"triage": "evaluate", "version": 2}`
+	got := cleanLLMJSON(input)
+	if got != want {
+		t.Errorf("cleanLLMJSON = %q, want %q", got, want)
+	}
+}
+
+func TestCleanLLMJSON_ProseWithEmbeddedFence(t *testing.T) {
+	input := "I have analyzed the session. Here is my output:\n\n```json\n{\"triage\": \"clean\"}\n```\n"
+	want := `{"triage": "clean"}`
+	got := cleanLLMJSON(input)
+	if got != want {
+		t.Errorf("cleanLLMJSON = %q, want %q", got, want)
+	}
+}
+
+func TestCleanLLMJSON_ProseWithEmbeddedBareFence(t *testing.T) {
+	input := "Here is the result:\n\n```\n{\"version\": 2}\n```"
+	want := `{"version": 2}`
+	got := cleanLLMJSON(input)
+	if got != want {
+		t.Errorf("cleanLLMJSON = %q, want %q", got, want)
+	}
+}
+
+func TestCleanLLMJSON_WhitespaceAroundJSON(t *testing.T) {
+	input := "  \n  {\"triage\": \"evaluate\"}  \n  "
+	want := `{"triage": "evaluate"}`
+	got := cleanLLMJSON(input)
+	if got != want {
+		t.Errorf("cleanLLMJSON = %q, want %q", got, want)
+	}
+}
+
+func TestCleanLLMJSON_ProseAfterJSON(t *testing.T) {
+	input := "{\"triage\": \"clean\"}\n\nThis completes the analysis."
+	// The last '}' is the one in the JSON, so brace matching should work.
+	got := cleanLLMJSON(input)
+	if !strings.HasPrefix(got, "{") {
+		t.Errorf("cleanLLMJSON should start with '{', got %q", got)
+	}
+	if !strings.Contains(got, `"triage"`) {
+		t.Errorf("cleanLLMJSON should contain triage field, got %q", got)
+	}
+}
+
+func TestCleanLLMJSON_NoBraces(t *testing.T) {
+	input := "No JSON here at all"
+	got := cleanLLMJSON(input)
+	// Should return as-is when no JSON found.
+	if got != input {
+		t.Errorf("cleanLLMJSON = %q, want %q (passthrough)", got, input)
+	}
+}
+
 // --- evaluatorAllowedTools tests ---
 
 func TestEvaluatorAllowedTools_NilCwd(t *testing.T) {

@@ -292,7 +292,8 @@ func parseClaudeJSON(data []byte) (*ClaudeResult, error) {
 	}, nil
 }
 
-// cleanLLMJSON strips markdown code fences and whitespace from LLM output.
+// cleanLLMJSON extracts a JSON object from LLM output, handling markdown code
+// fences and prose preambles that some models emit before the actual JSON.
 func cleanLLMJSON(raw string) string {
 	s := strings.TrimSpace(raw)
 
@@ -309,7 +310,50 @@ func cleanLLMJSON(raw string) string {
 		s = strings.TrimSpace(s)
 	}
 
-	return s
+	// If it already starts with '{', we're done.
+	if strings.HasPrefix(s, "{") {
+		return s
+	}
+
+	// LLMs sometimes emit prose before the JSON object (e.g. "Based on my
+	// analysis, here is the classification:"). Look for a markdown fence
+	// embedded in the prose, or failing that, the first '{'.
+
+	// Check for an embedded ```json ... ``` block within the prose.
+	if fenceStart := strings.Index(s, "```json"); fenceStart != -1 {
+		inner := s[fenceStart+len("```json"):]
+		if nl := strings.Index(inner, "\n"); nl != -1 {
+			inner = inner[nl+1:]
+		}
+		if fenceEnd := strings.Index(inner, "```"); fenceEnd != -1 {
+			inner = inner[:fenceEnd]
+		}
+		inner = strings.TrimSpace(inner)
+		if strings.HasPrefix(inner, "{") {
+			return inner
+		}
+	}
+	if fenceStart := strings.Index(s, "```\n"); fenceStart != -1 {
+		inner := s[fenceStart+len("```\n"):]
+		if fenceEnd := strings.Index(inner, "```"); fenceEnd != -1 {
+			inner = inner[:fenceEnd]
+		}
+		inner = strings.TrimSpace(inner)
+		if strings.HasPrefix(inner, "{") {
+			return inner
+		}
+	}
+
+	// Last resort: find the first '{' and match to the last '}'.
+	braceStart := strings.Index(s, "{")
+	if braceStart == -1 {
+		return s // no JSON object found; return as-is for the caller to report
+	}
+	braceEnd := strings.LastIndex(s, "}")
+	if braceEnd == -1 || braceEnd < braceStart {
+		return s
+	}
+	return s[braceStart : braceEnd+1]
 }
 
 func truncateForLog(s string, max int) string {
