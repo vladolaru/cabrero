@@ -142,26 +142,26 @@ func createBatchSession(t *testing.T, sessionID string) BatchSession {
 
 // --- Fake classify/eval functions ---
 
-func fakeClassifyClean(sessionID string, cfg PipelineConfig) (*ClassifierResult, error) {
+func fakeClassifyClean(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
 	return &ClassifierResult{
 		Digest:           &parser.Digest{SessionID: sessionID},
 		ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "clean"},
-	}, nil
+	}, nil, nil
 }
 
-func fakeClassifyEvaluate(sessionID string, cfg PipelineConfig) (*ClassifierResult, error) {
+func fakeClassifyEvaluate(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
 	return &ClassifierResult{
 		Digest:           &parser.Digest{SessionID: sessionID},
 		ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate"},
-	}, nil
+	}, nil, nil
 }
 
-func fakeEvalNoProposals(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, error) {
-	return &EvaluatorOutput{SessionID: sessionID, Proposals: []Proposal{}}, nil
+func fakeEvalNoProposals(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+	return &EvaluatorOutput{SessionID: sessionID, Proposals: []Proposal{}}, nil, nil
 }
 
-func fakeEvalWithProposals(n int) func(string, *parser.Digest, *ClassifierOutput, PipelineConfig) (*EvaluatorOutput, error) {
-	return func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, error) {
+func fakeEvalWithProposals(n int) func(string, *parser.Digest, *ClassifierOutput, PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+	return func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
 		proposals := make([]Proposal, n)
 		for i := range proposals {
 			proposals[i] = Proposal{
@@ -171,7 +171,7 @@ func fakeEvalWithProposals(n int) func(string, *parser.Digest, *ClassifierOutput
 				Rationale:  "test",
 			}
 		}
-		return &EvaluatorOutput{SessionID: sessionID, Proposals: proposals}, nil
+		return &EvaluatorOutput{SessionID: sessionID, Proposals: proposals}, nil, nil
 	}
 }
 

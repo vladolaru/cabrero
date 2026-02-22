@@ -81,11 +81,11 @@ func setupTestDaemon(t *testing.T) (*Daemon, *notifySpy) {
 	t.Cleanup(func() { d.log.Close() })
 
 	// Inject fake classifier that marks everything as clean.
-	d.runner.ClassifyFunc = func(sessionID string, cfg pipeline.PipelineConfig) (*pipeline.ClassifierResult, error) {
+	d.runner.ClassifyFunc = func(sessionID string, cfg pipeline.PipelineConfig) (*pipeline.ClassifierResult, *pipeline.ClaudeResult, error) {
 		return &pipeline.ClassifierResult{
 			Digest:           &parser.Digest{SessionID: sessionID},
 			ClassifierOutput: &pipeline.ClassifierOutput{SessionID: sessionID, Triage: "clean"},
-		}, nil
+		}, nil, nil
 	}
 
 	spy := &notifySpy{}
@@ -139,7 +139,7 @@ func TestProcessQueued_NoNotifyWhenQueueStillHasSessions(t *testing.T) {
 	// queued session into the store before the second one finishes —
 	// simulating a hook capture arriving during processing.
 	callCount := 0
-	d.runner.ClassifyFunc = func(sessionID string, cfg pipeline.PipelineConfig) (*pipeline.ClassifierResult, error) {
+	d.runner.ClassifyFunc = func(sessionID string, cfg pipeline.PipelineConfig) (*pipeline.ClassifierResult, *pipeline.ClaudeResult, error) {
 		callCount++
 		if callCount == 2 {
 			// A new session arrives while we're still processing.
@@ -148,7 +148,7 @@ func TestProcessQueued_NoNotifyWhenQueueStillHasSessions(t *testing.T) {
 		return &pipeline.ClassifierResult{
 			Digest:           &parser.Digest{SessionID: sessionID},
 			ClassifierOutput: &pipeline.ClassifierOutput{SessionID: sessionID, Triage: "clean"},
-		}, nil
+		}, nil, nil
 	}
 
 	d.processQueued(context.Background())

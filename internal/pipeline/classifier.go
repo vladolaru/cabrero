@@ -20,15 +20,16 @@ const ClassifierModel = "claude-haiku-4-5"
 // RunClassifier constructs the prompt, invokes the Classifier via the claude CLI,
 // validates the output, and returns the parsed result.
 // The patterns parameter is optional cross-session aggregator output; pass nil if unavailable.
-func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput, cfg PipelineConfig) (*ClassifierOutput, error) {
+// Returns the ClaudeResult alongside the parsed output for usage tracking.
+func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput, cfg PipelineConfig) (*ClassifierOutput, *ClaudeResult, error) {
 	systemPrompt, err := readPromptTemplate(classifierPromptFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading classifier prompt: %w", err)
+		return nil, nil, fmt.Errorf("reading classifier prompt: %w", err)
 	}
 
 	digestJSON, err := json.MarshalIndent(digest, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshalling digest: %w", err)
+		return nil, nil, fmt.Errorf("marshalling digest: %w", err)
 	}
 
 	// Inject turn budget into the prompt template.
@@ -49,7 +50,7 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 	cabreroRoot := store.Root()
 	allowedTools := fmt.Sprintf("Read(//%s/**),Grep(//%s/**)", cabreroRoot, cabreroRoot)
 
-	stdout, err := invokeClaude(claudeConfig{
+	cr, err := invokeClaude(claudeConfig{
 		Model:          ClassifierModel,
 		SystemPrompt:   systemPrompt,
 		Agentic:        true,
@@ -63,13 +64,13 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 		SettingSources: &emptyStr,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invoking classifier: %w", err)
+		return nil, cr, fmt.Errorf("invoking classifier: %w", err)
 	}
 
 	// Parse JSON output (instructed via system prompt, cleaned defensively).
-	output, err := parseClassifierOutput(stdout)
+	output, err := parseClassifierOutput(cr.Result)
 	if err != nil {
-		return nil, fmt.Errorf("parsing classifier output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
+		return nil, cr, fmt.Errorf("parsing classifier output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
 	}
 
 	output.SessionID = sessionID
@@ -82,10 +83,10 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 
 	// Validate cited UUIDs.
 	if err := validateClassifierUUIDs(sessionID, output, cfg.logger()); err != nil {
-		return nil, err
+		return nil, cr, err
 	}
 
-	return output, nil
+	return output, cr, nil
 }
 
 func parseClassifierOutput(raw string) (*ClassifierOutput, error) {

@@ -28,20 +28,21 @@ type BatchSession struct {
 
 // RunEvaluator constructs the prompt, invokes the Evaluator via the claude CLI,
 // validates the output, and returns the parsed result.
-func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, error) {
+// Returns the ClaudeResult alongside the parsed output for usage tracking.
+func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
 	systemPrompt, err := readPromptTemplate(evaluatorPromptFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading evaluator prompt: %w", err)
+		return nil, nil, fmt.Errorf("reading evaluator prompt: %w", err)
 	}
 
 	classifierJSON, err := json.MarshalIndent(classifierOutput, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshalling classifier output: %w", err)
+		return nil, nil, fmt.Errorf("marshalling classifier output: %w", err)
 	}
 
 	digestJSON, err := json.MarshalIndent(digest, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshalling digest: %w", err)
+		return nil, nil, fmt.Errorf("marshalling digest: %w", err)
 	}
 
 	// System prompt goes via --system-prompt; data goes as the -p prompt.
@@ -54,7 +55,7 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 	// Scope filesystem access: ~/.cabrero + project dir + ~/.claude.
 	allowedTools := evaluatorAllowedTools(digest.Shape.Cwd)
 
-	stdout, err := invokeClaude(claudeConfig{
+	cr, err := invokeClaude(claudeConfig{
 		Model:          EvaluatorModel,
 		SystemPrompt:   systemPrompt,
 		Effort:         "high",
@@ -69,13 +70,13 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 		SettingSources: &emptyStr,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invoking evaluator: %w", err)
+		return nil, cr, fmt.Errorf("invoking evaluator: %w", err)
 	}
 
 	// Parse JSON output (instructed via system prompt, cleaned defensively).
-	output, err := parseEvaluatorOutput(stdout)
+	output, err := parseEvaluatorOutput(cr.Result)
 	if err != nil {
-		return nil, fmt.Errorf("parsing evaluator output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
+		return nil, cr, fmt.Errorf("parsing evaluator output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
 	}
 
 	output.SessionID = sessionID
@@ -83,23 +84,24 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 	output.ClassifierPromptVersion = classifierOutput.PromptVersion
 
 	if err := validateEvaluatorOutput(sessionID, output, classifierOutput, cfg.logger()); err != nil {
-		return nil, err
+		return nil, cr, err
 	}
 
-	return output, nil
+	return output, cr, nil
 }
 
 // RunEvaluatorBatch evaluates multiple sessions in a single Evaluator invocation.
 // Each session's Classifier output and digest are included as indexed entries.
 // Max turns and timeout scale with batch size, capped at 60 turns and 15 minutes.
-func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, error) {
+// Returns the ClaudeResult alongside the parsed output for usage tracking.
+func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
 	if len(sessions) == 0 {
-		return nil, fmt.Errorf("RunEvaluatorBatch called with zero sessions")
+		return nil, nil, fmt.Errorf("RunEvaluatorBatch called with zero sessions")
 	}
 
 	systemPrompt, err := readPromptTemplate(evaluatorPromptFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading evaluator prompt: %w", err)
+		return nil, nil, fmt.Errorf("reading evaluator prompt: %w", err)
 	}
 
 	// Build batch prompt with indexed session data.
@@ -110,12 +112,12 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	for i, s := range sessions {
 		classifierJSON, err := json.MarshalIndent(s.ClassifierOutput, "", "  ")
 		if err != nil {
-			return nil, fmt.Errorf("marshalling classifier output for session %d: %w", i, err)
+			return nil, nil, fmt.Errorf("marshalling classifier output for session %d: %w", i, err)
 		}
 
 		digestJSON, err := json.MarshalIndent(s.Digest, "", "  ")
 		if err != nil {
-			return nil, fmt.Errorf("marshalling digest for session %d: %w", i, err)
+			return nil, nil, fmt.Errorf("marshalling digest for session %d: %w", i, err)
 		}
 
 		dataBuilder.WriteString(fmt.Sprintf("<session index=\"%d\" id=\"%s\">\n", i+1, s.SessionID))
@@ -145,7 +147,7 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	// Scope filesystem access: use first session's cwd (all sessions share the same project).
 	allowedTools := evaluatorAllowedTools(sessions[0].Digest.Shape.Cwd)
 
-	stdout, err := invokeClaude(claudeConfig{
+	cr, err := invokeClaude(claudeConfig{
 		Model:          EvaluatorModel,
 		SystemPrompt:   systemPrompt,
 		Effort:         "high",
@@ -160,12 +162,12 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 		SettingSources: &emptyStr,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invoking evaluator batch: %w", err)
+		return nil, cr, fmt.Errorf("invoking evaluator batch: %w", err)
 	}
 
-	output, err := parseEvaluatorOutput(stdout)
+	output, err := parseEvaluatorOutput(cr.Result)
 	if err != nil {
-		return nil, fmt.Errorf("parsing evaluator batch output: %w\nRaw output:\n%s", err, truncateForLog(stdout, 500))
+		return nil, cr, fmt.Errorf("parsing evaluator batch output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
 	}
 
 	// Set metadata from the first session (batch output covers multiple sessions).
@@ -175,10 +177,10 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 
 	// Validate: build combined skill set and UUID set from all sessions.
 	if err := validateEvaluatorBatchOutput(sessions, output, cfg.logger()); err != nil {
-		return nil, err
+		return nil, cr, err
 	}
 
-	return output, nil
+	return output, cr, nil
 }
 
 // validateEvaluatorBatchOutput validates proposals against all sessions in the batch.

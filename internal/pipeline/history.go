@@ -11,6 +11,38 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
+// InvocationUsage captures token consumption and cost for one LLM invocation.
+type InvocationUsage struct {
+	CCSessionID         string  `json:"cc_session_id,omitempty"`   // CC session ID for cross-referencing
+	NumTurns            int     `json:"num_turns"`                 // actual agentic turns
+	InputTokens         int     `json:"input_tokens"`
+	OutputTokens        int     `json:"output_tokens"`
+	CacheCreationTokens int     `json:"cache_creation_tokens"`
+	CacheReadTokens     int     `json:"cache_read_tokens"`
+	CostUSD             float64 `json:"cost_usd"`
+	WebSearchRequests   int     `json:"web_search_requests,omitempty"`
+	WebFetchRequests    int     `json:"web_fetch_requests,omitempty"`
+}
+
+// usageFromResult converts a ClaudeResult into an InvocationUsage.
+// Returns nil if cr is nil.
+func usageFromResult(cr *ClaudeResult) *InvocationUsage {
+	if cr == nil {
+		return nil
+	}
+	return &InvocationUsage{
+		CCSessionID:         cr.SessionID,
+		NumTurns:            cr.NumTurns,
+		InputTokens:         cr.InputTokens,
+		OutputTokens:        cr.OutputTokens,
+		CacheCreationTokens: cr.CacheCreationTokens,
+		CacheReadTokens:     cr.CacheReadTokens,
+		CostUSD:             cr.TotalCostUSD,
+		WebSearchRequests:   cr.WebSearchRequests,
+		WebFetchRequests:    cr.WebFetchRequests,
+	}
+}
+
 // HistoryRecord captures the full diagnostic context of a single pipeline run.
 // One record per session processed (batch runs emit one record per session).
 type HistoryRecord struct {
@@ -47,6 +79,15 @@ type HistoryRecord struct {
 	ClassifierPromptVersion string `json:"classifier_prompt_version"`           // e.g. "classifier-v3"
 	EvaluatorPromptVersion  string `json:"evaluator_prompt_version,omitempty"`
 
+	// Per-stage LLM usage (nil when stage was skipped or errored before invocation).
+	ClassifierUsage *InvocationUsage `json:"classifier_usage,omitempty"`
+	EvaluatorUsage  *InvocationUsage `json:"evaluator_usage,omitempty"`
+
+	// Totals across all stages.
+	TotalCostUSD      float64 `json:"total_cost_usd"`
+	TotalInputTokens  int     `json:"total_input_tokens"`
+	TotalOutputTokens int     `json:"total_output_tokens"`
+
 	// Config at invocation time (for detecting non-default settings).
 	ClassifierMaxTurns  int   `json:"classifier_max_turns"`
 	EvaluatorMaxTurns   int   `json:"evaluator_max_turns"`
@@ -73,6 +114,23 @@ func (r HistoryRecord) EvaluatorDuration() time.Duration {
 // TotalDuration returns the total pipeline run duration.
 func (r HistoryRecord) TotalDuration() time.Duration {
 	return time.Duration(r.TotalDurationNs)
+}
+
+// computeUsageTotals sets the total cost, input tokens, and output tokens
+// from the per-stage usage fields.
+func (r *HistoryRecord) computeUsageTotals() {
+	var cost float64
+	var input, output int
+	for _, u := range []*InvocationUsage{r.ClassifierUsage, r.EvaluatorUsage} {
+		if u != nil {
+			cost += u.CostUSD
+			input += u.InputTokens
+			output += u.OutputTokens
+		}
+	}
+	r.TotalCostUSD = cost
+	r.TotalInputTokens = input
+	r.TotalOutputTokens = output
 }
 
 var historyMu sync.Mutex

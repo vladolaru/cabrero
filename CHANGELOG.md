@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Token usage tracking in pipeline history** — each run history record now captures
+  per-stage token consumption, cost, and CC session IDs via `--output-format json`
+  from the `claude` CLI. New `InvocationUsage` struct records input/output tokens,
+  cache creation/read tokens, cost, turn count, and web search/fetch request counts.
+  Per-stage fields (`classifier_usage`, `evaluator_usage`) and totals
+  (`total_cost_usd`, `total_input_tokens`, `total_output_tokens`) are added to
+  `HistoryRecord`. Batch evaluator usage is split equally among sessions in the chunk.
+  Usage is captured even on CC-level errors for partial observability.
+
 ## [0.11.0] - 2026-02-22
 
 ### Added

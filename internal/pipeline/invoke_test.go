@@ -20,7 +20,7 @@ func TestBuildClaudeArgs_AgenticBaseline(t *testing.T) {
 	assertContains(t, args, "--model", "claude-haiku-4-5")
 	assertContains(t, args, "-p", "classify this")
 	assertContains(t, args, "--system-prompt", "You are a classifier.")
-	assertContains(t, args, "--output-format", "text")
+	assertContains(t, args, "--output-format", "json")
 	assertHasFlag(t, args, "--disable-slash-commands")
 	assertHasFlag(t, args, "--no-session-persistence")
 
@@ -370,6 +370,414 @@ func TestGenerateUUID_Uniqueness(t *testing.T) {
 			t.Fatalf("duplicate UUID at iteration %d: %s", i, uuid)
 		}
 		seen[uuid] = true
+	}
+}
+
+// --- parseClaudeJSON tests ---
+
+func TestParseClaudeJSON_Success(t *testing.T) {
+	jsonData := `{
+		"type": "result",
+		"subtype": "success",
+		"is_error": false,
+		"result": "{\"triage\": \"evaluate\"}",
+		"session_id": "abc-123-def",
+		"num_turns": 5,
+		"duration_ms": 12345,
+		"duration_api_ms": 9000,
+		"total_cost_usd": 0.0234,
+		"usage": {
+			"input_tokens": 5000,
+			"output_tokens": 1500,
+			"cache_creation_input_tokens": 200,
+			"cache_read_input_tokens": 3000,
+			"server_tool_use": {
+				"web_search_requests": 0,
+				"web_fetch_requests": 0
+			}
+		}
+	}`
+
+	cr, err := parseClaudeJSON([]byte(jsonData))
+	if err != nil {
+		t.Fatalf("parseClaudeJSON: %v", err)
+	}
+
+	if cr.Result != `{"triage": "evaluate"}` {
+		t.Errorf("Result = %q, want JSON string", cr.Result)
+	}
+	if cr.SessionID != "abc-123-def" {
+		t.Errorf("SessionID = %q, want %q", cr.SessionID, "abc-123-def")
+	}
+	if cr.NumTurns != 5 {
+		t.Errorf("NumTurns = %d, want 5", cr.NumTurns)
+	}
+	if cr.DurationMs != 12345 {
+		t.Errorf("DurationMs = %d, want 12345", cr.DurationMs)
+	}
+	if cr.DurationApiMs != 9000 {
+		t.Errorf("DurationApiMs = %d, want 9000", cr.DurationApiMs)
+	}
+	if cr.TotalCostUSD != 0.0234 {
+		t.Errorf("TotalCostUSD = %f, want 0.0234", cr.TotalCostUSD)
+	}
+	if cr.InputTokens != 5000 {
+		t.Errorf("InputTokens = %d, want 5000", cr.InputTokens)
+	}
+	if cr.OutputTokens != 1500 {
+		t.Errorf("OutputTokens = %d, want 1500", cr.OutputTokens)
+	}
+	if cr.CacheCreationTokens != 200 {
+		t.Errorf("CacheCreationTokens = %d, want 200", cr.CacheCreationTokens)
+	}
+	if cr.CacheReadTokens != 3000 {
+		t.Errorf("CacheReadTokens = %d, want 3000", cr.CacheReadTokens)
+	}
+	if cr.IsError {
+		t.Error("IsError = true, want false")
+	}
+	if len(cr.Errors) != 0 {
+		t.Errorf("Errors = %v, want empty", cr.Errors)
+	}
+}
+
+func TestParseClaudeJSON_Error(t *testing.T) {
+	jsonData := `{
+		"type": "result",
+		"subtype": "error_response",
+		"is_error": true,
+		"result": "Something went wrong",
+		"session_id": "err-session-1",
+		"num_turns": 2,
+		"duration_ms": 5000,
+		"duration_api_ms": 3000,
+		"total_cost_usd": 0.005,
+		"usage": {
+			"input_tokens": 1000,
+			"output_tokens": 200,
+			"cache_creation_input_tokens": 0,
+			"cache_read_input_tokens": 0,
+			"server_tool_use": {
+				"web_search_requests": 0,
+				"web_fetch_requests": 0
+			}
+		},
+		"errors": ["rate limit exceeded", "retry later"]
+	}`
+
+	cr, err := parseClaudeJSON([]byte(jsonData))
+	if err != nil {
+		t.Fatalf("parseClaudeJSON: %v", err)
+	}
+
+	if !cr.IsError {
+		t.Error("IsError = false, want true")
+	}
+	if len(cr.Errors) != 2 {
+		t.Fatalf("Errors len = %d, want 2", len(cr.Errors))
+	}
+	if cr.Errors[0] != "rate limit exceeded" {
+		t.Errorf("Errors[0] = %q, want %q", cr.Errors[0], "rate limit exceeded")
+	}
+	// Usage should still be captured even on error.
+	if cr.InputTokens != 1000 {
+		t.Errorf("InputTokens = %d, want 1000", cr.InputTokens)
+	}
+	if cr.OutputTokens != 200 {
+		t.Errorf("OutputTokens = %d, want 200", cr.OutputTokens)
+	}
+	if cr.TotalCostUSD != 0.005 {
+		t.Errorf("TotalCostUSD = %f, want 0.005", cr.TotalCostUSD)
+	}
+}
+
+func TestParseClaudeJSON_Malformed(t *testing.T) {
+	_, err := parseClaudeJSON([]byte("not json at all"))
+	if err == nil {
+		t.Fatal("expected error for malformed input")
+	}
+	if !strings.Contains(err.Error(), "invalid claude JSON") {
+		t.Errorf("error = %q, want to contain 'invalid claude JSON'", err.Error())
+	}
+}
+
+func TestParseClaudeJSON_EmptyResult(t *testing.T) {
+	jsonData := `{
+		"type": "result",
+		"is_error": false,
+		"result": "",
+		"session_id": "empty-result",
+		"num_turns": 1,
+		"duration_ms": 100,
+		"duration_api_ms": 50,
+		"total_cost_usd": 0.001,
+		"usage": {
+			"input_tokens": 100,
+			"output_tokens": 10,
+			"cache_creation_input_tokens": 0,
+			"cache_read_input_tokens": 0,
+			"server_tool_use": {
+				"web_search_requests": 0,
+				"web_fetch_requests": 0
+			}
+		}
+	}`
+
+	cr, err := parseClaudeJSON([]byte(jsonData))
+	if err != nil {
+		t.Fatalf("parseClaudeJSON: %v", err)
+	}
+
+	if cr.Result != "" {
+		t.Errorf("Result = %q, want empty string", cr.Result)
+	}
+	if cr.InputTokens != 100 {
+		t.Errorf("InputTokens = %d, want 100", cr.InputTokens)
+	}
+}
+
+func TestParseClaudeJSON_WebSearchUsage(t *testing.T) {
+	jsonData := `{
+		"type": "result",
+		"is_error": false,
+		"result": "search results",
+		"session_id": "web-search-1",
+		"num_turns": 3,
+		"duration_ms": 8000,
+		"duration_api_ms": 6000,
+		"total_cost_usd": 0.015,
+		"usage": {
+			"input_tokens": 3000,
+			"output_tokens": 800,
+			"cache_creation_input_tokens": 0,
+			"cache_read_input_tokens": 0,
+			"server_tool_use": {
+				"web_search_requests": 2,
+				"web_fetch_requests": 3
+			}
+		}
+	}`
+
+	cr, err := parseClaudeJSON([]byte(jsonData))
+	if err != nil {
+		t.Fatalf("parseClaudeJSON: %v", err)
+	}
+
+	if cr.WebSearchRequests != 2 {
+		t.Errorf("WebSearchRequests = %d, want 2", cr.WebSearchRequests)
+	}
+	if cr.WebFetchRequests != 3 {
+		t.Errorf("WebFetchRequests = %d, want 3", cr.WebFetchRequests)
+	}
+}
+
+// --- usageFromResult tests ---
+
+func TestUsageFromResult_Nil(t *testing.T) {
+	usage := usageFromResult(nil)
+	if usage != nil {
+		t.Errorf("usageFromResult(nil) = %v, want nil", usage)
+	}
+}
+
+func TestUsageFromResult_MapsFields(t *testing.T) {
+	cr := &ClaudeResult{
+		SessionID:           "sess-123",
+		NumTurns:            5,
+		TotalCostUSD:        0.025,
+		InputTokens:         5000,
+		OutputTokens:        1500,
+		CacheCreationTokens: 200,
+		CacheReadTokens:     3000,
+		WebSearchRequests:   1,
+		WebFetchRequests:    2,
+	}
+
+	usage := usageFromResult(cr)
+	if usage == nil {
+		t.Fatal("usageFromResult returned nil for non-nil input")
+	}
+	if usage.CCSessionID != "sess-123" {
+		t.Errorf("CCSessionID = %q, want %q", usage.CCSessionID, "sess-123")
+	}
+	if usage.NumTurns != 5 {
+		t.Errorf("NumTurns = %d, want 5", usage.NumTurns)
+	}
+	if usage.CostUSD != 0.025 {
+		t.Errorf("CostUSD = %f, want 0.025", usage.CostUSD)
+	}
+	if usage.InputTokens != 5000 {
+		t.Errorf("InputTokens = %d, want 5000", usage.InputTokens)
+	}
+	if usage.OutputTokens != 1500 {
+		t.Errorf("OutputTokens = %d, want 1500", usage.OutputTokens)
+	}
+	if usage.CacheCreationTokens != 200 {
+		t.Errorf("CacheCreationTokens = %d, want 200", usage.CacheCreationTokens)
+	}
+	if usage.CacheReadTokens != 3000 {
+		t.Errorf("CacheReadTokens = %d, want 3000", usage.CacheReadTokens)
+	}
+	if usage.WebSearchRequests != 1 {
+		t.Errorf("WebSearchRequests = %d, want 1", usage.WebSearchRequests)
+	}
+	if usage.WebFetchRequests != 2 {
+		t.Errorf("WebFetchRequests = %d, want 2", usage.WebFetchRequests)
+	}
+}
+
+// --- computeUsageTotals tests ---
+
+func TestComputeUsageTotals_BothStages(t *testing.T) {
+	rec := HistoryRecord{
+		ClassifierUsage: &InvocationUsage{
+			InputTokens:  5000,
+			OutputTokens: 1500,
+			CostUSD:      0.01,
+		},
+		EvaluatorUsage: &InvocationUsage{
+			InputTokens:  10000,
+			OutputTokens: 3000,
+			CostUSD:      0.03,
+		},
+	}
+
+	rec.computeUsageTotals()
+
+	if rec.TotalInputTokens != 15000 {
+		t.Errorf("TotalInputTokens = %d, want 15000", rec.TotalInputTokens)
+	}
+	if rec.TotalOutputTokens != 4500 {
+		t.Errorf("TotalOutputTokens = %d, want 4500", rec.TotalOutputTokens)
+	}
+	if rec.TotalCostUSD != 0.04 {
+		t.Errorf("TotalCostUSD = %f, want 0.04", rec.TotalCostUSD)
+	}
+}
+
+func TestComputeUsageTotals_ClassifierOnly(t *testing.T) {
+	rec := HistoryRecord{
+		ClassifierUsage: &InvocationUsage{
+			InputTokens:  5000,
+			OutputTokens: 1500,
+			CostUSD:      0.01,
+		},
+	}
+
+	rec.computeUsageTotals()
+
+	if rec.TotalInputTokens != 5000 {
+		t.Errorf("TotalInputTokens = %d, want 5000", rec.TotalInputTokens)
+	}
+	if rec.TotalOutputTokens != 1500 {
+		t.Errorf("TotalOutputTokens = %d, want 1500", rec.TotalOutputTokens)
+	}
+	if rec.TotalCostUSD != 0.01 {
+		t.Errorf("TotalCostUSD = %f, want 0.01", rec.TotalCostUSD)
+	}
+}
+
+func TestComputeUsageTotals_NoUsage(t *testing.T) {
+	rec := HistoryRecord{}
+
+	rec.computeUsageTotals()
+
+	if rec.TotalInputTokens != 0 {
+		t.Errorf("TotalInputTokens = %d, want 0", rec.TotalInputTokens)
+	}
+	if rec.TotalOutputTokens != 0 {
+		t.Errorf("TotalOutputTokens = %d, want 0", rec.TotalOutputTokens)
+	}
+	if rec.TotalCostUSD != 0 {
+		t.Errorf("TotalCostUSD = %f, want 0", rec.TotalCostUSD)
+	}
+}
+
+// --- splitUsageForBatch tests ---
+
+func TestSplitUsageForBatch_NilResult(t *testing.T) {
+	result := splitUsageForBatch(nil, 3)
+	if len(result) != 3 {
+		t.Fatalf("len = %d, want 3", len(result))
+	}
+	for i, u := range result {
+		if u != nil {
+			t.Errorf("result[%d] = %v, want nil", i, u)
+		}
+	}
+}
+
+func TestSplitUsageForBatch_SplitsEvenly(t *testing.T) {
+	cr := &ClaudeResult{
+		SessionID:           "batch-sess",
+		NumTurns:            10,
+		TotalCostUSD:        0.06,
+		InputTokens:         9000,
+		OutputTokens:        3000,
+		CacheCreationTokens: 600,
+		CacheReadTokens:     1200,
+		WebSearchRequests:   2,
+		WebFetchRequests:    4,
+	}
+
+	result := splitUsageForBatch(cr, 3)
+	if len(result) != 3 {
+		t.Fatalf("len = %d, want 3", len(result))
+	}
+
+	for i, u := range result {
+		if u == nil {
+			t.Fatalf("result[%d] is nil", i)
+		}
+		// All share the same session ID.
+		if u.CCSessionID != "batch-sess" {
+			t.Errorf("[%d] CCSessionID = %q, want %q", i, u.CCSessionID, "batch-sess")
+		}
+		// NumTurns is shared (not divisible).
+		if u.NumTurns != 10 {
+			t.Errorf("[%d] NumTurns = %d, want 10", i, u.NumTurns)
+		}
+		// Tokens split equally.
+		if u.InputTokens != 3000 {
+			t.Errorf("[%d] InputTokens = %d, want 3000", i, u.InputTokens)
+		}
+		if u.OutputTokens != 1000 {
+			t.Errorf("[%d] OutputTokens = %d, want 1000", i, u.OutputTokens)
+		}
+		if u.CacheCreationTokens != 200 {
+			t.Errorf("[%d] CacheCreationTokens = %d, want 200", i, u.CacheCreationTokens)
+		}
+		if u.CacheReadTokens != 400 {
+			t.Errorf("[%d] CacheReadTokens = %d, want 400", i, u.CacheReadTokens)
+		}
+		// Cost split equally.
+		if u.CostUSD != 0.02 {
+			t.Errorf("[%d] CostUSD = %f, want 0.02", i, u.CostUSD)
+		}
+		// Web requests are shared (not divided).
+		if u.WebSearchRequests != 2 {
+			t.Errorf("[%d] WebSearchRequests = %d, want 2", i, u.WebSearchRequests)
+		}
+	}
+}
+
+func TestSplitUsageForBatch_SingleSession(t *testing.T) {
+	cr := &ClaudeResult{
+		SessionID:    "single-sess",
+		InputTokens:  5000,
+		OutputTokens: 1500,
+		TotalCostUSD: 0.01,
+	}
+
+	result := splitUsageForBatch(cr, 1)
+	if len(result) != 1 {
+		t.Fatalf("len = %d, want 1", len(result))
+	}
+	if result[0].InputTokens != 5000 {
+		t.Errorf("InputTokens = %d, want 5000", result[0].InputTokens)
+	}
+	if result[0].OutputTokens != 1500 {
+		t.Errorf("OutputTokens = %d, want 1500", result[0].OutputTokens)
 	}
 }
 

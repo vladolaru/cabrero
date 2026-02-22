@@ -189,13 +189,25 @@ pipeline.
 `"daemon"`, `"cli-run"`, or `"cli-backfill"`. Set by the caller before `RunOne`/`RunGroup`.
 
 **Batch context:** Records from batch runs share `batch_mode: true`, `batch_size`,
-and `batch_session_ids`. Evaluator duration in batch evaluations is divided equally
-among sessions in the chunk (a single LLM call covers multiple sessions).
+and `batch_session_ids`. Evaluator duration and token usage in batch evaluations are
+divided equally among sessions in the chunk (a single LLM call covers multiple sessions).
+
+**Token usage tracking:** Each record includes per-stage `InvocationUsage` structs
+(`classifier_usage`, `evaluator_usage`) with CC session ID, turn count, input/output
+tokens, cache stats, cost, and web search/fetch counts. Usage is captured via
+`--output-format json` from the `claude` CLI, which returns a structured JSON envelope
+with full usage data at zero additional overhead. Usage is available even on CC-level
+errors (`is_error: true`), providing partial data for failed runs. Totals
+(`total_cost_usd`, `total_input_tokens`, `total_output_tokens`) are computed across
+all stages before appending the record.
 
 **Fields per record:** session identity, timestamp, project, source, batch context,
 capture trigger, previous status (retry detection), triage outcome, pipeline status,
 proposal count, error detail, per-stage durations (parse, classifier, evaluator, total
-in nanoseconds), model and prompt versions actually used, and config snapshot
+in nanoseconds), per-stage token usage (`classifier_usage`, `evaluator_usage` with
+CC session ID, turns, input/output tokens, cache creation/read tokens, cost, web
+search/fetch requests), usage totals (`total_cost_usd`, `total_input_tokens`,
+`total_output_tokens`), model and prompt versions actually used, and config snapshot
 (max turns, timeouts, debug flag).
 
 **Rotation:** On daemon startup, records older than 90 days are removed via

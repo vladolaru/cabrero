@@ -23,9 +23,9 @@ type Runner struct {
 	// Testing hooks — when nil, package-level functions are used.
 	ParseSessionFunc func(sessionID string) (*parser.Digest, error)
 	AggregateFunc    func(sessionID string, project string) (*patterns.AggregatorOutput, error)
-	ClassifyFunc     func(sessionID string, cfg PipelineConfig) (*ClassifierResult, error)
-	EvalFunc         func(sessionID string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, error)
-	EvalBatchFunc    func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, error)
+	ClassifyFunc     func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error)
+	EvalFunc         func(sessionID string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
+	EvalBatchFunc    func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
 }
 
 // NewRunner creates a Runner with default (nil) hooks.
@@ -50,33 +50,33 @@ func (r *Runner) emit(sessionID string, event BatchEvent) {
 	}
 }
 
-func (r *Runner) classify(sessionID string) (*ClassifierResult, error) {
+func (r *Runner) classify(sessionID string) (*ClassifierResult, *ClaudeResult, error) {
 	if r.ClassifyFunc != nil {
 		return r.ClassifyFunc(sessionID, r.Config)
 	}
 
 	// Default: pre-parse, aggregate, then classify.
 	if !store.SessionExists(sessionID) {
-		return nil, fmt.Errorf("session %s not found in store", sessionID)
+		return nil, nil, fmt.Errorf("session %s not found in store", sessionID)
 	}
 	if err := EnsurePrompts(); err != nil {
-		return nil, fmt.Errorf("ensuring prompt files: %w", err)
+		return nil, nil, fmt.Errorf("ensuring prompt files: %w", err)
 	}
 
 	log := r.log()
 
 	pre, err := r.runPreParseAndAggregate(sessionID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	log.Info("  Running Classifier...")
-	classifierOutput, err := RunClassifier(sessionID, pre.Digest, pre.AggregatorOutput, r.Config)
+	classifierOutput, cr, err := RunClassifier(sessionID, pre.Digest, pre.AggregatorOutput, r.Config)
 	if err != nil {
-		return nil, fmt.Errorf("classifier failed: %w", err)
+		return nil, cr, fmt.Errorf("classifier failed: %w", err)
 	}
 	if err := WriteClassifierOutput(sessionID, classifierOutput); err != nil {
-		return nil, fmt.Errorf("writing classifier output: %w", err)
+		return nil, cr, fmt.Errorf("writing classifier output: %w", err)
 	}
 	log.Info("  Classifier: goal=%q, %d errors, %d key turns, %d skill signals, triage=%s",
 		classifierOutput.Goal.Summary,
@@ -89,17 +89,17 @@ func (r *Runner) classify(sessionID string) (*ClassifierResult, error) {
 		Digest:           pre.Digest,
 		AggregatorOutput: pre.AggregatorOutput,
 		ClassifierOutput: classifierOutput,
-	}, nil
+	}, cr, nil
 }
 
-func (r *Runner) evalOne(sessionID string, digest *parser.Digest, co *ClassifierOutput) (*EvaluatorOutput, error) {
+func (r *Runner) evalOne(sessionID string, digest *parser.Digest, co *ClassifierOutput) (*EvaluatorOutput, *ClaudeResult, error) {
 	if r.EvalFunc != nil {
 		return r.EvalFunc(sessionID, digest, co, r.Config)
 	}
 	return RunEvaluator(sessionID, digest, co, r.Config)
 }
 
-func (r *Runner) evalMany(sessions []BatchSession) (*EvaluatorOutput, error) {
+func (r *Runner) evalMany(sessions []BatchSession) (*EvaluatorOutput, *ClaudeResult, error) {
 	if r.EvalBatchFunc != nil {
 		return r.EvalBatchFunc(sessions, r.Config)
 	}
@@ -189,13 +189,16 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	}
 
 	classifyStart := time.Now()
-	classifierResult, err := r.classify(sessionID)
+	classifierResult, classifierCR, err := r.classify(sessionID)
 	classifyDuration := time.Since(classifyStart)
+
+	rec.ClassifierUsage = usageFromResult(classifierCR)
 
 	if err != nil {
 		rec.Status = "error"
 		rec.ErrorDetail = err.Error()
 		rec.ClassifierDurationNs = int64(classifyDuration)
+		rec.computeUsageTotals()
 		rec.TotalDurationNs = int64(time.Since(runStart))
 		_ = AppendHistory(rec)
 		if markErr := store.MarkError(sessionID); markErr != nil {
@@ -219,6 +222,7 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 		rec.Status = "processed"
 		rec.EvaluatorModel = "" // evaluator not used
 		rec.EvaluatorPromptVersion = ""
+		rec.computeUsageTotals()
 		rec.TotalDurationNs = int64(time.Since(runStart))
 		_ = AppendHistory(rec)
 		if markErr := store.MarkProcessed(sessionID); markErr != nil {
@@ -238,13 +242,16 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 
 	log.Info("  Running Evaluator...")
 	evalStart := time.Now()
-	evaluatorOutput, err := r.evalOne(sessionID, classifierResult.Digest, classifierResult.ClassifierOutput)
+	evaluatorOutput, evaluatorCR, err := r.evalOne(sessionID, classifierResult.Digest, classifierResult.ClassifierOutput)
 	evalDuration := time.Since(evalStart)
+
+	rec.EvaluatorUsage = usageFromResult(evaluatorCR)
 
 	if err != nil {
 		rec.Status = "error"
 		rec.ErrorDetail = err.Error()
 		rec.EvaluatorDurationNs = int64(evalDuration)
+		rec.computeUsageTotals()
 		rec.TotalDurationNs = int64(time.Since(runStart))
 		_ = AppendHistory(rec)
 		if markErr := store.MarkError(sessionID); markErr != nil {
@@ -273,6 +280,7 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	rec.Status = "processed"
 	rec.ProposalCount = len(evaluatorOutput.Proposals)
 	rec.EvaluatorDurationNs = int64(evalDuration)
+	rec.computeUsageTotals()
 	rec.TotalDurationNs = int64(time.Since(runStart))
 	_ = AppendHistory(rec)
 
@@ -362,11 +370,12 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		}
 
 		classifyStart := time.Now()
-		classifierResult, err := r.classify(s.SessionID)
+		classifierResult, classifierCR, err := r.classify(s.SessionID)
 		classifyDuration := time.Since(classifyStart)
 
 		rec := records[s.SessionID]
 		rec.ClassifierDurationNs = int64(classifyDuration)
+		rec.ClassifierUsage = usageFromResult(classifierCR)
 
 		if err != nil {
 			results[i].Status = "error"
@@ -375,6 +384,7 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 
 			rec.Status = "error"
 			rec.ErrorDetail = err.Error()
+			rec.computeUsageTotals()
 			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
 			_ = AppendHistory(*rec)
 
@@ -399,6 +409,7 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 			rec.Status = "processed"
 			rec.EvaluatorModel = ""
 			rec.EvaluatorPromptVersion = ""
+			rec.computeUsageTotals()
 			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
 			_ = AppendHistory(*rec)
 
@@ -459,10 +470,11 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 	rec := records[s.SessionID]
 
 	evalStart := time.Now()
-	evaluatorOutput, err := r.evalOne(s.SessionID, s.Digest, s.ClassifierOutput)
+	evaluatorOutput, evaluatorCR, err := r.evalOne(s.SessionID, s.Digest, s.ClassifierOutput)
 	evalDuration := time.Since(evalStart)
 
 	rec.EvaluatorDurationNs = int64(evalDuration)
+	rec.EvaluatorUsage = usageFromResult(evaluatorCR)
 
 	if err != nil {
 		results[idx].Status = "error"
@@ -471,6 +483,7 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 
 		rec.Status = "error"
 		rec.ErrorDetail = err.Error()
+		rec.computeUsageTotals()
 		rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
 		_ = AppendHistory(*rec)
 
@@ -491,6 +504,7 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 
 	rec.Status = "processed"
 	rec.ProposalCount = len(evaluatorOutput.Proposals)
+	rec.computeUsageTotals()
 	rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
 	_ = AppendHistory(*rec)
 
@@ -501,15 +515,18 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 
 func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, indexByID map[string]int, records map[string]*HistoryRecord, runStarts map[string]time.Time) {
 	evalStart := time.Now()
-	evaluatorOutput, err := r.evalMany(chunk)
+	evaluatorOutput, evaluatorCR, err := r.evalMany(chunk)
 	evalDuration := time.Since(evalStart)
 
 	// Split batch evaluator duration equally among sessions in the chunk.
 	perSessionDuration := evalDuration / time.Duration(len(chunk))
 
+	// Split usage equally among sessions in the chunk (same approximation as duration).
+	splitUsage := splitUsageForBatch(evaluatorCR, len(chunk))
+
 	if err != nil {
 		// Mark all sessions in the chunk as errors.
-		for _, s := range chunk {
+		for i, s := range chunk {
 			idx := indexByID[s.SessionID]
 			results[idx].Status = "error"
 			results[idx].Error = err
@@ -519,6 +536,8 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 			rec.Status = "error"
 			rec.ErrorDetail = err.Error()
 			rec.EvaluatorDurationNs = int64(perSessionDuration)
+			rec.EvaluatorUsage = splitUsage[i]
+			rec.computeUsageTotals()
 			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
 			_ = AppendHistory(*rec)
 
@@ -532,7 +551,7 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 	// Partition proposals by session: proposal IDs encode their session
 	// via the format "prop-{first 6 chars of sessionId}-{index}".
 	totalMatched := 0
-	for _, s := range chunk {
+	for i, s := range chunk {
 		idx := indexByID[s.SessionID]
 		rec := records[s.SessionID]
 
@@ -553,6 +572,8 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 		rec.Status = "processed"
 		rec.ProposalCount = len(filtered.Proposals)
 		rec.EvaluatorDurationNs = int64(perSessionDuration)
+		rec.EvaluatorUsage = splitUsage[i]
+		rec.computeUsageTotals()
 		rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
 		_ = AppendHistory(*rec)
 
@@ -572,4 +593,30 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
 		r.emit(chunk[0].SessionID, BatchEvent{Type: "error", Error: err})
 	}
+}
+
+// splitUsageForBatch divides a single ClaudeResult's usage equally among n sessions.
+// Returns a slice of n *InvocationUsage entries, all sharing the same CCSessionID.
+// Returns a slice of nils if cr is nil.
+func splitUsageForBatch(cr *ClaudeResult, n int) []*InvocationUsage {
+	result := make([]*InvocationUsage, n)
+	if cr == nil || n == 0 {
+		return result
+	}
+
+	for i := range result {
+		result[i] = &InvocationUsage{
+			CCSessionID:         cr.SessionID,
+			NumTurns:            cr.NumTurns, // shared — not divisible
+			InputTokens:         cr.InputTokens / n,
+			OutputTokens:        cr.OutputTokens / n,
+			CacheCreationTokens: cr.CacheCreationTokens / n,
+			CacheReadTokens:     cr.CacheReadTokens / n,
+			CostUSD:             cr.TotalCostUSD / float64(n),
+			WebSearchRequests:   cr.WebSearchRequests,
+			WebFetchRequests:    cr.WebFetchRequests,
+		}
+	}
+
+	return result
 }

@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,48 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/store"
 )
+
+// ClaudeResult holds the parsed output from a claude CLI JSON response.
+type ClaudeResult struct {
+	Result              string  // LLM text output (from "result" field)
+	SessionID           string  // CC session ID for cross-referencing
+	NumTurns            int     // actual agentic turns used
+	DurationMs          int     // total execution time (CC-reported)
+	DurationApiMs       int     // API call time only (CC-reported)
+	TotalCostUSD        float64 // total API cost
+	InputTokens         int
+	OutputTokens        int
+	CacheCreationTokens int
+	CacheReadTokens     int
+	WebSearchRequests   int
+	WebFetchRequests    int
+	IsError             bool     // true if CC returned an error result
+	Errors              []string // error messages from CC
+}
+
+// claudeJSONResponse is the raw JSON envelope from `claude --output-format json`.
+type claudeJSONResponse struct {
+	Type          string  `json:"type"`
+	Subtype       string  `json:"subtype"`
+	IsError       bool    `json:"is_error"`
+	Result        string  `json:"result"`
+	SessionID     string  `json:"session_id"`
+	NumTurns      int     `json:"num_turns"`
+	DurationMs    int     `json:"duration_ms"`
+	DurationApiMs int     `json:"duration_api_ms"`
+	TotalCostUSD  float64 `json:"total_cost_usd"`
+	Usage         struct {
+		InputTokens              int `json:"input_tokens"`
+		OutputTokens             int `json:"output_tokens"`
+		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+		ServerToolUse            struct {
+			WebSearchRequests int `json:"web_search_requests"`
+			WebFetchRequests  int `json:"web_fetch_requests"`
+		} `json:"server_tool_use"`
+	} `json:"usage"`
+	Errors []string `json:"errors"`
+}
 
 // claudeConfig controls how the claude CLI is invoked.
 type claudeConfig struct {
@@ -41,17 +84,20 @@ var emptyStr = ""
 //
 // Two modes are supported:
 //   - Print mode (Agentic=false): uses --print with stdin pipe and all tools disabled.
-//     Data is provided via cfg.Stdin.
+//     Data is provided via cfg.Stdin. Returns the raw text output as ClaudeResult.Result.
 //   - Agentic mode (Agentic=true): uses -p with the prompt as a positional argument,
-//     --allowedTools for selective tool access, and --output-format text for clean output.
+//     --allowedTools for selective tool access, and --output-format json for structured output.
 //     MaxTurns is informational only (embedded in the prompt by callers, not a CLI flag).
-func invokeClaude(cfg claudeConfig) (string, error) {
+//
+// When CC returns is_error: true, both a non-nil result (with usage data) and an error
+// are returned so callers can capture partial usage from failed invocations.
+func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 	// Validate required fields per mode.
 	if cfg.Agentic && cfg.Prompt == "" {
-		return "", fmt.Errorf("invokeClaude: Prompt is required for agentic mode")
+		return nil, fmt.Errorf("invokeClaude: Prompt is required for agentic mode")
 	}
 	if !cfg.Agentic && cfg.Stdin == nil {
-		return "", fmt.Errorf("invokeClaude: Stdin is required for print mode")
+		return nil, fmt.Errorf("invokeClaude: Stdin is required for print mode")
 	}
 
 	// In debug mode, generate a session ID and blocklist it before invocation.
@@ -59,11 +105,11 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 	if cfg.Debug {
 		id, err := generateUUID()
 		if err != nil {
-			return "", fmt.Errorf("generating debug session ID: %w", err)
+			return nil, fmt.Errorf("generating debug session ID: %w", err)
 		}
 		debugSessionID = id
 		if err := store.BlockSession(debugSessionID); err != nil {
-			return "", fmt.Errorf("blocklisting debug session: %w", err)
+			return nil, fmt.Errorf("blocklisting debug session: %w", err)
 		}
 	}
 
@@ -94,19 +140,45 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		if cfg.Timeout > 0 && ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("claude timed out after %s", cfg.Timeout)
+			return nil, fmt.Errorf("claude timed out after %s", cfg.Timeout)
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("claude exited with code %d: %s", exitErr.ExitCode(), string(exitErr.Stderr))
+			// Attempt to parse stdout for usage data even on non-zero exit.
+			if cfg.Agentic && len(out) > 0 {
+				if cr, parseErr := parseClaudeJSON(out); parseErr == nil {
+					return cr, fmt.Errorf("claude exited with code %d: %s", exitErr.ExitCode(), string(exitErr.Stderr))
+				}
+			}
+			return nil, fmt.Errorf("claude exited with code %d: %s", exitErr.ExitCode(), string(exitErr.Stderr))
 		}
-		return "", fmt.Errorf("running claude: %w", err)
+		return nil, fmt.Errorf("running claude: %w", err)
 	}
 
 	if cfg.Debug && cfg.Logger != nil && debugSessionID != "" {
 		cfg.Logger.Info("  [debug] CC session %s persisted for inspection", debugSessionID)
 	}
 
-	return string(out), nil
+	// Print mode returns raw text — no JSON envelope.
+	if !cfg.Agentic {
+		return &ClaudeResult{Result: string(out)}, nil
+	}
+
+	// Agentic mode returns JSON envelope with usage data.
+	cr, parseErr := parseClaudeJSON(out)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parsing claude JSON output: %w", parseErr)
+	}
+
+	// If CC itself reported an error, return both result (for usage) and error.
+	if cr.IsError {
+		errMsg := "claude returned error"
+		if len(cr.Errors) > 0 {
+			errMsg = fmt.Sprintf("claude returned error: %s", strings.Join(cr.Errors, "; "))
+		}
+		return cr, fmt.Errorf("%s", errMsg)
+	}
+
+	return cr, nil
 }
 
 // buildClaudeArgs constructs the CLI argument list for the claude command.
@@ -120,7 +192,7 @@ func buildClaudeArgs(cfg claudeConfig, debugSessionID string) []string {
 			"--model", cfg.Model,
 			"-p", cfg.Prompt,
 			"--system-prompt", cfg.SystemPrompt,
-			"--output-format", "text",
+			"--output-format", "json",
 			"--disable-slash-commands",
 		}
 		if !cfg.Debug {
@@ -192,6 +264,32 @@ func readPromptTemplate(filename string) (string, error) {
 		return "", fmt.Errorf("prompt file not found: %s\nRun 'cabrero prompts' or create it manually", path)
 	}
 	return string(data), nil
+}
+
+// parseClaudeJSON parses the JSON envelope from `claude --output-format json`
+// into a ClaudeResult.
+func parseClaudeJSON(data []byte) (*ClaudeResult, error) {
+	var resp claudeJSONResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("invalid claude JSON: %w", err)
+	}
+
+	return &ClaudeResult{
+		Result:              resp.Result,
+		SessionID:           resp.SessionID,
+		NumTurns:            resp.NumTurns,
+		DurationMs:          resp.DurationMs,
+		DurationApiMs:       resp.DurationApiMs,
+		TotalCostUSD:        resp.TotalCostUSD,
+		InputTokens:         resp.Usage.InputTokens,
+		OutputTokens:        resp.Usage.OutputTokens,
+		CacheCreationTokens: resp.Usage.CacheCreationInputTokens,
+		CacheReadTokens:     resp.Usage.CacheReadInputTokens,
+		WebSearchRequests:   resp.Usage.ServerToolUse.WebSearchRequests,
+		WebFetchRequests:    resp.Usage.ServerToolUse.WebFetchRequests,
+		IsError:             resp.IsError,
+		Errors:              resp.Errors,
+	}, nil
 }
 
 // cleanLLMJSON strips markdown code fences and whitespace from LLM output.
