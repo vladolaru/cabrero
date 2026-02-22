@@ -3,7 +3,10 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/patterns"
@@ -441,5 +444,570 @@ func TestRunGroup_MaxBatchSizeForcesSingleEval(t *testing.T) {
 
 	if singleCount != 2 {
 		t.Errorf("EvalFunc called %d times, want 2", singleCount)
+	}
+}
+
+// --- History integration tests ---
+// These verify that RunOne and RunGroup actually append HistoryRecords
+// with correct fields. The existing setupBatchStore(t) sets HOME to a
+// temp dir, so historyPath() points to the right place.
+
+// readHistoryForTest reads the history file from the store root.
+func readHistoryForTest(t *testing.T) []HistoryRecord {
+	t.Helper()
+	records, err := ReadHistory()
+	if err != nil {
+		t.Fatalf("ReadHistory: %v", err)
+	}
+	return records
+}
+
+func findRecord(records []HistoryRecord, sessionID string) *HistoryRecord {
+	for i := range records {
+		if records[i].SessionID == sessionID {
+			return &records[i]
+		}
+	}
+	return nil
+}
+
+func TestRunOne_CleanTriage_WritesHistory(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-clean0000001"
+	createBatchSession(t, sid)
+
+	cfg := DefaultPipelineConfig()
+	cfg.Logger = &discardLogger{}
+
+	r := NewRunner(cfg)
+	r.Source = "cli-run"
+	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
+		return &parser.Digest{SessionID: sessionID}, nil
+	}
+	r.ClassifyFunc = fakeClassifyClean
+
+	_, err := r.RunOne(context.Background(), sid, false)
+	if err != nil {
+		t.Fatalf("RunOne: %v", err)
+	}
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record found for %s", sid)
+	}
+
+	if rec.Source != "cli-run" {
+		t.Errorf("Source = %q, want %q", rec.Source, "cli-run")
+	}
+	if rec.Triage != "clean" {
+		t.Errorf("Triage = %q, want %q", rec.Triage, "clean")
+	}
+	if rec.Status != "processed" {
+		t.Errorf("Status = %q, want %q", rec.Status, "processed")
+	}
+	if rec.BatchMode {
+		t.Error("BatchMode = true, want false")
+	}
+	if rec.ClassifierDurationNs <= 0 {
+		t.Errorf("ClassifierDurationNs = %d, want > 0", rec.ClassifierDurationNs)
+	}
+	if rec.EvaluatorDurationNs != 0 {
+		t.Errorf("EvaluatorDurationNs = %d, want 0 (clean session skips evaluator)", rec.EvaluatorDurationNs)
+	}
+	if rec.TotalDurationNs <= 0 {
+		t.Errorf("TotalDurationNs = %d, want > 0", rec.TotalDurationNs)
+	}
+	if rec.EvaluatorModel != "" {
+		t.Errorf("EvaluatorModel = %q, want empty (clean session)", rec.EvaluatorModel)
+	}
+	if rec.ClassifierModel != ClassifierModel {
+		t.Errorf("ClassifierModel = %q, want %q", rec.ClassifierModel, ClassifierModel)
+	}
+	if rec.PreviousStatus != "queued" {
+		t.Errorf("PreviousStatus = %q, want %q", rec.PreviousStatus, "queued")
+	}
+	if rec.ClassifierMaxTurns != cfg.ClassifierMaxTurns {
+		t.Errorf("ClassifierMaxTurns = %d, want %d", rec.ClassifierMaxTurns, cfg.ClassifierMaxTurns)
+	}
+}
+
+func TestRunOne_Evaluate_WritesHistory(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-eval00000001"
+	createBatchSession(t, sid)
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "daemon"
+	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
+		return &parser.Digest{SessionID: sessionID}, nil
+	}
+	r.ClassifyFunc = func(sessionID string, cfg PipelineConfig) (*ClassifierResult, error) {
+		return &ClassifierResult{
+			Digest:           &parser.Digest{SessionID: sessionID},
+			ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate", PromptVersion: "classifier-v3"},
+		}, nil
+	}
+	r.EvalFunc = func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, error) {
+		return &EvaluatorOutput{
+			SessionID:     sessionID,
+			PromptVersion: "evaluator-v3",
+			Proposals: []Proposal{
+				{ID: fmt.Sprintf("prop-%s-0", shortID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				{ID: fmt.Sprintf("prop-%s-1", shortID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+			},
+		}, nil
+	}
+
+	_, err := r.RunOne(context.Background(), sid, false)
+	if err != nil {
+		t.Fatalf("RunOne: %v", err)
+	}
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record found for %s", sid)
+	}
+
+	if rec.Source != "daemon" {
+		t.Errorf("Source = %q, want %q", rec.Source, "daemon")
+	}
+	if rec.Triage != "evaluate" {
+		t.Errorf("Triage = %q, want %q", rec.Triage, "evaluate")
+	}
+	if rec.Status != "processed" {
+		t.Errorf("Status = %q, want %q", rec.Status, "processed")
+	}
+	if rec.ProposalCount != 2 {
+		t.Errorf("ProposalCount = %d, want 2", rec.ProposalCount)
+	}
+	if rec.ClassifierDurationNs <= 0 {
+		t.Errorf("ClassifierDurationNs = %d, want > 0", rec.ClassifierDurationNs)
+	}
+	if rec.EvaluatorDurationNs <= 0 {
+		t.Errorf("EvaluatorDurationNs = %d, want > 0", rec.EvaluatorDurationNs)
+	}
+	if rec.TotalDurationNs <= 0 {
+		t.Errorf("TotalDurationNs = %d, want > 0", rec.TotalDurationNs)
+	}
+	if rec.ClassifierPromptVersion != "classifier-v3" {
+		t.Errorf("ClassifierPromptVersion = %q, want %q", rec.ClassifierPromptVersion, "classifier-v3")
+	}
+	if rec.EvaluatorPromptVersion != "evaluator-v3" {
+		t.Errorf("EvaluatorPromptVersion = %q, want %q", rec.EvaluatorPromptVersion, "evaluator-v3")
+	}
+	if rec.EvaluatorModel != EvaluatorModel {
+		t.Errorf("EvaluatorModel = %q, want %q", rec.EvaluatorModel, EvaluatorModel)
+	}
+}
+
+func TestRunOne_ClassifierError_WritesHistory(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-clerr0000001"
+	createBatchSession(t, sid)
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "cli-run"
+	r.ClassifyFunc = func(_ string, _ PipelineConfig) (*ClassifierResult, error) {
+		return nil, fmt.Errorf("classifier boom")
+	}
+
+	_, err := r.RunOne(context.Background(), sid, false)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record found for %s after classifier error", sid)
+	}
+
+	if rec.Status != "error" {
+		t.Errorf("Status = %q, want %q", rec.Status, "error")
+	}
+	if !strings.Contains(rec.ErrorDetail, "classifier boom") {
+		t.Errorf("ErrorDetail = %q, want to contain 'classifier boom'", rec.ErrorDetail)
+	}
+	if rec.ClassifierDurationNs <= 0 {
+		t.Errorf("ClassifierDurationNs = %d, want > 0 (even on error)", rec.ClassifierDurationNs)
+	}
+	if rec.TotalDurationNs <= 0 {
+		t.Errorf("TotalDurationNs = %d, want > 0", rec.TotalDurationNs)
+	}
+}
+
+func TestRunOne_EvaluatorError_WritesHistory(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-everr0000001"
+	createBatchSession(t, sid)
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "cli-run"
+	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
+		return &parser.Digest{SessionID: sessionID}, nil
+	}
+	r.ClassifyFunc = fakeClassifyEvaluate
+	r.EvalFunc = func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, error) {
+		return nil, fmt.Errorf("evaluator boom")
+	}
+
+	_, err := r.RunOne(context.Background(), sid, false)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record found for %s after evaluator error", sid)
+	}
+
+	if rec.Status != "error" {
+		t.Errorf("Status = %q, want %q", rec.Status, "error")
+	}
+	if rec.Triage != "evaluate" {
+		t.Errorf("Triage = %q, want %q", rec.Triage, "evaluate")
+	}
+	if !strings.Contains(rec.ErrorDetail, "evaluator boom") {
+		t.Errorf("ErrorDetail = %q, want to contain 'evaluator boom'", rec.ErrorDetail)
+	}
+	if rec.ClassifierDurationNs <= 0 {
+		t.Errorf("ClassifierDurationNs = %d, want > 0", rec.ClassifierDurationNs)
+	}
+	if rec.EvaluatorDurationNs <= 0 {
+		t.Errorf("EvaluatorDurationNs = %d, want > 0 (even on error)", rec.EvaluatorDurationNs)
+	}
+}
+
+func TestRunOne_DryRun_NoHistory(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-dryrun000001"
+	createBatchSession(t, sid)
+	writeTranscript(t, sid, []string{"uuid-1"})
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "cli-run"
+	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
+		return &parser.Digest{SessionID: sessionID}, nil
+	}
+
+	_, err := r.RunOne(context.Background(), sid, true)
+	if err != nil {
+		t.Fatalf("RunOne: %v", err)
+	}
+
+	records := readHistoryForTest(t)
+	if rec := findRecord(records, sid); rec != nil {
+		t.Errorf("dry run should not write history, but found record for %s", sid)
+	}
+}
+
+func TestRunGroup_WritesHistoryWithBatchContext(t *testing.T) {
+	setupBatchStore(t)
+	// Session IDs must have distinct 6-char prefixes for proposal partitioning.
+	s1 := createBatchSession(t, "aaaaaa-hist-b0001")
+	s2 := createBatchSession(t, "bbbbbb-hist-b0002")
+	s3 := createBatchSession(t, "cccccc-hist-b0003")
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "cli-backfill"
+	// s1 and s3 evaluate, s2 is clean.
+	r.ClassifyFunc = func(sessionID string, cfg PipelineConfig) (*ClassifierResult, error) {
+		triage := "evaluate"
+		if sessionID == s2.SessionID {
+			triage = "clean"
+		}
+		return &ClassifierResult{
+			Digest:           &parser.Digest{SessionID: sessionID},
+			ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: triage, PromptVersion: "classifier-v3"},
+		}, nil
+	}
+	r.EvalBatchFunc = func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, error) {
+		var proposals []Proposal
+		for _, s := range sessions {
+			proposals = append(proposals, Proposal{
+				ID: fmt.Sprintf("prop-%s-0", shortID(s.SessionID)),
+				Type: "skill_improvement", Confidence: "high", Rationale: "test",
+			})
+		}
+		return &EvaluatorOutput{Proposals: proposals, PromptVersion: "evaluator-v3"}, nil
+	}
+
+	r.RunGroup(context.Background(), []BatchSession{s1, s2, s3})
+
+	records := readHistoryForTest(t)
+	if len(records) != 3 {
+		t.Fatalf("expected 3 history records, got %d", len(records))
+	}
+
+	// Check all records have batch context.
+	for _, sid := range []string{s1.SessionID, s2.SessionID, s3.SessionID} {
+		rec := findRecord(records, sid)
+		if rec == nil {
+			t.Fatalf("missing history record for %s", sid)
+		}
+
+		if rec.Source != "cli-backfill" {
+			t.Errorf("[%s] Source = %q, want %q", sid, rec.Source, "cli-backfill")
+		}
+		if !rec.BatchMode {
+			t.Errorf("[%s] BatchMode = false, want true", sid)
+		}
+		if rec.BatchSize != 3 {
+			t.Errorf("[%s] BatchSize = %d, want 3", sid, rec.BatchSize)
+		}
+		if len(rec.BatchSessionIDs) != 3 {
+			t.Errorf("[%s] BatchSessionIDs len = %d, want 3", sid, len(rec.BatchSessionIDs))
+		}
+	}
+
+	// Check clean session.
+	cleanRec := findRecord(records, s2.SessionID)
+	if cleanRec.Triage != "clean" {
+		t.Errorf("clean session Triage = %q, want %q", cleanRec.Triage, "clean")
+	}
+	if cleanRec.EvaluatorDurationNs != 0 {
+		t.Errorf("clean session EvaluatorDurationNs = %d, want 0", cleanRec.EvaluatorDurationNs)
+	}
+
+	// Check evaluated sessions.
+	for _, sid := range []string{s1.SessionID, s3.SessionID} {
+		rec := findRecord(records, sid)
+		if rec.Triage != "evaluate" {
+			t.Errorf("[%s] Triage = %q, want %q", sid, rec.Triage, "evaluate")
+		}
+		if rec.Status != "processed" {
+			t.Errorf("[%s] Status = %q, want %q", sid, rec.Status, "processed")
+		}
+		if rec.ProposalCount != 1 {
+			t.Errorf("[%s] ProposalCount = %d, want 1", sid, rec.ProposalCount)
+		}
+		if rec.EvaluatorDurationNs <= 0 {
+			t.Errorf("[%s] EvaluatorDurationNs = %d, want > 0", sid, rec.EvaluatorDurationNs)
+		}
+		if rec.EvaluatorPromptVersion != "evaluator-v3" {
+			t.Errorf("[%s] EvaluatorPromptVersion = %q, want %q", sid, rec.EvaluatorPromptVersion, "evaluator-v3")
+		}
+	}
+}
+
+func TestRunGroup_ClassifierError_WritesHistory(t *testing.T) {
+	setupBatchStore(t)
+	s := createBatchSession(t, "hist-grperr000001")
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "daemon"
+	r.ClassifyFunc = func(_ string, _ PipelineConfig) (*ClassifierResult, error) {
+		return nil, fmt.Errorf("batch classifier boom")
+	}
+
+	r.RunGroup(context.Background(), []BatchSession{s})
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, s.SessionID)
+	if rec == nil {
+		t.Fatalf("no history record after RunGroup classifier error")
+	}
+
+	if rec.Status != "error" {
+		t.Errorf("Status = %q, want %q", rec.Status, "error")
+	}
+	if !strings.Contains(rec.ErrorDetail, "batch classifier boom") {
+		t.Errorf("ErrorDetail = %q, want to contain 'batch classifier boom'", rec.ErrorDetail)
+	}
+	if !rec.BatchMode {
+		t.Error("BatchMode = false, want true")
+	}
+}
+
+func TestRunGroup_EvalSingleError_WritesHistory(t *testing.T) {
+	setupBatchStore(t)
+	s := createBatchSession(t, "hist-evserr000001")
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "daemon"
+	r.ClassifyFunc = fakeClassifyEvaluate
+	r.EvalFunc = func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, error) {
+		return nil, fmt.Errorf("eval single boom")
+	}
+
+	r.RunGroup(context.Background(), []BatchSession{s})
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, s.SessionID)
+	if rec == nil {
+		t.Fatalf("no history record after eval single error")
+	}
+
+	if rec.Status != "error" {
+		t.Errorf("Status = %q, want %q", rec.Status, "error")
+	}
+	if rec.Triage != "evaluate" {
+		t.Errorf("Triage = %q, want %q", rec.Triage, "evaluate")
+	}
+	if !strings.Contains(rec.ErrorDetail, "eval single boom") {
+		t.Errorf("ErrorDetail = %q, want to contain 'eval single boom'", rec.ErrorDetail)
+	}
+}
+
+func TestRunGroup_EvalBatchError_WritesHistory(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "hist-evberr000001")
+	s2 := createBatchSession(t, "hist-evberr000002")
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "daemon"
+	r.ClassifyFunc = fakeClassifyEvaluate
+	r.EvalBatchFunc = func(_ []BatchSession, _ PipelineConfig) (*EvaluatorOutput, error) {
+		return nil, fmt.Errorf("eval batch boom")
+	}
+
+	r.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	records := readHistoryForTest(t)
+	for _, sid := range []string{s1.SessionID, s2.SessionID} {
+		rec := findRecord(records, sid)
+		if rec == nil {
+			t.Fatalf("no history record for %s after batch eval error", sid)
+		}
+		if rec.Status != "error" {
+			t.Errorf("[%s] Status = %q, want %q", sid, rec.Status, "error")
+		}
+		if !strings.Contains(rec.ErrorDetail, "eval batch boom") {
+			t.Errorf("[%s] ErrorDetail = %q, want to contain 'eval batch boom'", sid, rec.ErrorDetail)
+		}
+	}
+}
+
+func TestRunOne_PreviousStatus_CapturedBeforeMarkError(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-prevst000001"
+	// Create session with "imported" status to verify PreviousStatus captures it.
+	rawDir := store.RawDir(sid)
+	if err := os.MkdirAll(rawDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := store.Metadata{
+		SessionID:      sid,
+		Timestamp:      time.Now().UTC().Format(time.RFC3339),
+		CaptureTrigger: "session-end",
+		Status:         "imported",
+	}
+	if err := store.WriteMetadata(rawDir, meta); err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r.Source = "cli-backfill"
+	r.ClassifyFunc = fakeClassifyClean
+
+	_, err := r.RunOne(context.Background(), sid, false)
+	if err != nil {
+		t.Fatalf("RunOne: %v", err)
+	}
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record found for %s", sid)
+	}
+
+	// PreviousStatus should be "imported" (what it was BEFORE pipeline ran).
+	if rec.PreviousStatus != "imported" {
+		t.Errorf("PreviousStatus = %q, want %q", rec.PreviousStatus, "imported")
+	}
+	if rec.CaptureTrigger != "session-end" {
+		t.Errorf("CaptureTrigger = %q, want %q", rec.CaptureTrigger, "session-end")
+	}
+}
+
+func TestListPipelineRunsFromHistory_UsesHistoryTiming(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-listfh000001"
+	createBatchSession(t, sid)
+
+	// Write a history record with known timing.
+	rec := HistoryRecord{
+		SessionID:            sid,
+		Timestamp:            time.Now(),
+		Source:               "cli-run",
+		Triage:               "evaluate",
+		Status:               "processed",
+		ProposalCount:        3,
+		ClassifierDurationNs: int64(500 * time.Millisecond),
+		EvaluatorDurationNs:  int64(2 * time.Second),
+		TotalDurationNs:      int64(3 * time.Second),
+	}
+	if err := AppendHistory(rec); err != nil {
+		t.Fatalf("AppendHistory: %v", err)
+	}
+
+	sessions, _ := store.ListSessions()
+	runs, err := ListPipelineRunsFromHistory(sessions, 0)
+	if err != nil {
+		t.Fatalf("ListPipelineRunsFromHistory: %v", err)
+	}
+
+	// Find the run for our session.
+	var found *PipelineRun
+	for i := range runs {
+		if runs[i].SessionID == sid {
+			found = &runs[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("no PipelineRun found for %s", sid)
+	}
+
+	// Timing should come from history, not mtime estimation.
+	if found.ClassifierDuration != 500*time.Millisecond {
+		t.Errorf("ClassifierDuration = %v, want 500ms", found.ClassifierDuration)
+	}
+	if found.EvaluatorDuration != 2*time.Second {
+		t.Errorf("EvaluatorDuration = %v, want 2s", found.EvaluatorDuration)
+	}
+	if found.ProposalCount != 3 {
+		t.Errorf("ProposalCount = %d, want 3", found.ProposalCount)
+	}
+	if !found.HasClassifier {
+		t.Error("HasClassifier = false, want true")
+	}
+	if !found.HasEvaluator {
+		t.Error("HasEvaluator = false, want true")
+	}
+}
+
+func TestListPipelineRunsFromHistory_FallbackToMtime(t *testing.T) {
+	setupBatchStore(t)
+	sid := "hist-listmt000001"
+	createBatchSession(t, sid)
+
+	// Don't write any history record — should fall back to mtime.
+	sessions, _ := store.ListSessions()
+	runs, err := ListPipelineRunsFromHistory(sessions, 0)
+	if err != nil {
+		t.Fatalf("ListPipelineRunsFromHistory: %v", err)
+	}
+
+	var found *PipelineRun
+	for i := range runs {
+		if runs[i].SessionID == sid {
+			found = &runs[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("no PipelineRun found for %s", sid)
+	}
+
+	// Without digest/classifier/evaluator files, timing should be zero.
+	if found.ClassifierDuration != 0 {
+		t.Errorf("ClassifierDuration = %v, want 0 (no files)", found.ClassifierDuration)
+	}
+	if found.HasDigest {
+		t.Error("HasDigest = true, want false (no digest file)")
 	}
 }

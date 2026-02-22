@@ -37,6 +37,7 @@ func Run(args []string) error {
 	cfg.Debug = *debug
 
 	runner := pipeline.NewRunner(cfg)
+	runner.Source = "cli-run"
 	result, err := runner.RunOne(context.Background(), sessionID, *dryRun)
 	if err != nil {
 		return err

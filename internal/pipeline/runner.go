@@ -3,6 +3,8 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/patterns"
@@ -14,7 +16,8 @@ import (
 // package-level functions are used.
 type Runner struct {
 	Config       PipelineConfig
-	MaxBatchSize int // 0 means DefaultMaxBatchSize
+	MaxBatchSize int    // 0 means DefaultMaxBatchSize
+	Source       string // "daemon", "cli-run", "cli-backfill" — set by caller before RunOne/RunGroup
 	OnStatus     func(sessionID string, event BatchEvent)
 
 	// Testing hooks — when nil, package-level functions are used.
@@ -117,6 +120,31 @@ func (r *Runner) aggregate(sessionID, project string) (*patterns.AggregatorOutpu
 	return patterns.Aggregate(sessionID, project)
 }
 
+// buildBaseRecord creates a HistoryRecord pre-filled with identity, source,
+// provenance, config, and model/prompt fields. Caller fills in timing and outcome.
+func (r *Runner) buildBaseRecord(sessionID string, runStart time.Time) HistoryRecord {
+	meta, _ := store.ReadMetadata(sessionID)
+	return HistoryRecord{
+		SessionID:      sessionID,
+		Timestamp:      runStart,
+		Project:        store.ProjectDisplayName(meta.Project),
+		Source:         r.Source,
+		CaptureTrigger: meta.CaptureTrigger,
+		PreviousStatus: meta.Status,
+
+		ClassifierModel:         ClassifierModel,
+		ClassifierPromptVersion: strings.TrimSuffix(classifierPromptFile, ".txt"),
+		EvaluatorModel:          EvaluatorModel,
+		EvaluatorPromptVersion:  strings.TrimSuffix(evaluatorPromptFile, ".txt"),
+
+		ClassifierMaxTurns:  r.Config.ClassifierMaxTurns,
+		EvaluatorMaxTurns:   r.Config.EvaluatorMaxTurns,
+		ClassifierTimeoutNs: int64(r.Config.ClassifierTimeout),
+		EvaluatorTimeoutNs:  int64(r.Config.EvaluatorTimeout),
+		Debug:               r.Config.Debug,
+	}
+}
+
 // RunOne executes the full pipeline for a single session.
 // If dryRun is true, only the pre-parser runs (no LLM invocations).
 func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*RunResult, error) {
@@ -129,6 +157,7 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 
 	log := r.log()
 	result := &RunResult{DryRun: dryRun}
+	runStart := time.Now()
 
 	// Check context before work begins.
 	select {
@@ -138,7 +167,7 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	}
 
 	if dryRun {
-		// Dry-run only needs pre-parse.
+		// Dry-run only needs pre-parse — no history record for dry runs.
 		pre, err := r.runPreParseAndAggregate(sessionID)
 		if err != nil {
 			return nil, err
@@ -149,6 +178,8 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 		return result, nil
 	}
 
+	rec := r.buildBaseRecord(sessionID, runStart)
+
 	// Full run: classify (includes pre-parse when no hook is set).
 	// Check context before classify.
 	select {
@@ -157,8 +188,16 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	default:
 	}
 
+	classifyStart := time.Now()
 	classifierResult, err := r.classify(sessionID)
+	classifyDuration := time.Since(classifyStart)
+
 	if err != nil {
+		rec.Status = "error"
+		rec.ErrorDetail = err.Error()
+		rec.ClassifierDurationNs = int64(classifyDuration)
+		rec.TotalDurationNs = int64(time.Since(runStart))
+		_ = AppendHistory(rec)
 		if markErr := store.MarkError(sessionID); markErr != nil {
 			log.Error("  marking error for %s: %v", sessionID, markErr)
 		}
@@ -168,15 +207,27 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	result.AggregatorOutput = classifierResult.AggregatorOutput
 	result.ClassifierOutput = classifierResult.ClassifierOutput
 
+	rec.ClassifierDurationNs = int64(classifyDuration)
+	if classifierResult.ClassifierOutput != nil && classifierResult.ClassifierOutput.PromptVersion != "" {
+		rec.ClassifierPromptVersion = classifierResult.ClassifierOutput.PromptVersion
+	}
+
 	// Triage gate.
 	if classifierResult.ClassifierOutput.Triage == "clean" {
 		log.Info("  Classifier triage: clean session — skipping Evaluator")
+		rec.Triage = "clean"
+		rec.Status = "processed"
+		rec.EvaluatorModel = "" // evaluator not used
+		rec.EvaluatorPromptVersion = ""
+		rec.TotalDurationNs = int64(time.Since(runStart))
+		_ = AppendHistory(rec)
 		if markErr := store.MarkProcessed(sessionID); markErr != nil {
 			log.Error("  marking processed for %s: %v", sessionID, markErr)
 		}
 		return result, nil
 	}
 	log.Info("  Classifier triage: session worth evaluating")
+	rec.Triage = "evaluate"
 
 	// Check context before evaluator.
 	select {
@@ -186,14 +237,26 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	}
 
 	log.Info("  Running Evaluator...")
+	evalStart := time.Now()
 	evaluatorOutput, err := r.evalOne(sessionID, classifierResult.Digest, classifierResult.ClassifierOutput)
+	evalDuration := time.Since(evalStart)
+
 	if err != nil {
+		rec.Status = "error"
+		rec.ErrorDetail = err.Error()
+		rec.EvaluatorDurationNs = int64(evalDuration)
+		rec.TotalDurationNs = int64(time.Since(runStart))
+		_ = AppendHistory(rec)
 		if markErr := store.MarkError(sessionID); markErr != nil {
 			log.Error("  marking error for %s: %v", sessionID, markErr)
 		}
 		return nil, fmt.Errorf("evaluator failed: %w", err)
 	}
 	result.EvaluatorOutput = evaluatorOutput
+
+	if evaluatorOutput.PromptVersion != "" {
+		rec.EvaluatorPromptVersion = evaluatorOutput.PromptVersion
+	}
 
 	// Persist proposals.
 	proposals := persistEvaluatorResults(sessionID, evaluatorOutput, log)
@@ -206,6 +269,12 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 		}
 		log.Info("  Evaluator: no proposals (%s)", reason)
 	}
+
+	rec.Status = "processed"
+	rec.ProposalCount = len(evaluatorOutput.Proposals)
+	rec.EvaluatorDurationNs = int64(evalDuration)
+	rec.TotalDurationNs = int64(time.Since(runStart))
+	_ = AppendHistory(rec)
 
 	if markErr := store.MarkProcessed(sessionID); markErr != nil {
 		log.Error("  marking processed for %s: %v", sessionID, markErr)
@@ -258,6 +327,26 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		indexByID[s.SessionID] = i
 	}
 
+	// Build batch context for history records.
+	allSessionIDs := make([]string, len(sessions))
+	for i, s := range sessions {
+		allSessionIDs[i] = s.SessionID
+	}
+
+	// History records indexed by session ID — filled progressively.
+	records := make(map[string]*HistoryRecord, len(sessions))
+	runStarts := make(map[string]time.Time, len(sessions))
+
+	for _, s := range sessions {
+		now := time.Now()
+		runStarts[s.SessionID] = now
+		rec := r.buildBaseRecord(s.SessionID, now)
+		rec.BatchMode = true
+		rec.BatchSize = len(sessions)
+		rec.BatchSessionIDs = allSessionIDs
+		records[s.SessionID] = &rec
+	}
+
 	// Phase 1: Run Classifier individually on each session.
 	var toEvaluate []BatchSession
 	for i, s := range sessions {
@@ -272,11 +361,23 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		default:
 		}
 
+		classifyStart := time.Now()
 		classifierResult, err := r.classify(s.SessionID)
+		classifyDuration := time.Since(classifyStart)
+
+		rec := records[s.SessionID]
+		rec.ClassifierDurationNs = int64(classifyDuration)
+
 		if err != nil {
 			results[i].Status = "error"
 			results[i].Error = err
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+
+			rec.Status = "error"
+			rec.ErrorDetail = err.Error()
+			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+			_ = AppendHistory(*rec)
+
 			if markErr := store.MarkError(s.SessionID); markErr != nil {
 				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
 			}
@@ -286,14 +387,28 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		triage := classifierResult.ClassifierOutput.Triage
 		results[i].Triage = triage
 
+		if classifierResult.ClassifierOutput.PromptVersion != "" {
+			rec.ClassifierPromptVersion = classifierResult.ClassifierOutput.PromptVersion
+		}
+
 		if triage == "clean" {
 			results[i].Status = "processed"
 			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "clean"})
+
+			rec.Triage = "clean"
+			rec.Status = "processed"
+			rec.EvaluatorModel = ""
+			rec.EvaluatorPromptVersion = ""
+			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+			_ = AppendHistory(*rec)
+
 			if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
 				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
 			}
 			continue
 		}
+
+		rec.Triage = "evaluate"
 
 		// Session needs evaluation.
 		r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "evaluate"})
@@ -330,27 +445,43 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		chunk := toEvaluate[chunkStart:chunkEnd]
 
 		if len(chunk) == 1 {
-			r.runGroupEvalSingle(chunk[0], results, indexByID)
+			r.runGroupEvalSingle(chunk[0], results, indexByID, records, runStarts)
 		} else {
-			r.runGroupEvalBatch(chunk, results, indexByID)
+			r.runGroupEvalBatch(chunk, results, indexByID, records, runStarts)
 		}
 	}
 
 	return results
 }
 
-func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, indexByID map[string]int) {
+func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, indexByID map[string]int, records map[string]*HistoryRecord, runStarts map[string]time.Time) {
 	idx := indexByID[s.SessionID]
+	rec := records[s.SessionID]
 
+	evalStart := time.Now()
 	evaluatorOutput, err := r.evalOne(s.SessionID, s.Digest, s.ClassifierOutput)
+	evalDuration := time.Since(evalStart)
+
+	rec.EvaluatorDurationNs = int64(evalDuration)
+
 	if err != nil {
 		results[idx].Status = "error"
 		results[idx].Error = err
 		r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+
+		rec.Status = "error"
+		rec.ErrorDetail = err.Error()
+		rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+		_ = AppendHistory(*rec)
+
 		if markErr := store.MarkError(s.SessionID); markErr != nil {
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
 		}
 		return
+	}
+
+	if evaluatorOutput.PromptVersion != "" {
+		rec.EvaluatorPromptVersion = evaluatorOutput.PromptVersion
 	}
 
 	proposals := persistEvaluatorResults(s.SessionID, evaluatorOutput, r.log())
@@ -358,13 +489,24 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 	results[idx].Proposals = proposals
 	r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
 
+	rec.Status = "processed"
+	rec.ProposalCount = len(evaluatorOutput.Proposals)
+	rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+	_ = AppendHistory(*rec)
+
 	if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
 		r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
 	}
 }
 
-func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, indexByID map[string]int) {
+func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, indexByID map[string]int, records map[string]*HistoryRecord, runStarts map[string]time.Time) {
+	evalStart := time.Now()
 	evaluatorOutput, err := r.evalMany(chunk)
+	evalDuration := time.Since(evalStart)
+
+	// Split batch evaluator duration equally among sessions in the chunk.
+	perSessionDuration := evalDuration / time.Duration(len(chunk))
+
 	if err != nil {
 		// Mark all sessions in the chunk as errors.
 		for _, s := range chunk {
@@ -372,6 +514,14 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 			results[idx].Status = "error"
 			results[idx].Error = err
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
+
+			rec := records[s.SessionID]
+			rec.Status = "error"
+			rec.ErrorDetail = err.Error()
+			rec.EvaluatorDurationNs = int64(perSessionDuration)
+			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+			_ = AppendHistory(*rec)
+
 			if markErr := store.MarkError(s.SessionID); markErr != nil {
 				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
 			}
@@ -384,15 +534,27 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 	totalMatched := 0
 	for _, s := range chunk {
 		idx := indexByID[s.SessionID]
+		rec := records[s.SessionID]
+
 		prefix := "prop-" + shortID(s.SessionID) + "-"
 		filtered := filterProposals(evaluatorOutput, prefix)
 		filtered.SessionID = s.SessionID
 		totalMatched += len(filtered.Proposals)
 
+		if evaluatorOutput.PromptVersion != "" {
+			rec.EvaluatorPromptVersion = evaluatorOutput.PromptVersion
+		}
+
 		proposals := persistEvaluatorResults(s.SessionID, filtered, r.log())
 		results[idx].Status = "processed"
 		results[idx].Proposals = proposals
 		r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
+
+		rec.Status = "processed"
+		rec.ProposalCount = len(filtered.Proposals)
+		rec.EvaluatorDurationNs = int64(perSessionDuration)
+		rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+		_ = AppendHistory(*rec)
 
 		if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})

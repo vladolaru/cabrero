@@ -166,12 +166,43 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
     evaluator-v3.txt         # Evaluator stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
   config.json                # TUI and daemon settings (debug toggle, navigation, theme, etc.)
   blocklist.json             # session IDs to never process (loop prevention)
+  run_history.jsonl          # append-only pipeline run history (one JSON object per line)
   daemon.log                 # background daemon log (rotated, 5MB × 3)
   daemon.pid                 # PID file for single-instance enforcement
 ```
 
 **Rules:** immutable writes on raw backups. Configurable retention (e.g. 90 days raw,
 indefinite digests). CC version captured at copy time for schema drift detection.
+
+### Pipeline Run History
+
+`run_history.jsonl` is an append-only JSONL file that captures full diagnostic context
+for every pipeline run. One JSON object per line, one line per session processed (batch
+runs emit one record per session).
+
+**Recording:** `Runner.RunOne` and `Runner.RunGroup` wrap each pipeline stage with
+`time.Now()` calls and append a `HistoryRecord` after each session completes (both
+success and error paths). History recording is best-effort — failures don't block the
+pipeline.
+
+**Source tracking:** The `Runner.Source` field identifies the invocation path:
+`"daemon"`, `"cli-run"`, or `"cli-backfill"`. Set by the caller before `RunOne`/`RunGroup`.
+
+**Batch context:** Records from batch runs share `batch_mode: true`, `batch_size`,
+and `batch_session_ids`. Evaluator duration in batch evaluations is divided equally
+among sessions in the chunk (a single LLM call covers multiple sessions).
+
+**Fields per record:** session identity, timestamp, project, source, batch context,
+capture trigger, previous status (retry detection), triage outcome, pipeline status,
+proposal count, error detail, per-stage durations (parse, classifier, evaluator, total
+in nanoseconds), model and prompt versions actually used, and config snapshot
+(max turns, timeouts, debug flag).
+
+**Rotation:** On daemon startup, records older than 90 days are removed via
+`RotateHistory`. Uses atomic rewrite to prevent partial reads.
+
+**TUI integration:** `ListPipelineRunsFromHistory` prefers history data for timing;
+falls back to mtime-based estimation for sessions predating the history file.
 
 ### Store Write Invariants
 

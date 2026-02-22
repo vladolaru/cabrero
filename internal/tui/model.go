@@ -274,7 +274,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			proposals := m.proposals
 			return m, func() tea.Msg {
 				sessions, _ := store.ListSessions()
-				runs, _ := pipeline.ListPipelineRunsFromSessions(sessions, recentRunsLimit)
+				runs, _ := pipeline.ListPipelineRunsFromHistory(sessions, recentRunsLimit)
 				stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, sparklineDays)
 				prompts, _ := pipeline.ListPromptVersions()
 				dashStats := gatherStatsFromSessions(sessions, proposals)

@@ -53,6 +53,7 @@ func New(cfg Config) (*Daemon, error) {
 	}
 	cfg.Pipeline.Logger = &daemonPipelineLogger{log: log}
 	runner := pipeline.NewRunner(cfg.Pipeline)
+	runner.Source = "daemon"
 	return &Daemon{config: cfg, log: log, runner: runner}, nil
 }
 
@@ -88,6 +89,13 @@ func (d *Daemon) Run(ctx context.Context) error {
 
 	d.log.Info("daemon started (PID %d)", os.Getpid())
 	d.log.Info("poll=%s stale=%s delay=%s", d.config.PollInterval, d.config.StaleInterval, d.config.InterSessionDelay)
+
+	// Rotate old history records on startup.
+	if removed, err := pipeline.RotateHistory(90 * 24 * time.Hour); err != nil {
+		d.log.Info("history rotation failed: %v", err)
+	} else if removed > 0 {
+		d.log.Info("rotated %d old history records", removed)
+	}
 
 	// Run an immediate scan on startup.
 	d.processQueued(ctx)

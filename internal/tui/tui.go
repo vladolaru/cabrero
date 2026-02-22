@@ -42,7 +42,7 @@ func Run() error {
 
 	var sourceGroups []fitness.SourceGroup
 
-	runs, err := pipeline.ListPipelineRunsFromSessions(sessions, cfg.Pipeline.RecentRunsLimit)
+	runs, err := pipeline.ListPipelineRunsFromHistory(sessions, cfg.Pipeline.RecentRunsLimit)
 	if err != nil {
 		runs = nil // non-fatal
 	}

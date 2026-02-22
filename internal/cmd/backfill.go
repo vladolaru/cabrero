@@ -261,6 +261,7 @@ func runBackfill(sessions []store.Metadata, cfg pipeline.PipelineConfig) error {
 
 		sessionCount := len(g.sessions)
 		runner := pipeline.NewRunner(cfg)
+		runner.Source = "cli-backfill"
 		runner.OnStatus = func(sessionID string, event pipeline.BatchEvent) {
 			sid := sessionID
 			if len(sid) > 8 {

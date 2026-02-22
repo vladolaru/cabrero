@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Pipeline run history** — append-only JSONL log (`~/.cabrero/run_history.jsonl`)
+  captures full diagnostic context for every pipeline run: actual wall-clock timing
+  per stage, invocation source (daemon/CLI/backfill), batch context, models and
+  prompt versions used, config snapshot, and error details. Replaces unreliable
+  mtime-based timing estimates in the TUI. Records rotated after 90 days on daemon
+  startup. Includes `ComputeStatsFromHistory` for aggregate analysis (median/p95
+  latency, evaluator skip rate, retry rate, source breakdown).
+
 - **Debug mode indicator** — `cabrero status`, the dashboard header, and the
   pipeline monitor DAEMON section now show "Debug: enabled" in warning color
   when pipeline debug mode is active. Hidden when off.

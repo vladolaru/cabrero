@@ -16,6 +16,9 @@ import (
 
 const evaluatorPromptFile = "evaluator-v3.txt"
 
+// EvaluatorModel is the Claude model used for evaluation.
+const EvaluatorModel = "claude-sonnet-4-6"
+
 // BatchSession holds data for one session in an Evaluator batch.
 type BatchSession struct {
 	SessionID        string
@@ -52,7 +55,7 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 	allowedTools := evaluatorAllowedTools(digest.Shape.Cwd)
 
 	stdout, err := invokeClaude(claudeConfig{
-		Model:          "claude-sonnet-4-6",
+		Model:          EvaluatorModel,
 		SystemPrompt:   systemPrompt,
 		Effort:         "high",
 		Agentic:        true,
@@ -143,7 +146,7 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	allowedTools := evaluatorAllowedTools(sessions[0].Digest.Shape.Cwd)
 
 	stdout, err := invokeClaude(claudeConfig{
-		Model:          "claude-sonnet-4-6",
+		Model:          EvaluatorModel,
 		SystemPrompt:   systemPrompt,
 		Effort:         "high",
 		Agentic:        true,
