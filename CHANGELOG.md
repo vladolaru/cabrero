@@ -15,6 +15,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pipeline monitor, fitness report, log viewer, or help overlay retains the
   header context. Snapshots also include the header for all views.
 
+### Fixed
+
+- **Status bar no longer wraps at narrow widths** — `RenderStatusBar` now
+  measures visual width and drops trailing bindings to guarantee a single-line
+  status bar at any terminal width.
+- **Detail view respects terminal height** — replaced the unbounded
+  strings.Builder body with a single scrollable viewport (matching the fitness
+  view pattern). Diff, rationale, citations, and apply-state overlays all render
+  inside the viewport, capping output to exactly the declared height.
+- **Chat panel respects terminal height** — fixed viewport sizing to account
+  for bordered chip chrome and added fill-to-height logic.
+
 ## [0.13.0] - 2026-02-22
 
 ### Added
