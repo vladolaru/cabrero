@@ -10,6 +10,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
+	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -83,6 +84,31 @@ func Status(args []string) error {
 	preCompact, sessionEnd := checkHooks()
 	fmt.Printf("  %s  pre-compact %s   session-end %s\n",
 		cli.Bold("Hooks:"), hookStatus(preCompact), hookStatus(sessionEnd))
+
+	// Pipeline models and prompts.
+	cfg := pipeline.DefaultPipelineConfig()
+	prompts, _ := pipeline.ListPromptVersions()
+	classifierPrompt := ""
+	evaluatorPrompt := ""
+	for _, p := range prompts {
+		if p.Name == "classifier" {
+			classifierPrompt = p.Version
+		}
+		if p.Name == "evaluator" {
+			evaluatorPrompt = p.Version
+		}
+	}
+	fmt.Printf("  %s\n", cli.Bold("Pipeline:"))
+	clsLine := fmt.Sprintf("    Classifier:  %s", cfg.ClassifierModel)
+	if classifierPrompt != "" {
+		clsLine += cli.Muted(fmt.Sprintf("  (prompt: %s)", classifierPrompt))
+	}
+	fmt.Println(clsLine)
+	evalLine := fmt.Sprintf("    Evaluator:   %s", cfg.EvaluatorModel)
+	if evaluatorPrompt != "" {
+		evalLine += cli.Muted(fmt.Sprintf("  (prompt: %s)", evaluatorPrompt))
+	}
+	fmt.Println(evalLine)
 
 	// Debug mode.
 	if store.ReadDebugFlag() {
