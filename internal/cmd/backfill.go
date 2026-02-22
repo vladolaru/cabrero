@@ -76,7 +76,7 @@ func Backfill(args []string) error {
 	}
 
 	// Show preview.
-	showBackfillPreview(sessions, filter)
+	showBackfillPreview(sessions, filter, cfg)
 
 	if *dryRun {
 		return nil
@@ -146,7 +146,7 @@ func enqueueSessions(sessions []store.Metadata) error {
 	return nil
 }
 
-func showBackfillPreview(sessions []store.Metadata, filter store.SessionFilter) {
+func showBackfillPreview(sessions []store.Metadata, filter store.SessionFilter, cfg pipeline.PipelineConfig) {
 	fmt.Println()
 	fmt.Println("Backfill Preview")
 	fmt.Println(strings.Repeat("═", 40))
@@ -207,8 +207,8 @@ func showBackfillPreview(sessions []store.Metadata, filter store.SessionFilter) 
 
 	// Estimate.
 	fmt.Printf("\n  Estimated pipeline calls:\n")
-	fmt.Printf("    Classifier: %d invocations (Haiku — low cost)\n", len(sessions))
-	fmt.Printf("    Evaluator:  up to %d batch invocations (Sonnet — one per project)\n", len(projectOrder))
+	fmt.Printf("    Classifier: %d invocations (%s)\n", len(sessions), cfg.ClassifierModel)
+	fmt.Printf("    Evaluator:  up to %d batch invocations (%s)\n", len(projectOrder), cfg.EvaluatorModel)
 	fmt.Println()
 }
 
