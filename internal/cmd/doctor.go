@@ -14,6 +14,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
+	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -1007,6 +1008,21 @@ func (d *doctorRunner) checkPath() []checkResult {
 
 func (d *doctorRunner) checkPipeline() []checkResult {
 	var results []checkResult
+
+	// Active models.
+	cfg := pipeline.DefaultPipelineConfig()
+	results = append(results, checkResult{
+		name:     "Classifier model",
+		category: "Pipeline",
+		status:   checkPass,
+		message:  cfg.ClassifierModel,
+	})
+	results = append(results, checkResult{
+		name:     "Evaluator model",
+		category: "Pipeline",
+		status:   checkPass,
+		message:  cfg.EvaluatorModel,
+	})
 
 	sessions, err := store.ListSessions()
 	if err != nil {
