@@ -61,6 +61,11 @@ func (m Model) View() string {
 	// Recent runs.
 	sections = append(sections, m.renderRecentRuns())
 
+	// Models: hidden in narrow mode.
+	if m.layoutMode() != layoutNarrow {
+		sections = append(sections, m.renderModels())
+	}
+
 	// Prompts: hidden in narrow mode.
 	if len(m.prompts) > 0 && m.layoutMode() != layoutNarrow {
 		sections = append(sections, m.renderPrompts())
@@ -277,6 +282,24 @@ func (m Model) renderRunDetail(run pl.PipelineRun) string {
 	}
 	if run.ErrorDetail != "" {
 		b.WriteString(fmt.Sprintf("\n      Error: %s", run.ErrorDetail))
+	}
+	return b.String()
+}
+
+func (m Model) renderModels() string {
+	var b strings.Builder
+	b.WriteString(sectionHeaderStyle.Render("MODELS"))
+	b.WriteString("\n")
+
+	cfg := pl.DefaultPipelineConfig()
+	b.WriteString(fmt.Sprintf("  Classifier:  %s", cfg.ClassifierModel))
+	if cfg.ClassifierModel != pl.DefaultClassifierModel {
+		b.WriteString(warningStyle.Render("  (override)"))
+	}
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("  Evaluator:   %s", cfg.EvaluatorModel))
+	if cfg.EvaluatorModel != pl.DefaultEvaluatorModel {
+		b.WriteString(warningStyle.Render("  (override)"))
 	}
 	return b.String()
 }
