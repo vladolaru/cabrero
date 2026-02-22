@@ -54,6 +54,8 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 		AllowedTools: "Read,Grep",
 		MaxTurns:     cfg.EvaluatorMaxTurns,
 		Timeout:      cfg.EvaluatorTimeout,
+		Debug:        cfg.Debug,
+		Logger:       cfg.logger(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking evaluator: %w", err)
@@ -138,6 +140,8 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 		AllowedTools: "Read,Grep",
 		MaxTurns:     maxTurns,
 		Timeout:      timeout,
+		Debug:        cfg.Debug,
+		Logger:       cfg.logger(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking evaluator batch: %w", err)

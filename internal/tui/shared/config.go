@@ -8,6 +8,7 @@ import "encoding/json"
 // Config holds all TUI configuration. Stored at ~/.cabrero/config.json.
 // Missing fields get defaults. Unknown fields are preserved on roundtrip.
 type Config struct {
+	Debug         bool                `json:"debug,omitempty"`
 	Navigation    string              `json:"navigation"`
 	Theme         string              `json:"theme"`
 	Dashboard     DashboardConfig     `json:"dashboard"`

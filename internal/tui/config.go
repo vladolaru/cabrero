@@ -49,7 +49,7 @@ func LoadConfigFrom(path string) (*Config, error) {
 
 	// Preserve unknown top-level fields.
 	known := map[string]bool{
-		"navigation": true, "theme": true,
+		"debug": true, "navigation": true, "theme": true,
 		"dashboard": true, "detail": true,
 		"personality": true, "confirmations": true,
 		"sourceManager": true, "pipeline": true,

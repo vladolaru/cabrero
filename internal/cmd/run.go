@@ -13,6 +13,7 @@ func Run(args []string) error {
 	defaults := pipeline.DefaultPipelineConfig()
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	dryRun := fs.Bool("dry-run", false, "run only the pre-parser, skip LLM invocations")
+	debug := fs.Bool("debug", false, "persist CC sessions for classifier/evaluator inspection")
 	classifierMaxTurns := fs.Int("classifier-max-turns", defaults.ClassifierMaxTurns, "max agentic turns for Classifier")
 	evaluatorMaxTurns := fs.Int("evaluator-max-turns", defaults.EvaluatorMaxTurns, "max agentic turns for Evaluator")
 	classifierTimeout := fs.Duration("classifier-timeout", defaults.ClassifierTimeout, "timeout for Classifier")
@@ -33,6 +34,7 @@ func Run(args []string) error {
 	cfg.EvaluatorMaxTurns = *evaluatorMaxTurns
 	cfg.ClassifierTimeout = *classifierTimeout
 	cfg.EvaluatorTimeout = *evaluatorTimeout
+	cfg.Debug = *debug
 
 	runner := pipeline.NewRunner(cfg)
 	result, err := runner.RunOne(context.Background(), sessionID, *dryRun)

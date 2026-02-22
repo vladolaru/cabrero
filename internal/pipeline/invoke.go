@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -25,6 +26,8 @@ type claudeConfig struct {
 	MaxTurns     int           // turn budget — no --max-turns CLI flag exists; callers embed this in the prompt
 	Timeout      time.Duration // hard wall-clock timeout via context.WithTimeout
 	Stdin        io.Reader     // only used in --print mode (Agentic=false)
+	Debug        bool          // persist CC session transcript for inspection
+	Logger       Logger        // for debug log messages (nil = no debug logging)
 }
 
 // invokeClaude runs the claude CLI with the given config.
@@ -46,6 +49,19 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 
 	var args []string
 
+	// In debug mode, generate a session ID and blocklist it before invocation.
+	var debugSessionID string
+	if cfg.Debug {
+		id, err := generateUUID()
+		if err != nil {
+			return "", fmt.Errorf("generating debug session ID: %w", err)
+		}
+		debugSessionID = id
+		if err := store.BlockSession(debugSessionID); err != nil {
+			return "", fmt.Errorf("blocklisting debug session: %w", err)
+		}
+	}
+
 	if cfg.Agentic {
 		// Agentic mode: prompt as positional arg, tools enabled.
 		args = []string{
@@ -53,8 +69,12 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 			"-p", cfg.Prompt,
 			"--system-prompt", cfg.SystemPrompt,
 			"--output-format", "text",
-			"--no-session-persistence",
 			"--disable-slash-commands",
+		}
+		if !cfg.Debug {
+			args = append(args, "--no-session-persistence")
+		} else {
+			args = append(args, "--session-id", debugSessionID)
 		}
 		if cfg.AllowedTools != "" {
 			args = append(args, "--allowedTools", cfg.AllowedTools)
@@ -68,13 +88,21 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 			"--model", cfg.Model,
 			"--print",
 			"--system-prompt", cfg.SystemPrompt,
-			"--no-session-persistence",
 			"--disable-slash-commands",
 			"--tools", "",
+		}
+		if !cfg.Debug {
+			args = append(args, "--no-session-persistence")
+		} else {
+			args = append(args, "--session-id", debugSessionID)
 		}
 		if cfg.Effort != "" {
 			args = append(args, "--effort", cfg.Effort)
 		}
+	}
+
+	if cfg.Debug && cfg.Logger != nil {
+		cfg.Logger.Info("  [debug] claude args: %v", args)
 	}
 
 	// Always create a context so we can detect timeout in error handling.
@@ -105,7 +133,24 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 		return "", fmt.Errorf("running claude: %w", err)
 	}
 
+	if cfg.Debug && cfg.Logger != nil && debugSessionID != "" {
+		cfg.Logger.Info("  [debug] CC session %s persisted for inspection", debugSessionID)
+	}
+
 	return string(out), nil
+}
+
+// generateUUID returns a random UUID v4 string using crypto/rand.
+func generateUUID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	// Set version (4) and variant (RFC 4122).
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
 }
 
 // readPromptTemplate reads a prompt file from ~/.cabrero/prompts/.

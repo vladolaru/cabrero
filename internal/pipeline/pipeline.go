@@ -40,6 +40,7 @@ type PipelineConfig struct {
 	ClassifierTimeout  time.Duration
 	EvaluatorTimeout   time.Duration
 	Logger             Logger // nil defaults to stdLogger (stdout/stderr)
+	Debug              bool   // persist CC sessions for classifier/evaluator
 }
 
 // logger returns the configured Logger, falling back to stdLogger.

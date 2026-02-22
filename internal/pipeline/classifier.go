@@ -49,6 +49,8 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 		AllowedTools: "Read,Grep",
 		MaxTurns:     cfg.ClassifierMaxTurns,
 		Timeout:      cfg.ClassifierTimeout,
+		Debug:        cfg.Debug,
+		Logger:       cfg.logger(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking classifier: %w", err)

@@ -159,6 +159,24 @@ func IsBlocked(sessionID string) bool {
 	return m[sessionID]
 }
 
+// --- config helpers ---------------------------------------------------
+
+// ReadDebugFlag reads the "debug" field from ~/.cabrero/config.json.
+// Returns false if the file is missing, malformed, or the field is absent.
+func ReadDebugFlag() bool {
+	data, err := os.ReadFile(filepath.Join(Root(), "config.json"))
+	if err != nil {
+		return false
+	}
+	var cfg struct {
+		Debug bool `json:"debug"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return false
+	}
+	return cfg.Debug
+}
+
 // BlocklistLen returns the number of entries in the blocklist.
 func BlocklistLen() int {
 	blocklistMu.Lock()

@@ -109,6 +109,16 @@ func (d *Daemon) Run(ctx context.Context) error {
 }
 
 func (d *Daemon) processQueued(ctx context.Context) {
+	// Re-read debug flag from config each cycle (cheap: one small JSON file).
+	if configDebug := store.ReadDebugFlag(); configDebug != d.runner.Config.Debug {
+		d.runner.Config.Debug = configDebug
+		if configDebug {
+			d.log.Info("debug mode enabled via config")
+		} else {
+			d.log.Info("debug mode disabled via config")
+		}
+	}
+
 	queued, err := ScanQueued()
 	if err != nil {
 		d.log.Error("scanning queued sessions: %v", err)
