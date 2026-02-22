@@ -26,7 +26,7 @@ var commands = []command{
 	{"approve", "Approve and apply a proposal", cmd.Approve},
 	{"reject", "Reject a proposal with optional reason", cmd.Reject},
 	{"calibrate", "Manage calibration set for prompt testing", cmd.Calibrate},
-	{"replay", "Re-run pipeline with a different prompt", cmdNotImplemented},
+	{"replay", "Re-run pipeline with a different prompt", cmd.Replay},
 	{"prompts", "List prompt files with versions", cmd.Prompts},
 	{"import", "Seed the store from existing CC session files", cmd.Import},
 	{"backfill", "Run pipeline on existing sessions with date/project filtering", cmd.Backfill},

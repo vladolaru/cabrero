@@ -26,7 +26,19 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading classifier prompt: %w", err)
 	}
+	return runClassifierCore(sessionID, digest, aggregatorOutput, cfg, systemPrompt)
+}
 
+// RunClassifierWithPrompt is like RunClassifier but uses a caller-supplied system prompt
+// instead of reading the default prompt file from disk. Intended for replay/testing workflows
+// that need to exercise an alternate prompt version.
+func RunClassifierWithPrompt(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput, cfg PipelineConfig, systemPrompt string) (*ClassifierOutput, *ClaudeResult, error) {
+	return runClassifierCore(sessionID, digest, aggregatorOutput, cfg, systemPrompt)
+}
+
+// runClassifierCore holds the shared implementation called by RunClassifier and
+// RunClassifierWithPrompt. systemPrompt is the full prompt text (already loaded).
+func runClassifierCore(sessionID string, digest *parser.Digest, aggregatorOutput *patterns.AggregatorOutput, cfg PipelineConfig, systemPrompt string) (*ClassifierOutput, *ClaudeResult, error) {
 	digestJSON, err := json.MarshalIndent(digest, "", "  ")
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshalling digest: %w", err)

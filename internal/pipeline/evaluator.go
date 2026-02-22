@@ -34,7 +34,19 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading evaluator prompt: %w", err)
 	}
+	return runEvaluatorCore(sessionID, digest, classifierOutput, cfg, systemPrompt)
+}
 
+// RunEvaluatorWithPrompt is like RunEvaluator but uses a caller-supplied system prompt
+// instead of reading the default prompt file from disk. Intended for replay/testing workflows
+// that need to exercise an alternate prompt version.
+func RunEvaluatorWithPrompt(sessionID string, digest *parser.Digest, classifierOutput *ClassifierOutput, cfg PipelineConfig, systemPrompt string) (*EvaluatorOutput, *ClaudeResult, error) {
+	return runEvaluatorCore(sessionID, digest, classifierOutput, cfg, systemPrompt)
+}
+
+// runEvaluatorCore holds the shared implementation called by RunEvaluator and
+// RunEvaluatorWithPrompt. systemPrompt is the full prompt text (already loaded).
+func runEvaluatorCore(sessionID string, digest *parser.Digest, classifierOutput *ClassifierOutput, cfg PipelineConfig, systemPrompt string) (*EvaluatorOutput, *ClaudeResult, error) {
 	classifierJSON, err := json.MarshalIndent(classifierOutput, "", "  ")
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshalling classifier output: %w", err)
