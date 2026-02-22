@@ -7,6 +7,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Debug mode indicator** — `cabrero status`, the dashboard header, and the
+  pipeline monitor DAEMON section now show "Debug: enabled" in warning color
+  when pipeline debug mode is active. Hidden when off.
+
+### Fixed
+
+- **macOS network volume TCC prompts** — `claude` child processes inherited
+  `cwd=/` from the launchd daemon, causing CC's startup project discovery to
+  probe paths reaching the Google Drive FileProvider. Now sets `cmd.Dir` to
+  `~/.cabrero/` for a safe, local-only starting directory.
+
 ## [0.10.0] - 2026-02-22
 
 ### Added
