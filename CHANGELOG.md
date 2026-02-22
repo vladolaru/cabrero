@@ -13,6 +13,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pipeline monitor DAEMON section now show "Debug: enabled" in warning color
   when pipeline debug mode is active. Hidden when off.
 
+- **Scoped filesystem access for pipeline invocations** — Classifier and evaluator
+  CC sessions now use `--permission-mode dontAsk`, `--setting-sources ""`, and
+  path-scoped `--allowedTools` to restrict filesystem access. The classifier can
+  only read `~/.cabrero/`; the evaluator can read `~/.cabrero/`, the session's
+  project directory, and `~/.claude/`. Prevents CC from loading user plugins and
+  eliminates remaining macOS TCC prompt triggers.
+
 ### Fixed
 
 - **macOS network volume TCC prompts** — `claude` child processes inherited

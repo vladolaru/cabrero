@@ -28,7 +28,14 @@ type claudeConfig struct {
 	Stdin        io.Reader     // only used in --print mode (Agentic=false)
 	Debug        bool          // persist CC session transcript for inspection
 	Logger       Logger        // for debug log messages (nil = no debug logging)
+	// Isolation fields — restrict filesystem access and plugin loading.
+	DisallowedTools string  // comma-separated deny rules for --disallowedTools
+	PermissionMode  string  // permission mode (e.g. "dontAsk" to auto-deny unapproved tools)
+	SettingSources  *string // setting sources to load (nil = default, "" = none)
 }
+
+// emptyStr is a convenience value for &emptyStr when SettingSources should be "".
+var emptyStr = ""
 
 // invokeClaude runs the claude CLI with the given config.
 //
@@ -82,6 +89,15 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 		if cfg.Effort != "" {
 			args = append(args, "--effort", cfg.Effort)
 		}
+		if cfg.DisallowedTools != "" {
+			args = append(args, "--disallowedTools", cfg.DisallowedTools)
+		}
+		if cfg.PermissionMode != "" {
+			args = append(args, "--permission-mode", cfg.PermissionMode)
+		}
+		if cfg.SettingSources != nil {
+			args = append(args, "--setting-sources", *cfg.SettingSources)
+		}
 	} else {
 		// Print mode: stdin pipe, all tools disabled.
 		args = []string{
@@ -98,6 +114,12 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 		}
 		if cfg.Effort != "" {
 			args = append(args, "--effort", cfg.Effort)
+		}
+		if cfg.PermissionMode != "" {
+			args = append(args, "--permission-mode", cfg.PermissionMode)
+		}
+		if cfg.SettingSources != nil {
+			args = append(args, "--setting-sources", *cfg.SettingSources)
 		}
 	}
 

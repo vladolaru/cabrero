@@ -9,6 +9,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/patterns"
 	"github.com/vladolaru/cabrero/internal/retrieval"
+	"github.com/vladolaru/cabrero/internal/store"
 )
 
 const classifierPromptFile = "classifier-v3.txt"
@@ -41,16 +42,22 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 		}
 	}
 
+	// Scope filesystem access to ~/.cabrero/ only — classifier reads raw transcripts.
+	cabreroRoot := store.Root()
+	allowedTools := fmt.Sprintf("Read(//%s/**),Grep(//%s/**)", cabreroRoot, cabreroRoot)
+
 	stdout, err := invokeClaude(claudeConfig{
-		Model:        "claude-haiku-4-5",
-		SystemPrompt: systemPrompt,
-		Agentic:      true,
-		Prompt:       data,
-		AllowedTools: "Read,Grep",
-		MaxTurns:     cfg.ClassifierMaxTurns,
-		Timeout:      cfg.ClassifierTimeout,
-		Debug:        cfg.Debug,
-		Logger:       cfg.logger(),
+		Model:          "claude-haiku-4-5",
+		SystemPrompt:   systemPrompt,
+		Agentic:        true,
+		Prompt:         data,
+		AllowedTools:   allowedTools,
+		MaxTurns:       cfg.ClassifierMaxTurns,
+		Timeout:        cfg.ClassifierTimeout,
+		Debug:          cfg.Debug,
+		Logger:         cfg.logger(),
+		PermissionMode: "dontAsk",
+		SettingSources: &emptyStr,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking classifier: %w", err)

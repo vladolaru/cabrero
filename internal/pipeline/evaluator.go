@@ -3,12 +3,15 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/vladolaru/cabrero/internal/parser"
 	"github.com/vladolaru/cabrero/internal/retrieval"
+	"github.com/vladolaru/cabrero/internal/store"
 )
 
 const evaluatorPromptFile = "evaluator-v3.txt"
@@ -45,17 +48,22 @@ func RunEvaluator(sessionID string, digest *parser.Digest, classifierOutput *Cla
 	// Inject turn budget into the prompt template.
 	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(cfg.EvaluatorMaxTurns))
 
+	// Scope filesystem access: ~/.cabrero + project dir + ~/.claude.
+	allowedTools := evaluatorAllowedTools(digest.Shape.Cwd)
+
 	stdout, err := invokeClaude(claudeConfig{
-		Model:        "claude-sonnet-4-6",
-		SystemPrompt: systemPrompt,
-		Effort:       "high",
-		Agentic:      true,
-		Prompt:       data,
-		AllowedTools: "Read,Grep",
-		MaxTurns:     cfg.EvaluatorMaxTurns,
-		Timeout:      cfg.EvaluatorTimeout,
-		Debug:        cfg.Debug,
-		Logger:       cfg.logger(),
+		Model:          "claude-sonnet-4-6",
+		SystemPrompt:   systemPrompt,
+		Effort:         "high",
+		Agentic:        true,
+		Prompt:         data,
+		AllowedTools:   allowedTools,
+		MaxTurns:       cfg.EvaluatorMaxTurns,
+		Timeout:        cfg.EvaluatorTimeout,
+		Debug:          cfg.Debug,
+		Logger:         cfg.logger(),
+		PermissionMode: "dontAsk",
+		SettingSources: &emptyStr,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking evaluator: %w", err)
@@ -131,17 +139,22 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	// Inject scaled turn budget into the prompt template.
 	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(maxTurns))
 
+	// Scope filesystem access: use first session's cwd (all sessions share the same project).
+	allowedTools := evaluatorAllowedTools(sessions[0].Digest.Shape.Cwd)
+
 	stdout, err := invokeClaude(claudeConfig{
-		Model:        "claude-sonnet-4-6",
-		SystemPrompt: systemPrompt,
-		Effort:       "high",
-		Agentic:      true,
-		Prompt:       dataBuilder.String(),
-		AllowedTools: "Read,Grep",
-		MaxTurns:     maxTurns,
-		Timeout:      timeout,
-		Debug:        cfg.Debug,
-		Logger:       cfg.logger(),
+		Model:          "claude-sonnet-4-6",
+		SystemPrompt:   systemPrompt,
+		Effort:         "high",
+		Agentic:        true,
+		Prompt:         dataBuilder.String(),
+		AllowedTools:   allowedTools,
+		MaxTurns:       maxTurns,
+		Timeout:        timeout,
+		Debug:          cfg.Debug,
+		Logger:         cfg.logger(),
+		PermissionMode: "dontAsk",
+		SettingSources: &emptyStr,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("invoking evaluator batch: %w", err)
@@ -297,6 +310,36 @@ func filterAndValidateProposals(output *EvaluatorOutput, validUUIDs map[string]b
 
 	output.Proposals = validProposals
 	return nil
+}
+
+// evaluatorAllowedTools builds a path-scoped --allowedTools value for the evaluator.
+// Always includes ~/.cabrero and ~/.claude; includes the project dir when available.
+func evaluatorAllowedTools(cwd *string) string {
+	cabreroRoot := store.Root()
+	paths := []string{
+		fmt.Sprintf("Read(//%s/**)", cabreroRoot),
+		fmt.Sprintf("Grep(//%s/**)", cabreroRoot),
+	}
+
+	// Add project directory if available from the digest.
+	if cwd != nil && *cwd != "" {
+		paths = append(paths,
+			fmt.Sprintf("Read(//%s/**)", *cwd),
+			fmt.Sprintf("Grep(//%s/**)", *cwd),
+		)
+	}
+
+	// Allow reading ~/.claude/ for CLAUDE.md and settings context.
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		claudeDir := filepath.Join(home, ".claude")
+		paths = append(paths,
+			fmt.Sprintf("Read(//%s/**)", claudeDir),
+			fmt.Sprintf("Grep(//%s/**)", claudeDir),
+		)
+	}
+
+	return strings.Join(paths, ",")
 }
 
 func collectEvaluatorUUIDs(output *EvaluatorOutput) []string {
