@@ -40,13 +40,10 @@ func New(chips []string, contextPayload string, width, height int) Model {
 	ta.SetHeight(1)
 	ta.SetWidth(width - 4)
 
-	vp := viewport.New(width-2, height-6)
-
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 
-	return Model{
-		viewport:       vp,
+	m := Model{
 		input:          ta,
 		chips:          chips,
 		chipsVisible:   len(chips) > 0,
@@ -55,6 +52,10 @@ func New(chips []string, contextPayload string, width, height int) Model {
 		width:          width,
 		height:         height,
 	}
+
+	vpH := m.viewportHeight()
+	m.viewport = viewport.New(width-2, vpH)
+	return m
 }
 
 // SetSize updates the chat panel dimensions.
@@ -62,8 +63,28 @@ func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 	m.viewport.Width = width - 2
-	m.viewport.Height = height - 6
+	m.viewport.Height = m.viewportHeight()
 	m.input.SetWidth(width - 4)
+}
+
+// viewportHeight returns the viewport height after reserving space for chrome.
+// Chrome: header (2 lines) + optional chips + newline after viewport (1) + input (1).
+// Each visible chip is 3 visual lines (border top + content + border bottom) plus
+// a trailing newline, and a blank line follows the last chip.
+func (m Model) viewportHeight() int {
+	chrome := 4 // header (2) + post-viewport newline (1) + input (1)
+	if m.chipsVisible && len(m.chips) > 0 {
+		n := len(m.chips)
+		if n > 4 {
+			n = 4
+		}
+		chrome += n*3 + 1 // 3 lines per chip (border) + 1 trailing blank
+	}
+	h := m.height - chrome
+	if h < 1 {
+		h = 1
+	}
+	return h
 }
 
 // HasRevision returns true if the last assistant response contained a revision.

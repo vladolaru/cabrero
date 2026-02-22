@@ -42,7 +42,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward to active viewport.
 	if m.focus == FocusProposal {
 		var cmd tea.Cmd
-		m.diffViewport, cmd = m.diffViewport.Update(msg)
+		m.bodyViewport, cmd = m.bodyViewport.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -107,7 +107,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		key.Matches(msg, m.keys.HalfPageUp), key.Matches(msg, m.keys.HalfPageDown):
 		if m.focus == FocusProposal {
 			var cmd tea.Cmd
-			m.diffViewport, cmd = m.diffViewport.Update(msg)
+			m.bodyViewport, cmd = m.bodyViewport.Update(msg)
 			return m, cmd
 		}
 		return m, nil
@@ -133,16 +133,19 @@ func (m Model) startApprove() (Model, tea.Cmd) {
 
 	if m.HasRevision() {
 		m.revConfirm = components.NewRevisionConfirm("Apply this change?")
+		m.refreshBodyViewport()
 		return m, nil
 	}
 
 	m.confirm = components.NewConfirm("Apply this change?")
+	m.refreshBodyViewport()
 	return m, nil
 }
 
 func (m Model) handleConfirmResult(msg components.ConfirmResult) (Model, tea.Cmd) {
 	if !msg.Confirmed {
 		m.applyState = ApplyIdle
+		m.refreshBodyViewport()
 		return m, nil
 	}
 
@@ -150,6 +153,7 @@ func (m Model) handleConfirmResult(msg components.ConfirmResult) (Model, tea.Cmd
 	case ApplyConfirming:
 		// Start blending.
 		m.applyState = ApplyBlending
+		m.refreshBodyViewport()
 		id := m.proposal.Proposal.ID
 		return m, tea.Batch(
 			m.spinner.Tick,
@@ -161,18 +165,21 @@ func (m Model) handleConfirmResult(msg components.ConfirmResult) (Model, tea.Cmd
 		// Confirm apply after blend review.
 		id := m.proposal.Proposal.ID
 		m.applyState = ApplyDone
+		m.refreshBodyViewport()
 		return m, func() tea.Msg {
 			return message.ApplyConfirmed{ProposalID: id}
 		}
 	case ApplyRejectConfirming:
 		id := m.proposal.Proposal.ID
 		m.applyState = ApplyIdle
+		m.refreshBodyViewport()
 		return m, func() tea.Msg {
 			return message.RejectFinished{ProposalID: id}
 		}
 	case ApplyDeferConfirming:
 		id := m.proposal.Proposal.ID
 		m.applyState = ApplyIdle
+		m.refreshBodyViewport()
 		return m, func() tea.Msg {
 			return message.DeferFinished{ProposalID: id}
 		}
@@ -185,9 +192,11 @@ func (m Model) handleRevisionChoice(msg components.RevisionChoice) (Model, tea.C
 	switch msg.Choice {
 	case "cancel":
 		m.applyState = ApplyIdle
+		m.refreshBodyViewport()
 		return m, nil
 	case "original", "revision":
 		m.applyState = ApplyBlending
+		m.refreshBodyViewport()
 		id := m.proposal.Proposal.ID
 		return m, tea.Batch(
 			m.spinner.Tick,
@@ -199,9 +208,17 @@ func (m Model) handleRevisionChoice(msg components.RevisionChoice) (Model, tea.C
 	return m, nil
 }
 
+// refreshBodyViewport updates the body viewport content and scrolls to bottom
+// to keep overlays (confirm prompts, spinner, blend results) visible.
+func (m *Model) refreshBodyViewport() {
+	m.bodyViewport.SetContent(m.renderBodyContent())
+	m.bodyViewport.GotoBottom()
+}
+
 func (m Model) handleBlendFinished(msg message.BlendFinished) (Model, tea.Cmd) {
 	if msg.Err != nil {
 		m.applyState = ApplyIdle
+		m.refreshBodyViewport()
 		return m, func() tea.Msg {
 			return message.StatusMessage{Text: "Blend failed: " + msg.Err.Error()}
 		}
@@ -210,6 +227,7 @@ func (m Model) handleBlendFinished(msg message.BlendFinished) (Model, tea.Cmd) {
 	m.applyState = ApplyReviewing
 	m.blendResult = &msg.BeforeAfterDiff
 	m.confirm = components.NewConfirm("Commit this change?")
+	m.refreshBodyViewport()
 	return m, nil
 }
 
@@ -220,6 +238,7 @@ func (m Model) startReject() (Model, tea.Cmd) {
 	if m.config.Confirmations.RejectRequiresConfirm {
 		m.applyState = ApplyRejectConfirming
 		m.confirm = components.NewConfirm("Reject this proposal?")
+		m.refreshBodyViewport()
 		return m, nil
 	}
 	id := m.proposal.Proposal.ID
@@ -235,6 +254,7 @@ func (m Model) startDefer() (Model, tea.Cmd) {
 	if m.config.Confirmations.DeferRequiresConfirm {
 		m.applyState = ApplyDeferConfirming
 		m.confirm = components.NewConfirm("Defer this proposal?")
+		m.refreshBodyViewport()
 		return m, nil
 	}
 	id := m.proposal.Proposal.ID

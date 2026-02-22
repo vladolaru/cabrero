@@ -503,7 +503,7 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 
 			// Initialize chat for this proposal.
 			chips := defaultChips()
-			m.chat = chat.New(chips, "", chatWidth(m.width, m.config), ch-6)
+			m.chat = chat.New(chips, "", chatWidth(m.width, m.config), ch)
 
 			// Trigger follow-up action if specified.
 			switch action {

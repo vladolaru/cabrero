@@ -30,7 +30,7 @@ func (m Model) View() string {
 
 	var b strings.Builder
 
-	// Header.
+	// Header (5 visual lines).
 	p := &m.proposal.Proposal
 	b.WriteString(detailHeader.Render(fmt.Sprintf("  Proposal: %s", p.Type)))
 	b.WriteString("\n\n")
@@ -40,60 +40,9 @@ func (m Model) View() string {
 		detailMuted.Render(shared.TruncateID(m.proposal.SessionID, 12))))
 	b.WriteString("\n")
 
-	// Proposed change.
-	b.WriteString(detailSection.Render("  PROPOSED CHANGE"))
+	// Scrollable body viewport.
+	b.WriteString(m.bodyViewport.View())
 	b.WriteString("\n")
-	b.WriteString("  " + strings.Repeat("─", 17))
-	b.WriteString("\n")
-	b.WriteString(shared.IndentBlock(m.diffViewport.View(), 2))
-	b.WriteString("\n\n")
-
-	// Rationale.
-	b.WriteString(detailSection.Render("  RATIONALE"))
-	b.WriteString("\n")
-	b.WriteString("  " + strings.Repeat("─", 17))
-	b.WriteString("\n")
-	b.WriteString(shared.WrapIndent(p.Rationale, m.width, 2))
-	b.WriteString("\n\n")
-
-	// Citation chain.
-	if len(m.citations) > 0 {
-		b.WriteString(detailSection.Render(fmt.Sprintf("  CITATION CHAIN (%d entries)", len(m.citations))))
-		b.WriteString("\n")
-		b.WriteString("  " + strings.Repeat("─", 17))
-		b.WriteString("\n")
-		b.WriteString(renderCitations(m.citations, m.width))
-		b.WriteString("\n")
-	}
-
-	// Apply state overlay.
-	switch m.applyState {
-	case ApplyConfirming:
-		b.WriteString("\n")
-		if m.HasRevision() {
-			b.WriteString("  " + m.revConfirm.View())
-		} else {
-			b.WriteString("  " + m.confirm.View())
-		}
-	case ApplyBlending:
-		b.WriteString("\n")
-		b.WriteString(fmt.Sprintf("  %s Blending change...", m.spinner.View()))
-	case ApplyReviewing:
-		if m.blendResult != nil {
-			b.WriteString("\n")
-			b.WriteString(detailSection.Render("  BLENDED RESULT"))
-			b.WriteString("\n")
-			b.WriteString(shared.IndentBlock(*m.blendResult, 2))
-			b.WriteString("\n\n")
-			b.WriteString("  " + m.confirm.View())
-		}
-	case ApplyRejectConfirming, ApplyDeferConfirming:
-		b.WriteString("\n")
-		b.WriteString("  " + m.confirm.View())
-	case ApplyDone:
-		b.WriteString("\n")
-		b.WriteString("  " + components.ConfirmApprove())
-	}
 
 	// Fill remaining space.
 	content := b.String()
@@ -107,11 +56,11 @@ func (m Model) View() string {
 	bindings := m.keys.DetailShortHelp()
 	if !m.isWideMode() || !m.config.Detail.ChatPanelOpen {
 		var filtered []key.Binding
-		for _, b := range bindings {
-			if key.Matches(tea.KeyMsg{Type: tea.KeyTab}, b) {
+		for _, kb := range bindings {
+			if key.Matches(tea.KeyMsg{Type: tea.KeyTab}, kb) {
 				continue
 			}
-			filtered = append(filtered, b)
+			filtered = append(filtered, kb)
 		}
 		bindings = filtered
 	}

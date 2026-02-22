@@ -46,12 +46,20 @@ func (m Model) View() string {
 	b.WriteString(m.viewport.View())
 	b.WriteString("\n")
 
-	// Input area.
-	if m.input.Focused() {
-		b.WriteString(m.input.View())
-	} else {
-		b.WriteString(chatMuted.Render("  Press enter to type..."))
+	// Fill remaining space to match parent height.
+	content := b.String()
+	lines := strings.Count(content, "\n")
+	remaining := m.height - lines - 1 // -1 for input line
+	if remaining > 0 {
+		content += strings.Repeat("\n", remaining)
 	}
 
-	return b.String()
+	// Input area.
+	if m.input.Focused() {
+		content += m.input.View()
+	} else {
+		content += chatMuted.Render("  Press enter to type...")
+	}
+
+	return content
 }
