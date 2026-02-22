@@ -132,9 +132,9 @@ func (r *Runner) buildBaseRecord(sessionID string, runStart time.Time) HistoryRe
 		CaptureTrigger: meta.CaptureTrigger,
 		PreviousStatus: meta.Status,
 
-		ClassifierModel:         ClassifierModel,
+		ClassifierModel:         DefaultClassifierModel,
 		ClassifierPromptVersion: strings.TrimSuffix(classifierPromptFile, ".txt"),
-		EvaluatorModel:          EvaluatorModel,
+		EvaluatorModel:          DefaultEvaluatorModel,
 		EvaluatorPromptVersion:  strings.TrimSuffix(evaluatorPromptFile, ".txt"),
 
 		ClassifierMaxTurns:  r.Config.ClassifierMaxTurns,

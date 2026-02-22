@@ -521,8 +521,8 @@ func TestRunOne_CleanTriage_WritesHistory(t *testing.T) {
 	if rec.EvaluatorModel != "" {
 		t.Errorf("EvaluatorModel = %q, want empty (clean session)", rec.EvaluatorModel)
 	}
-	if rec.ClassifierModel != ClassifierModel {
-		t.Errorf("ClassifierModel = %q, want %q", rec.ClassifierModel, ClassifierModel)
+	if rec.ClassifierModel != DefaultClassifierModel {
+		t.Errorf("ClassifierModel = %q, want %q", rec.ClassifierModel, DefaultClassifierModel)
 	}
 	if rec.PreviousStatus != "queued" {
 		t.Errorf("PreviousStatus = %q, want %q", rec.PreviousStatus, "queued")
@@ -597,8 +597,8 @@ func TestRunOne_Evaluate_WritesHistory(t *testing.T) {
 	if rec.EvaluatorPromptVersion != "evaluator-v3" {
 		t.Errorf("EvaluatorPromptVersion = %q, want %q", rec.EvaluatorPromptVersion, "evaluator-v3")
 	}
-	if rec.EvaluatorModel != EvaluatorModel {
-		t.Errorf("EvaluatorModel = %q, want %q", rec.EvaluatorModel, EvaluatorModel)
+	if rec.EvaluatorModel != DefaultEvaluatorModel {
+		t.Errorf("EvaluatorModel = %q, want %q", rec.EvaluatorModel, DefaultEvaluatorModel)
 	}
 }
 

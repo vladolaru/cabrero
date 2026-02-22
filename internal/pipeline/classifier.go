@@ -14,8 +14,8 @@ import (
 
 const classifierPromptFile = "classifier-v3.txt"
 
-// ClassifierModel is the Claude model used for classification.
-const ClassifierModel = "claude-haiku-4-5"
+// DefaultClassifierModel is the compile-time default Claude model for classification.
+const DefaultClassifierModel = "claude-haiku-4-5"
 
 // RunClassifier constructs the prompt, invokes the Classifier via the claude CLI,
 // validates the output, and returns the parsed result.
@@ -51,7 +51,7 @@ func RunClassifier(sessionID string, digest *parser.Digest, aggregatorOutput *pa
 	allowedTools := fmt.Sprintf("Read(//%s/**),Grep(//%s/**)", cabreroRoot, cabreroRoot)
 
 	cr, err := invokeClaude(claudeConfig{
-		Model:          ClassifierModel,
+		Model:          DefaultClassifierModel,
 		SystemPrompt:   systemPrompt,
 		Agentic:        true,
 		Prompt:         data,
