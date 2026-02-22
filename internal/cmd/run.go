@@ -40,6 +40,8 @@ func Run(args []string) error {
 	cfg.EvaluatorModel = *evaluatorModel
 	cfg.Debug = *debug
 
+	fmt.Printf("  Models: classifier=%s, evaluator=%s\n", cfg.ClassifierModel, cfg.EvaluatorModel)
+
 	runner := pipeline.NewRunner(cfg)
 	runner.Source = "cli-run"
 	result, err := runner.RunOne(context.Background(), sessionID, *dryRun)
