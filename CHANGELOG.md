@@ -7,12 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-02-22
+
 ### Added
 
 - **Working directory in session metadata** — hook scripts now extract the `cwd`
   field from Claude Code's JSON payload and store it as `work_dir` in
   `metadata.json`. This records the actual filesystem path the session ran in,
   providing more reliable project identification than the CC project slug alone.
+- **Pipeline debug mode** — `--debug` flag on `cabrero run` and `cabrero daemon`
+  persists full CC session transcripts for classifier/evaluator invocations.
+  Pre-assigns a session ID via `--session-id`, immediately blocklists it to
+  prevent stale recovery, and logs CLI args and session ID for cross-reference.
+  Also togglable at runtime via `{"debug": true}` in `~/.cabrero/config.json`
+  (re-read each poll cycle, no daemon restart needed).
 
 ## [0.9.3] - 2026-02-21
 
@@ -351,6 +359,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.10.0]: https://github.com/vladolaru/cabrero/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.3
 [0.9.2]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.2
 [0.9.1]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.1
