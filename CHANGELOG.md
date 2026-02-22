@@ -7,6 +7,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Configurable pipeline models** — classifier and evaluator models are now
+  configurable via CLI flags (`--classifier-model`, `--evaluator-model`) on `run`,
+  `backfill`, and `daemon` commands, and via `config.json` (`classifierModel`,
+  `evaluatorModel`). Resolution: CLI flag → config.json → compile-time default.
+- `cabrero status` shows active pipeline models and prompt versions.
+- `cabrero doctor` reports active pipeline models under Pipeline diagnostics.
+- `cabrero run` prints active model names before pipeline execution.
+- TUI pipeline monitor shows a MODELS section with override detection.
+
+### Changed
+
+- `cabrero backfill` preview derives model names from configuration instead of
+  hardcoded prose.
+
 ## [0.12.0] - 2026-02-22
 
 ### Added

@@ -164,7 +164,7 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
   prompts/
     classifier-v3.txt        # Classifier stage prompt (v3: agentic with Read/Grep, triage, turn budget)
     evaluator-v3.txt         # Evaluator stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
-  config.json                # TUI and daemon settings (debug toggle, navigation, theme, etc.)
+  config.json                # TUI and daemon settings (debug toggle, navigation, theme, model overrides, etc.)
   blocklist.json             # session IDs to never process (loop prevention)
   run_history.jsonl          # append-only pipeline run history (one JSON object per line)
   daemon.log                 # background daemon log (rotated, 5MB × 3)
@@ -510,6 +510,11 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Smart batching** — uses `pipeline.BatchProcessor` to group queued sessions by project,
   run Classifier individually (cheap triage), then batch "evaluate" sessions into a single
   Evaluator call per project
+- **Model selection** — classifier and evaluator models configurable via CLI flags
+  (`--classifier-model`, `--evaluator-model`) or `config.json` (`classifierModel`,
+  `evaluatorModel`). Resolution: CLI flag → config.json → compile-time default
+  (`claude-haiku-4-5` for classifier, `claude-sonnet-4-6` for evaluator). Active models
+  surfaced in `cabrero status`, `cabrero doctor`, TUI pipeline monitor, and run output
 - **Evaluator tuning** — turn budgets and timeouts configurable via CLI flags
   (`--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`, `--evaluator-timeout`)
 - **Debug mode** — `--debug` flag or `{"debug": true}` in `config.json` persists full CC
