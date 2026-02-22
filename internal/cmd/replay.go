@@ -19,14 +19,16 @@ import (
 // Usage:
 //
 //	cabrero replay --session ID --prompt PATH [--stage classifier|evaluator] [options]
+//	cabrero replay --calibration --prompt PATH [--stage classifier|evaluator] [options]
 func Replay(args []string) error {
 	defaults := pipeline.DefaultPipelineConfig()
 	fs := flag.NewFlagSet("replay", flag.ContinueOnError)
 
-	sessionID := fs.String("session", "", "session ID to replay (required)")
+	sessionID := fs.String("session", "", "session ID to replay (required unless --calibration)")
 	promptPath := fs.String("prompt", "", "path to alternate prompt file (required)")
 	stage := fs.String("stage", "", "pipeline stage: classifier or evaluator (inferred from prompt filename when absent)")
 	compare := fs.Bool("compare", false, "print a diff of the new output against the original")
+	calibration := fs.Bool("calibration", false, "replay against all sessions in the calibration set")
 	debug := fs.Bool("debug", false, "persist CC sessions for inspection")
 	classifierMaxTurns := fs.Int("classifier-max-turns", defaults.ClassifierMaxTurns, "max agentic turns for Classifier")
 	evaluatorMaxTurns := fs.Int("evaluator-max-turns", defaults.EvaluatorMaxTurns, "max agentic turns for Evaluator")
@@ -39,17 +41,19 @@ func Replay(args []string) error {
 		return err
 	}
 
-	// Validate required flags.
-	if *sessionID == "" {
-		return fmt.Errorf("--session is required\nusage: cabrero replay --session ID --prompt PATH [--stage classifier|evaluator]")
+	// --session and --calibration are mutually exclusive.
+	if *sessionID != "" && *calibration {
+		return fmt.Errorf("--session and --calibration are mutually exclusive")
 	}
+
+	// --prompt is always required.
 	if *promptPath == "" {
 		return fmt.Errorf("--prompt is required\nusage: cabrero replay --session ID --prompt PATH [--stage classifier|evaluator]")
 	}
 
-	// Validate session exists.
-	if !store.SessionExists(*sessionID) {
-		return fmt.Errorf("session %q not found in store", *sessionID)
+	// At least one of --session or --calibration is required.
+	if *sessionID == "" && !*calibration {
+		return fmt.Errorf("--session is required (or use --calibration for batch mode)\nusage: cabrero replay --session ID --prompt PATH [--stage classifier|evaluator]")
 	}
 
 	// Infer stage from filename if not explicitly set.
@@ -84,32 +88,47 @@ func Replay(args []string) error {
 	cfg.EvaluatorModel = *evaluatorModel
 	cfg.Debug = *debug
 
-	fmt.Printf("Replaying %s stage for session %s\n", resolvedStage, *sessionID)
-	fmt.Printf("  Prompt: %s\n", *promptPath)
+	// Branch: calibration batch mode vs single-session mode.
+	if *calibration {
+		return replayCalibrationSet(resolvedStage, *promptPath, systemPrompt, cfg, *compare)
+	}
+
+	return replaySingleSession(*sessionID, resolvedStage, *promptPath, systemPrompt, cfg, *compare)
+}
+
+// replaySingleSession replays one session with the alternate prompt.
+func replaySingleSession(sessionID, resolvedStage, promptPath, systemPrompt string, cfg pipeline.PipelineConfig, compare bool) error {
+	// Validate session exists.
+	if !store.SessionExists(sessionID) {
+		return fmt.Errorf("session %q not found in store", sessionID)
+	}
+
+	fmt.Printf("Replaying %s stage for session %s\n", resolvedStage, sessionID)
+	fmt.Printf("  Prompt: %s\n", promptPath)
 	fmt.Printf("  Models: classifier=%s, evaluator=%s\n", cfg.ClassifierModel, cfg.EvaluatorModel)
 
 	// Parse the session to get a digest.
 	fmt.Println("  Parsing session...")
-	digest, err := pipeline.ParseSessionForReplay(*sessionID)
+	digest, err := pipeline.ParseSessionForReplay(sessionID)
 	if err != nil {
 		return fmt.Errorf("parsing session: %w", err)
 	}
 
-	replayID := pipeline.NewReplayID(*sessionID)
+	replayID := pipeline.NewReplayID(sessionID)
 	result := pipeline.ReplayResult{
 		ReplayID:   replayID,
-		SessionID:  *sessionID,
+		SessionID:  sessionID,
 		Stage:      resolvedStage,
-		PromptPath: *promptPath,
+		PromptPath: promptPath,
 	}
 
 	// Look up the original decision for comparison / metadata.
-	originalDecision := lookupOriginalDecision(*sessionID)
+	originalDecision := lookupOriginalDecision(sessionID)
 
 	switch resolvedStage {
 	case "classifier":
 		fmt.Println("  Running Classifier with alternate prompt...")
-		classOut, _, err := pipeline.RunClassifierWithPrompt(*sessionID, digest, nil, cfg, systemPrompt)
+		classOut, _, err := pipeline.RunClassifierWithPrompt(sessionID, digest, nil, cfg, systemPrompt)
 		if err != nil {
 			return fmt.Errorf("classifier replay failed: %w", err)
 		}
@@ -122,21 +141,21 @@ func Replay(args []string) error {
 			len(classOut.SkillSignals),
 		)
 
-		if *compare && originalDecision != "" {
+		if compare && originalDecision != "" {
 			printClassifierComparison(originalDecision, classOut.Triage)
 		}
 
 	case "evaluator":
 		// Evaluator needs the classifier output. Read from disk if available,
 		// otherwise fail with a helpful message.
-		classOut, err := pipeline.ReadClassifierOutput(*sessionID)
+		classOut, err := pipeline.ReadClassifierOutput(sessionID)
 		if err != nil {
 			return fmt.Errorf("reading classifier output for session %q: %w\n"+
-				"Hint: run 'cabrero run %s' first to generate the classifier output", *sessionID, err, *sessionID)
+				"Hint: run 'cabrero run %s' first to generate the classifier output", sessionID, err, sessionID)
 		}
 
 		fmt.Println("  Running Evaluator with alternate prompt...")
-		evalOut, _, err := pipeline.RunEvaluatorWithPrompt(*sessionID, digest, classOut, cfg, systemPrompt)
+		evalOut, _, err := pipeline.RunEvaluatorWithPrompt(sessionID, digest, classOut, cfg, systemPrompt)
 		if err != nil {
 			return fmt.Errorf("evaluator replay failed: %w", err)
 		}
@@ -151,18 +170,18 @@ func Replay(args []string) error {
 			fmt.Printf("    No proposals: %s\n", *evalOut.NoProposalReason)
 		}
 
-		if *compare {
-			printEvaluatorComparison(*sessionID, evalOut)
+		if compare {
+			printEvaluatorComparison(sessionID, evalOut)
 		}
 	}
 
 	// Persist the replay result.
 	meta := pipeline.ReplayMeta{
 		ReplayID:         replayID,
-		SessionID:        *sessionID,
+		SessionID:        sessionID,
 		Timestamp:        time.Now().UTC().Format(time.RFC3339),
 		Stage:            resolvedStage,
-		PromptFile:       *promptPath,
+		PromptFile:       promptPath,
 		OriginalDecision: originalDecision,
 	}
 	if err := pipeline.WriteReplayResult(result, meta); err != nil {
@@ -171,6 +190,196 @@ func Replay(args []string) error {
 
 	fmt.Printf("\nReplay complete. Results saved to ~/.cabrero/replays/%s/\n", replayID)
 	return nil
+}
+
+// calibrationRow holds per-session results for the calibration summary table.
+type calibrationRow struct {
+	sessionID string
+	label     string // from calibration set: "approve" or "reject"
+	original  string // original pipeline output summary
+	replay    string // replay output summary
+	match     bool   // whether replay agrees with original
+	err       error  // non-nil if replay failed for this session
+}
+
+// replayCalibrationSet replays the alternate prompt against every session in the
+// calibration set and prints a summary table comparing outcomes.
+func replayCalibrationSet(resolvedStage, promptPath, systemPrompt string, cfg pipeline.PipelineConfig, compare bool) error {
+	entries, err := store.ListCalibrationEntries()
+	if err != nil {
+		return fmt.Errorf("reading calibration set: %w", err)
+	}
+	if len(entries) == 0 {
+		return fmt.Errorf("calibration set is empty — use 'cabrero calibrate tag' to add sessions")
+	}
+
+	fmt.Printf("Replaying %s stage against %d calibration sessions\n", resolvedStage, len(entries))
+	fmt.Printf("  Prompt: %s\n", promptPath)
+	fmt.Printf("  Models: classifier=%s, evaluator=%s\n", cfg.ClassifierModel, cfg.EvaluatorModel)
+	fmt.Println()
+
+	var rows []calibrationRow
+
+	for i, entry := range entries {
+		sid := entry.SessionID
+		fmt.Printf("[%d/%d] Session %s (label: %s)\n", i+1, len(entries), truncateID(sid, 20), entry.Label)
+
+		row := calibrationRow{
+			sessionID: sid,
+			label:     entry.Label,
+		}
+
+		if !store.SessionExists(sid) {
+			row.err = fmt.Errorf("session not found in store")
+			row.replay = "ERROR"
+			fmt.Printf("  Skipped: session not found in store\n")
+			rows = append(rows, row)
+			continue
+		}
+
+		// Parse session.
+		digest, err := pipeline.ParseSessionForReplay(sid)
+		if err != nil {
+			row.err = fmt.Errorf("parsing: %w", err)
+			row.replay = "ERROR"
+			fmt.Printf("  Skipped: %v\n", err)
+			rows = append(rows, row)
+			continue
+		}
+
+		// Look up the original decision.
+		origDecision := lookupOriginalDecision(sid)
+		row.original = origDecision
+		if row.original == "" {
+			row.original = "(unknown)"
+		}
+
+		replayID := pipeline.NewReplayID(sid)
+		result := pipeline.ReplayResult{
+			ReplayID:   replayID,
+			SessionID:  sid,
+			Stage:      resolvedStage,
+			PromptPath: promptPath,
+		}
+
+		switch resolvedStage {
+		case "classifier":
+			classOut, _, err := pipeline.RunClassifierWithPrompt(sid, digest, nil, cfg, systemPrompt)
+			if err != nil {
+				row.err = err
+				row.replay = "ERROR"
+				fmt.Printf("  Classifier failed: %v\n", err)
+				rows = append(rows, row)
+				continue
+			}
+			result.ClassifierOutput = classOut
+			row.replay = classOut.Triage
+			row.match = row.original == row.replay
+			fmt.Printf("  Classifier: triage=%s (original=%s, match=%v)\n", classOut.Triage, row.original, row.match)
+
+		case "evaluator":
+			classOut, err := pipeline.ReadClassifierOutput(sid)
+			if err != nil {
+				row.err = fmt.Errorf("no classifier output: %w", err)
+				row.replay = "ERROR"
+				fmt.Printf("  Skipped: no classifier output available\n")
+				rows = append(rows, row)
+				continue
+			}
+
+			evalOut, _, err := pipeline.RunEvaluatorWithPrompt(sid, digest, classOut, cfg, systemPrompt)
+			if err != nil {
+				row.err = err
+				row.replay = "ERROR"
+				fmt.Printf("  Evaluator failed: %v\n", err)
+				rows = append(rows, row)
+				continue
+			}
+			result.EvaluatorOutput = evalOut
+
+			row.replay = fmt.Sprintf("%d proposals", len(evalOut.Proposals))
+			// For evaluator, check original proposal count.
+			origEval, origErr := pipeline.ReadEvaluatorOutput(sid)
+			if origErr == nil {
+				row.original = fmt.Sprintf("%d proposals", len(origEval.Proposals))
+				row.match = len(origEval.Proposals) == len(evalOut.Proposals)
+			} else {
+				row.original = "(no original)"
+				row.match = false
+			}
+			fmt.Printf("  Evaluator: %s (original=%s, match=%v)\n", row.replay, row.original, row.match)
+		}
+
+		// Persist each individual replay result.
+		meta := pipeline.ReplayMeta{
+			ReplayID:         replayID,
+			SessionID:        sid,
+			Timestamp:        time.Now().UTC().Format(time.RFC3339),
+			Stage:            resolvedStage,
+			PromptFile:       promptPath,
+			OriginalDecision: origDecision,
+		}
+		if err := pipeline.WriteReplayResult(result, meta); err != nil {
+			fmt.Printf("  Warning: failed to persist replay: %v\n", err)
+		}
+
+		rows = append(rows, row)
+	}
+
+	// Print summary table.
+	printCalibrationSummary(rows)
+	return nil
+}
+
+// printCalibrationSummary prints a table comparing calibration replay results.
+func printCalibrationSummary(rows []calibrationRow) {
+	fmt.Println()
+	fmt.Println("── CALIBRATION REPLAY SUMMARY ──")
+	fmt.Println()
+	fmt.Printf("%-22s %-8s %-18s %-18s %s\n", "SESSION", "LABEL", "ORIGINAL", "REPLAY", "MATCH")
+	fmt.Printf("%-22s %-8s %-18s %-18s %s\n", "───────", "─────", "────────", "──────", "─────")
+
+	matches := 0
+	errors := 0
+	for _, r := range rows {
+		sid := truncateID(r.sessionID, 20)
+		matchStr := "YES"
+		if r.err != nil {
+			matchStr = "ERROR"
+			errors++
+		} else if !r.match {
+			matchStr = "CHANGED"
+		} else {
+			matches++
+		}
+
+		orig := r.original
+		if len(orig) > 16 {
+			orig = orig[:14] + ".."
+		}
+		replay := r.replay
+		if len(replay) > 16 {
+			replay = replay[:14] + ".."
+		}
+
+		fmt.Printf("%-22s %-8s %-18s %-18s %s\n", sid, r.label, orig, replay, matchStr)
+	}
+
+	total := len(rows)
+	fmt.Println()
+	fmt.Printf("%d/%d match", matches, total)
+	if errors > 0 {
+		fmt.Printf(", %d errors", errors)
+	}
+	fmt.Println()
+}
+
+// truncateID shortens a session ID for display, appending ".." if truncated.
+func truncateID(id string, maxLen int) string {
+	if len(id) <= maxLen {
+		return id
+	}
+	return id[:maxLen-2] + ".."
 }
 
 // lookupOriginalDecision returns the original triage decision for a session

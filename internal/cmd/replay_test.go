@@ -115,3 +115,64 @@ func TestReplay_UnambiguousStageInference(t *testing.T) {
 		t.Errorf("expected filename in error, got: %v", err)
 	}
 }
+
+// TestReplay_CalibrationRequiresPrompt verifies that --calibration without
+// --prompt returns an error.
+func TestReplay_CalibrationRequiresPrompt(t *testing.T) {
+	setupTestEnv(t)
+
+	err := Replay([]string{"--calibration"})
+	if err == nil {
+		t.Fatal("expected error for --calibration without --prompt")
+	}
+	if !strings.Contains(err.Error(), "--prompt") {
+		t.Errorf("expected error to mention --prompt, got: %v", err)
+	}
+}
+
+// TestReplay_CalibrationAndSessionMutuallyExclusive verifies that providing
+// both --session and --calibration returns an error.
+func TestReplay_CalibrationAndSessionMutuallyExclusive(t *testing.T) {
+	setupTestEnv(t)
+
+	dir := t.TempDir()
+	promptFile := filepath.Join(dir, "classifier-v4.txt")
+	if err := os.WriteFile(promptFile, []byte("test"), 0o644); err != nil {
+		t.Fatalf("writing temp prompt: %v", err)
+	}
+
+	err := Replay([]string{
+		"--session", "abc123",
+		"--calibration",
+		"--prompt", promptFile,
+	})
+	if err == nil {
+		t.Fatal("expected error for both --session and --calibration")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("expected 'mutually exclusive' in error, got: %v", err)
+	}
+}
+
+// TestReplay_CalibrationEmptySet verifies that --calibration with an empty
+// calibration set returns an appropriate error.
+func TestReplay_CalibrationEmptySet(t *testing.T) {
+	setupTestEnv(t)
+
+	dir := t.TempDir()
+	promptFile := filepath.Join(dir, "classifier-v4.txt")
+	if err := os.WriteFile(promptFile, []byte("test"), 0o644); err != nil {
+		t.Fatalf("writing temp prompt: %v", err)
+	}
+
+	err := Replay([]string{
+		"--calibration",
+		"--prompt", promptFile,
+	})
+	if err == nil {
+		t.Fatal("expected error for empty calibration set")
+	}
+	if !strings.Contains(err.Error(), "empty") {
+		t.Errorf("expected 'empty' in error, got: %v", err)
+	}
+}
