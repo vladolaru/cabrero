@@ -164,6 +164,7 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
   prompts/
     classifier-v3.txt        # Classifier stage prompt (v3: agentic with Read/Grep, triage, turn budget)
     evaluator-v3.txt         # Evaluator stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
+  config.json                # TUI and daemon settings (debug toggle, navigation, theme, etc.)
   blocklist.json             # session IDs to never process (loop prevention)
   daemon.log                 # background daemon log (rotated, 5MB × 3)
   daemon.pid                 # PID file for single-instance enforcement
@@ -253,6 +254,24 @@ All LLM calls are mediated by the `claude` CLI. No API keys in the app — CC's 
 auth is reused throughout. Classifier and Evaluator run as agentic tool-using sessions with
 constrained tool access (Read, Grep). Apply stage uses `--print` (non-agentic). The
 daemon sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
+
+**Debug mode.** By default, `invokeClaude()` passes `--no-session-persistence` so CC
+discards the session transcript after each invocation — only the final text output is
+captured. This means there is zero visibility into what tool calls (Read, Grep) the
+Classifier and Evaluator made, including which file paths they accessed. When debug mode
+is enabled (`--debug` flag or `{"debug": true}` in `config.json`):
+
+1. A UUID v4 session ID is generated and pre-assigned via `--session-id`
+2. `--no-session-persistence` is dropped, so CC saves the full JSONL transcript to
+   `~/.claude/projects/`
+3. The UUID is immediately added to the blocklist to prevent the stale scanner from
+   picking it up as an unprocessed session
+4. CLI args and session ID are logged for cross-reference with daemon.log
+
+This enables inspecting exactly what paths the agentic evaluators accessed — useful for
+diagnosing TCC prompts from network volumes, iCloud, or Google Drive. The config-based
+toggle (`store.ReadDebugFlag()`) is re-read at the top of each daemon poll cycle, so
+debug mode can be switched on and off without restarting the daemon.
 
 **Trigger:** The daemon only processes sessions with status `"queued"`. Hook-captured
 sessions (session-end, pre-compact) are written with `"queued"` status and processed
@@ -450,6 +469,9 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
   Evaluator call per project
 - **Evaluator tuning** — turn budgets and timeouts configurable via CLI flags
   (`--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`, `--evaluator-timeout`)
+- **Debug mode** — `--debug` flag or `{"debug": true}` in `config.json` persists full CC
+  session transcripts for Classifier/Evaluator invocations. Config-based toggle is re-read
+  each poll cycle (no restart needed)
 
 LaunchAgent plist template at `launchd/com.cabrero.daemon.plist` with `KeepAlive`,
 `RunAtLoad`, low-priority I/O, and `Nice: 10`.
@@ -544,6 +566,8 @@ fi
 **Session ID blocklist.** Cabrero records the session ID of every CLI process it spawns.
 The capture layer checks incoming session IDs against this blocklist before processing.
 Independent of the env var — a second structural filter that doesn't rely on hook behavior.
+In debug mode, pre-assigned session IDs are blocklisted immediately before invocation to
+prevent the stale scanner from recovering them as unprocessed user sessions.
 
 **Skill path restriction.** Cabrero's internal prompts and any operational files are
 stored outside all monitored skill paths — not in `~/.claude/` or any project skill
@@ -600,6 +624,7 @@ Lives at `~/.cabrero/bin/cabrero`, added to PATH on install.
 ```
 cabrero run <session_id>        Run the full pipeline on a session
   --dry-run                       Run only the pre-parser, skip LLM invocations
+  --debug                         Persist CC sessions for classifier/evaluator inspection
   --classifier-max-turns <int>    Max agentic turns for Classifier (default 15)
   --evaluator-max-turns <int>     Max agentic turns for Evaluator (default 20)
   --classifier-timeout <duration> Timeout for Classifier (default 2m)
@@ -629,6 +654,7 @@ cabrero daemon                  Run background session processor (for launchd)
   --poll <duration>               Pending session check interval (default 2m)
   --stale <duration>              Stale session scan interval (default 30m)
   --delay <duration>              Pause between processing sessions (default 30s)
+  --debug                         Persist CC sessions for classifier/evaluator inspection
   --classifier-max-turns <int>    Max agentic turns for Classifier (default 15)
   --evaluator-max-turns <int>     Max agentic turns for Evaluator (default 20)
   --classifier-timeout <duration> Timeout for Classifier (default 2m)
