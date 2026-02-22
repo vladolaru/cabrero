@@ -5,7 +5,7 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.13.0] - 2026-02-22
 
 ### Added
 
@@ -447,6 +447,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.13.0]: https://github.com/vladolaru/cabrero/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/vladolaru/cabrero/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/vladolaru/cabrero/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/vladolaru/cabrero/compare/v0.10.0...v0.11.0
