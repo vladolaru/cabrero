@@ -19,7 +19,6 @@ func EnsurePrompts() error {
 	prompts := map[string]string{
 		classifierPromptFile: defaultClassifierPrompt,
 		evaluatorPromptFile:  defaultEvaluatorPrompt,
-		// v1 files are no longer written but remain on disk if they exist.
 	}
 
 	for filename, content := range prompts {
