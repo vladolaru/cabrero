@@ -7,6 +7,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-02-22
+
 ### Added
 
 - **Pipeline run history** — append-only JSONL log (`~/.cabrero/run_history.jsonl`)
@@ -34,6 +36,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `cwd=/` from the launchd daemon, causing CC's startup project discovery to
   probe paths reaching the Google Drive FileProvider. Now sets `cmd.Dir` to
   `~/.cabrero/` for a safe, local-only starting directory.
+
+- **False queue-drain notification** — daemon sent "Queue processing complete"
+  even when new sessions arrived during processing. Now re-scans after the
+  batch and only notifies when the queue is truly empty.
+
+- **Apply workflow hardening** — `apply.Blend` sets `cmd.Dir` to prevent macOS
+  TCC prompts; `apply.Commit` validates proposal targets (rejects non-`.md` and
+  path traversal) and uses atomic writes; `truncateForLog` uses rune slicing for
+  UTF-8 correctness; import batch-reads blocklist once; hook scripts escape
+  backslashes/quotes in `SESSION_CWD`.
 
 ## [0.10.0] - 2026-02-22
 
@@ -387,6 +399,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.11.0]: https://github.com/vladolaru/cabrero/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/vladolaru/cabrero/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.3
 [0.9.2]: https://github.com/vladolaru/cabrero/releases/tag/v0.9.2
