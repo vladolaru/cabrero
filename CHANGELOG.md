@@ -5,6 +5,16 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Persistent header across all TUI views** — the dashboard header (title,
+  version, proposal counts, daemon status, hooks) now renders above every view
+  instead of only the dashboard. Navigating to proposal detail, source manager,
+  pipeline monitor, fitness report, log viewer, or help overlay retains the
+  header context. Snapshots also include the header for all views.
+
 ## [0.13.0] - 2026-02-22
 
 ### Added
