@@ -215,8 +215,9 @@ func cleanLLMJSON(raw string) string {
 }
 
 func truncateForLog(s string, max int) string {
-	if len(s) <= max {
+	r := []rune(s)
+	if len(r) <= max {
 		return s
 	}
-	return s[:max] + "..."
+	return string(r[:max]) + "..."
 }

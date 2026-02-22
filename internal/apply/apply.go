@@ -28,6 +28,10 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 
 	target := expandPath(proposal.Target)
 
+	if err := validateTarget(target); err != nil {
+		return "", fmt.Errorf("unsafe target path: %w", err)
+	}
+
 	// Read current file content (may not exist for scaffolds).
 	current, _ := os.ReadFile(target)
 
@@ -55,6 +59,7 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 		"--disable-slash-commands",
 		"--tools", "",
 	)
+	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from network volumes
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
 
@@ -76,13 +81,17 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 func Commit(proposal *pipeline.Proposal, blendedContent string) error {
 	target := expandPath(proposal.Target)
 
+	if err := validateTarget(target); err != nil {
+		return fmt.Errorf("unsafe target path: %w", err)
+	}
+
 	// Ensure parent directory exists.
 	dir := filepath.Dir(target)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	if err := os.WriteFile(target, []byte(blendedContent), 0o644); err != nil {
+	if err := store.AtomicWrite(target, []byte(blendedContent), 0o644); err != nil {
 		return fmt.Errorf("writing target: %w", err)
 	}
 
@@ -164,6 +173,24 @@ func buildBlendPrompt(currentContent, changeText, proposalType, rationale string
 	b.WriteString("Output ONLY the complete new file content with the change applied. No explanation, no markdown fencing — just the raw file content.")
 
 	return b.String()
+}
+
+// validateTarget checks that a resolved target path is safe to read and write.
+// Cabrero only modifies markdown files (CLAUDE.md, SKILL.md, etc.), so we
+// reject any path that doesn't end in .md or contains traversal components.
+func validateTarget(resolved string) error {
+	// Reject path traversal.
+	cleaned := filepath.Clean(resolved)
+	if strings.Contains(cleaned, "..") {
+		return fmt.Errorf("path contains traversal: %s", resolved)
+	}
+
+	// Must be a markdown file.
+	if !strings.HasSuffix(strings.ToLower(cleaned), ".md") {
+		return fmt.Errorf("target must be a .md file, got: %s", resolved)
+	}
+
+	return nil
 }
 
 func expandPath(p string) string {

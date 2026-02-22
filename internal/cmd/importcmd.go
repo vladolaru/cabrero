@@ -41,6 +41,12 @@ func RunImport(from string, dryRun bool, quiet bool) (ImportResult, error) {
 
 	result := ImportResult{}
 
+	// Read blocklist once to avoid N file reads inside the loop.
+	blocked, err := store.ReadBlocklist()
+	if err != nil {
+		return result, fmt.Errorf("reading blocklist: %w", err)
+	}
+
 	projects, err := os.ReadDir(from)
 	if err != nil {
 		return result, fmt.Errorf("reading %s: %w", from, err)
@@ -60,13 +66,13 @@ func RunImport(from string, dryRun bool, quiet bool) (ImportResult, error) {
 		for _, entry := range entries {
 			if entry.IsDir() {
 				// Check for subagents/ inside session directories.
-				importSubagents(filepath.Join(projectDir, entry.Name()), proj.Name(), from, dryRun, quiet, &result)
+				importSubagents(filepath.Join(projectDir, entry.Name()), proj.Name(), from, dryRun, quiet, blocked, &result)
 				continue
 			}
 			if !strings.HasSuffix(entry.Name(), ".jsonl") {
 				continue
 			}
-			importSession(filepath.Join(projectDir, entry.Name()), entry, proj.Name(), from, dryRun, quiet, &result)
+			importSession(filepath.Join(projectDir, entry.Name()), entry, proj.Name(), from, dryRun, quiet, blocked, &result)
 		}
 	}
 
@@ -74,7 +80,7 @@ func RunImport(from string, dryRun bool, quiet bool) (ImportResult, error) {
 }
 
 // importSubagents checks <sessionDir>/subagents/ for agent JSONL files.
-func importSubagents(sessionDir, project, from string, dryRun, quiet bool, result *ImportResult) {
+func importSubagents(sessionDir, project, from string, dryRun, quiet bool, blocked map[string]bool, result *ImportResult) {
 	subDir := filepath.Join(sessionDir, "subagents")
 	entries, err := os.ReadDir(subDir)
 	if err != nil {
@@ -84,11 +90,11 @@ func importSubagents(sessionDir, project, from string, dryRun, quiet bool, resul
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
 			continue
 		}
-		importSession(filepath.Join(subDir, entry.Name()), entry, project, from, dryRun, quiet, result)
+		importSession(filepath.Join(subDir, entry.Name()), entry, project, from, dryRun, quiet, blocked, result)
 	}
 }
 
-func importSession(path string, entry os.DirEntry, project, from string, dryRun, quiet bool, result *ImportResult) {
+func importSession(path string, entry os.DirEntry, project, from string, dryRun, quiet bool, blocked map[string]bool, result *ImportResult) {
 	sessionID := strings.TrimSuffix(entry.Name(), ".jsonl")
 	if sessionID == "" || len(sessionID) < 8 {
 		return
@@ -98,7 +104,7 @@ func importSession(path string, entry os.DirEntry, project, from string, dryRun,
 		result.Skipped++
 		return
 	}
-	if store.IsBlocked(sessionID) {
+	if blocked[sessionID] {
 		result.Skipped++
 		return
 	}
