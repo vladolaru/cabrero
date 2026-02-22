@@ -54,8 +54,6 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 		return "", fmt.Errorf("invokeClaude: Stdin is required for print mode")
 	}
 
-	var args []string
-
 	// In debug mode, generate a session ID and blocklist it before invocation.
 	var debugSessionID string
 	if cfg.Debug {
@@ -68,6 +66,53 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 			return "", fmt.Errorf("blocklisting debug session: %w", err)
 		}
 	}
+
+	args := buildClaudeArgs(cfg, debugSessionID)
+
+	if cfg.Debug && cfg.Logger != nil {
+		cfg.Logger.Info("  [debug] claude args: %v", args)
+	}
+
+	// Always create a context so we can detect timeout in error handling.
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if cfg.Timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), cfg.Timeout)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "claude", args...)
+	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from `/`
+	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
+
+	if !cfg.Agentic {
+		cmd.Stdin = cfg.Stdin
+	}
+
+	out, err := cmd.Output()
+	if err != nil {
+		if cfg.Timeout > 0 && ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("claude timed out after %s", cfg.Timeout)
+		}
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("claude exited with code %d: %s", exitErr.ExitCode(), string(exitErr.Stderr))
+		}
+		return "", fmt.Errorf("running claude: %w", err)
+	}
+
+	if cfg.Debug && cfg.Logger != nil && debugSessionID != "" {
+		cfg.Logger.Info("  [debug] CC session %s persisted for inspection", debugSessionID)
+	}
+
+	return string(out), nil
+}
+
+// buildClaudeArgs constructs the CLI argument list for the claude command.
+// debugSessionID is only used when cfg.Debug is true.
+func buildClaudeArgs(cfg claudeConfig, debugSessionID string) []string {
+	var args []string
 
 	if cfg.Agentic {
 		// Agentic mode: prompt as positional arg, tools enabled.
@@ -123,44 +168,7 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 		}
 	}
 
-	if cfg.Debug && cfg.Logger != nil {
-		cfg.Logger.Info("  [debug] claude args: %v", args)
-	}
-
-	// Always create a context so we can detect timeout in error handling.
-	var ctx context.Context
-	var cancel context.CancelFunc
-	if cfg.Timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), cfg.Timeout)
-	} else {
-		ctx, cancel = context.WithCancel(context.Background())
-	}
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "claude", args...)
-	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from `/`
-	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
-
-	if !cfg.Agentic {
-		cmd.Stdin = cfg.Stdin
-	}
-
-	out, err := cmd.Output()
-	if err != nil {
-		if cfg.Timeout > 0 && ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("claude timed out after %s", cfg.Timeout)
-		}
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("claude exited with code %d: %s", exitErr.ExitCode(), string(exitErr.Stderr))
-		}
-		return "", fmt.Errorf("running claude: %w", err)
-	}
-
-	if cfg.Debug && cfg.Logger != nil && debugSessionID != "" {
-		cfg.Logger.Info("  [debug] CC session %s persisted for inspection", debugSessionID)
-	}
-
-	return string(out), nil
+	return args
 }
 
 // generateUUID returns a random UUID v4 string using crypto/rand.
