@@ -110,6 +110,9 @@ func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.Pro
 	// Hook status.
 	stats.HookPreCompact, stats.HookSessionEnd = checkHookStatus()
 
+	// Debug mode.
+	stats.DebugMode = store.ReadDebugFlag()
+
 	return stats
 }
 

@@ -83,6 +83,11 @@ func Status(args []string) error {
 	preCompact, sessionEnd := checkHooks()
 	fmt.Printf("  %s  pre-compact %s   session-end %s\n",
 		cli.Bold("Hooks:"), hookStatus(preCompact), hookStatus(sessionEnd))
+
+	// Debug mode.
+	if store.ReadDebugFlag() {
+		fmt.Printf("  %s  %s %s\n", cli.Bold("Debug:"), cli.Warn("enabled"), cli.Muted("(via config)"))
+	}
 	fmt.Println()
 
 	return nil

@@ -16,6 +16,7 @@ var (
 	titleStyle         = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
 	sectionHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
 	successStyle       = shared.SuccessStyle
+	warningStyle       = shared.WarningStyle
 	errorStyle         = shared.ErrorStyle
 	mutedStyle         = shared.MutedStyle
 )
@@ -106,6 +107,9 @@ func (m Model) renderDaemonHeader() string {
 		left.WriteString(fmt.Sprintf("  Poll:    every %s\n", formatInterval(m.dashStats.PollInterval)))
 		left.WriteString(fmt.Sprintf("  Stale:   every %s\n", formatInterval(m.dashStats.StaleInterval)))
 		left.WriteString(fmt.Sprintf("  Delay:   %s", formatInterval(m.dashStats.InterSessionDelay)))
+	}
+	if m.dashStats.DebugMode {
+		left.WriteString(fmt.Sprintf("\n  Debug:   %s", warningStyle.Render("enabled")))
 	}
 
 	// Build right column: HOOKS + STORE (store hidden in narrow).

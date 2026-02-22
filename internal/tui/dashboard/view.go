@@ -99,10 +99,15 @@ func (m Model) renderHeader() string {
 	hookEnd := checkMark(m.stats.HookSessionEnd)
 	hooks := fmt.Sprintf("Hooks: pre-compact %s  session-end %s", hookPre, hookEnd)
 
+	debugIndicator := ""
+	if m.stats.DebugMode {
+		debugIndicator = "  │  Debug: " + warningStyle.Render("enabled")
+	}
+
 	if m.width >= 120 {
 		// Wide: stats on left, daemon/hooks on right.
 		left := title + "\n" + statsLine
-		right := fmt.Sprintf("Daemon: %s\n%s\n%s", daemonStatus, lastCapture, hooks)
+		right := fmt.Sprintf("Daemon: %s\n%s\n%s%s", daemonStatus, lastCapture, hooks, debugIndicator)
 		rightRendered := mutedStyle.Render(right)
 		return lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", rightRendered)
 	}
@@ -114,7 +119,7 @@ func (m Model) renderHeader() string {
 	}
 	return title + "\n" + mutedStyle.Render(statsLine) + "\n" +
 		mutedStyle.Render(daemonLine) + "\n" +
-		mutedStyle.Render("  "+hooks)
+		mutedStyle.Render("  "+hooks+debugIndicator)
 }
 
 func (m Model) renderItemList() string {

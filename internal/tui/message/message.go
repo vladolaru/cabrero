@@ -45,6 +45,7 @@ type DashboardStats struct {
 
 	HookPreCompact bool
 	HookSessionEnd bool
+	DebugMode      bool
 
 	LastCaptureTime *time.Time
 
