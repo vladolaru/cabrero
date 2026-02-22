@@ -40,6 +40,9 @@ type Daemon struct {
 	config Config
 	log    *Logger
 	runner *pipeline.Runner
+
+	// Testing hook — when nil, the package-level Notify function is used.
+	NotifyFunc func(title, message string) error
 }
 
 // New creates a Daemon with the given configuration.
@@ -189,7 +192,7 @@ func (d *Daemon) processQueued(ctx context.Context) {
 
 	// Re-scan before notifying — new sessions may have arrived during processing.
 	if remaining, err := ScanQueued(); err == nil && len(remaining) == 0 {
-		if err := Notify("Cabrero", "Queue processing complete"); err != nil {
+		if err := d.notify("Cabrero", "Queue processing complete"); err != nil {
 			d.log.Error("queue-drain notification failed: %v", err)
 		}
 	}
@@ -232,7 +235,7 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 
 	if totalProposals > 0 {
 		msg := fmt.Sprintf("%d new proposal(s) from %d session(s)", totalProposals, len(sessions))
-		if err := Notify("Cabrero", msg); err != nil {
+		if err := d.notify("Cabrero", msg); err != nil {
 			d.log.Error("notification failed: %v", err)
 		}
 	}
@@ -259,7 +262,7 @@ func (d *Daemon) processOne(ctx context.Context, sessionID string) {
 
 	if proposalCount > 0 {
 		msg := fmt.Sprintf("%d new proposal(s) from session %s", proposalCount, shortID(sessionID))
-		if err := Notify("Cabrero", msg); err != nil {
+		if err := d.notify("Cabrero", msg); err != nil {
 			d.log.Error("notification failed: %v", err)
 		}
 	}
@@ -303,6 +306,13 @@ func readPID() (int, bool) {
 // IsDaemonRunning reports whether a daemon process is alive, along with its PID.
 func IsDaemonRunning() (int, bool) {
 	return readPID()
+}
+
+func (d *Daemon) notify(title, message string) error {
+	if d.NotifyFunc != nil {
+		return d.NotifyFunc(title, message)
+	}
+	return Notify(title, message)
 }
 
 func shortID(id string) string {
