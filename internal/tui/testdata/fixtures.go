@@ -92,6 +92,8 @@ func TestDashboardStats() message.DashboardStats {
 	t := time.Now().Add(-12 * time.Minute)
 	startTime := time.Now().Add(-3*24*time.Hour - 14*time.Hour - 22*time.Minute)
 	return message.DashboardStats{
+		Version: "v0.13.0",
+
 		PendingCount:  3,
 		ApprovedCount: 7,
 		RejectedCount: 2,

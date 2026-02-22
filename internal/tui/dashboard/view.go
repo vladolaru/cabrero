@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/vladolaru/cabrero/internal/tui/components"
+	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
@@ -34,14 +35,6 @@ func (m Model) View() string {
 	}
 
 	var b strings.Builder
-
-	// Header.
-	b.WriteString(m.renderHeader())
-	b.WriteString("\n")
-
-	// Separator.
-	b.WriteString(strings.Repeat("─", m.width))
-	b.WriteString("\n")
 
 	// Content.
 	if len(m.filtered) == 0 {
@@ -74,37 +67,43 @@ func (m Model) View() string {
 	return content
 }
 
-func (m Model) renderHeader() string {
-	title := headerStyle.Render("  Cabrero Review")
+// RenderHeader renders the persistent header bar (title, version, stats, daemon status, hooks).
+// It is called by the root model to render above every child view.
+func RenderHeader(stats message.DashboardStats, width int) string {
+	titleText := "  Cabrero Review"
+	if stats.Version != "" {
+		titleText += "  " + mutedStyle.Render(stats.Version)
+	}
+	title := headerStyle.Render(titleText)
 
 	statsLine := fmt.Sprintf("  %d proposals awaiting review  ·  %d approved  ·  %d rejected",
-		m.stats.PendingCount, m.stats.ApprovedCount, m.stats.RejectedCount)
-	if m.stats.FitnessReportCount > 0 {
-		statsLine += fmt.Sprintf("  ·  %d fitness reports", m.stats.FitnessReportCount)
+		stats.PendingCount, stats.ApprovedCount, stats.RejectedCount)
+	if stats.FitnessReportCount > 0 {
+		statsLine += fmt.Sprintf("  ·  %d fitness reports", stats.FitnessReportCount)
 	}
 
 	var daemonStatus string
-	if m.stats.DaemonRunning {
-		daemonStatus = successStyle.Render("●") + fmt.Sprintf(" running (PID %d)", m.stats.DaemonPID)
+	if stats.DaemonRunning {
+		daemonStatus = successStyle.Render("●") + fmt.Sprintf(" running (PID %d)", stats.DaemonPID)
 	} else {
 		daemonStatus = errorStyle.Render("●") + " stopped"
 	}
 
 	var lastCapture string
-	if m.stats.LastCaptureTime != nil {
-		lastCapture = "Last capture: " + timeAgo(*m.stats.LastCaptureTime)
+	if stats.LastCaptureTime != nil {
+		lastCapture = "Last capture: " + timeAgo(*stats.LastCaptureTime)
 	}
 
-	hookPre := checkMark(m.stats.HookPreCompact)
-	hookEnd := checkMark(m.stats.HookSessionEnd)
+	hookPre := checkMark(stats.HookPreCompact)
+	hookEnd := checkMark(stats.HookSessionEnd)
 	hooks := fmt.Sprintf("Hooks: pre-compact %s  session-end %s", hookPre, hookEnd)
 
 	debugIndicator := ""
-	if m.stats.DebugMode {
+	if stats.DebugMode {
 		debugIndicator = "  │  Debug: " + warningStyle.Render("enabled")
 	}
 
-	if m.width >= 120 {
+	if width >= 120 {
 		// Wide: stats on left, daemon/hooks on right.
 		left := title + "\n" + statsLine
 		right := fmt.Sprintf("Daemon: %s\n%s\n%s%s", daemonStatus, lastCapture, hooks, debugIndicator)

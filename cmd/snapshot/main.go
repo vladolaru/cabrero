@@ -129,6 +129,16 @@ func defaults(w, h int) (int, int) {
 	return w, h
 }
 
+// renderWithHeader prepends the persistent header + separator to child content
+// and returns the remaining height available for the child view.
+func renderWithHeader(stats message.DashboardStats, w int) (prefix string, headerHeight int) {
+	header := dashboard.RenderHeader(stats, w)
+	separator := strings.Repeat("─", w)
+	prefix = header + "\n" + separator + "\n"
+	headerHeight = strings.Count(header, "\n") + 2 // +1 trailing newline, +1 separator line
+	return
+}
+
 func renderDashboard(w, h int, empty bool) (string, error) {
 	w, h = defaults(w, h)
 	cfg := testdata.TestConfig()
@@ -146,21 +156,25 @@ func renderDashboard(w, h int, empty bool) (string, error) {
 		stats = testdata.TestDashboardStats()
 	}
 
+	prefix, hh := renderWithHeader(stats, w)
 	m := dashboard.New(proposals, reports, stats, &keys, cfg)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
-	return m.View(), nil
+	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h - hh})
+	return prefix + m.View(), nil
 }
 
 func renderProposalDetail(w, h int) (string, error) {
 	w, h = defaults(w, h)
+	stats := testdata.TestDashboardStats()
+	prefix, hh := renderWithHeader(stats, w)
+
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
 	p := testdata.TestProposal()
 	citations := testdata.TestCitations()
 
 	m := detail.New(&p, citations, &keys, cfg)
-	m.SetSize(w, h)
-	return m.View(), nil
+	m.SetSize(w, h-hh)
+	return prefix + m.View(), nil
 }
 
 func renderProposalDetailChat(w, h int) (string, error) {
@@ -170,6 +184,10 @@ func renderProposalDetailChat(w, h int) (string, error) {
 	if h == 0 {
 		h = 40
 	}
+	stats := testdata.TestDashboardStats()
+	prefix, hh := renderWithHeader(stats, w)
+	ch := h - hh
+
 	cfg := testdata.TestConfig()
 	cfg.Detail.ChatPanelOpen = true
 	keys := shared.NewKeyMap(cfg.Navigation)
@@ -177,7 +195,7 @@ func renderProposalDetailChat(w, h int) (string, error) {
 	citations := testdata.TestCitations()
 
 	m := detail.New(&p, citations, &keys, cfg)
-	m.SetSize(w, h)
+	m.SetSize(w, ch)
 
 	chatPct := cfg.Detail.ChatPanelWidth
 	if chatPct <= 0 {
@@ -186,55 +204,66 @@ func renderProposalDetailChat(w, h int) (string, error) {
 	chatW := w * chatPct / 100
 	c := chat.New(
 		[]string{"Why was this flagged?", "Show the raw turns", "Conservative version", "Risk of approving?"},
-		"", chatW, h-6,
+		"", chatW, ch-6,
 	)
 
 	detailView := m.View()
 	chatView := c.View()
-	return lipgloss.JoinHorizontal(lipgloss.Top, detailView, chatView), nil
+	return prefix + lipgloss.JoinHorizontal(lipgloss.Top, detailView, chatView), nil
 }
 
 func renderFitnessReport(w, h int) (string, error) {
 	w, h = defaults(w, h)
+	stats := testdata.TestDashboardStats()
+	prefix, hh := renderWithHeader(stats, w)
+
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
 	report := testdata.TestFitnessReport()
 
 	m := fitness_tui.New(report, &keys, cfg)
-	m.SetSize(w, h)
-	return m.View(), nil
+	m.SetSize(w, h-hh)
+	return prefix + m.View(), nil
 }
 
 func renderSourceManager(w, h int) (string, error) {
 	w, h = defaults(w, h)
+	stats := testdata.TestDashboardStats()
+	prefix, hh := renderWithHeader(stats, w)
+
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
 	groups := testdata.TestSourceGroups()
 
 	m := sources.New(groups, &keys, cfg)
-	m.SetSize(w, h)
-	return m.View(), nil
+	m.SetSize(w, h-hh)
+	return prefix + m.View(), nil
 }
 
 func renderPipelineMonitor(w, h int) (string, error) {
 	w, h = defaults(w, h)
+	dashStats := testdata.TestDashboardStats()
+	prefix, hh := renderWithHeader(dashStats, w)
+
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
 	runs := testdata.TestPipelineRuns()
 	stats := testdata.TestPipelineStats()
 	prompts := testdata.TestPromptVersions()
-	dashStats := testdata.TestDashboardStats()
 
 	m := pipeline_tui.New(runs, stats, prompts, dashStats, &keys, cfg)
-	m.SetSize(w, h)
-	return m.View(), nil
+	m.SetSize(w, h-hh)
+	return prefix + m.View(), nil
 }
 
 func renderHelpOverlay(w, h int, nav string) (string, error) {
 	w, h = defaults(w, h)
+	stats := testdata.TestDashboardStats()
+	prefix, _ := renderWithHeader(stats, w)
+
 	keys := shared.NewKeyMap(nav)
 	hm := help.New()
 	hm.Width = w
 	hm.ShowAll = true
-	return hm.View(keys), nil
+	return prefix + hm.View(keys), nil
 }

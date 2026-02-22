@@ -35,6 +35,8 @@ type PopView struct{}
 
 // DashboardStats holds counts and status for the dashboard header.
 type DashboardStats struct {
+	Version string // build version, e.g. "v0.13.0"
+
 	PendingCount       int
 	ApprovedCount      int
 	RejectedCount      int

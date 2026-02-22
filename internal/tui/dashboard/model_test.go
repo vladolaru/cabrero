@@ -174,10 +174,7 @@ func TestDashboard_View80x24(t *testing.T) {
 
 	view := ansi.Strip(m.View())
 
-	// Should contain key elements.
-	if !strings.Contains(view, "Cabrero Review") {
-		t.Error("missing title")
-	}
+	// Should contain key elements (header is rendered by root model, not dashboard).
 	if !strings.Contains(view, "PENDING REVIEW") {
 		t.Error("missing section header")
 	}

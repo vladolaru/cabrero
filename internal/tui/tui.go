@@ -19,7 +19,8 @@ import (
 )
 
 // Run launches the interactive review TUI.
-func Run() error {
+// The version parameter is displayed in the dashboard header.
+func Run(version string) error {
 	cfg, err := LoadConfig()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -36,6 +37,7 @@ func Run() error {
 	sessions, _ := store.ListSessions()
 
 	stats := gatherStatsFromSessions(sessions, proposals)
+	stats.Version = version
 
 	// Future: reports := fitness.ListReports()
 	var reports []fitness.Report

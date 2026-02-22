@@ -5,6 +5,6 @@ import (
 )
 
 // Review launches the interactive review TUI.
-func Review(args []string) error {
-	return tui.Run()
+func Review(args []string, version string) error {
+	return tui.Run(version)
 }

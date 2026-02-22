@@ -22,7 +22,7 @@ var commands = []command{
 	{"status", "Show pipeline health and store overview", cmd.Status},
 	{"proposals", "List pending proposals", cmd.Proposals},
 	{"inspect", "Show a proposal with full citation chain", cmd.Inspect},
-	{"review", "Interactive review dashboard", cmd.Review},
+	{"review", "Interactive review dashboard", cmdReview},
 	{"approve", "Approve and apply a proposal", cmd.Approve},
 	{"reject", "Reject a proposal with optional reason", cmd.Reject},
 	{"calibrate", "Manage calibration set for prompt testing", cmd.Calibrate},
@@ -91,6 +91,10 @@ func printHelp() {
 	}
 	fmt.Println()
 	fmt.Println("Run 'cabrero help' for this message.")
+}
+
+func cmdReview(args []string) error {
+	return cmd.Review(args, version)
 }
 
 func cmdSetup(args []string) error {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -32,6 +33,10 @@ type reviewModel struct {
 	state     message.ViewState
 	viewStack []message.ViewState
 	config    *shared.Config
+
+	// Persistent header stats
+	stats        message.DashboardStats
+	headerHeight int
 
 	// Status bar
 	statusMsg    string
@@ -74,6 +79,7 @@ func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.
 	m := reviewModel{
 		state:           message.ViewDashboard,
 		config:          cfg,
+		stats:           stats,
 		keys:            keys,
 		proposals:       proposals,
 		sourceGroups:    sourceGroups,
@@ -93,12 +99,18 @@ func (m reviewModel) Init() tea.Cmd {
 // Update implements tea.Model.
 func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	childMsg := msg // message forwarded to child views (may be height-adjusted)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.Width = msg.Width
+
+		// Compute persistent header height.
+		header := dashboard.RenderHeader(m.stats, m.width)
+		m.headerHeight = strings.Count(header, "\n") + 2 // +1 trailing newline, +1 separator line
+		childMsg = tea.WindowSizeMsg{Width: msg.Width, Height: msg.Height - m.headerHeight}
 
 	case tea.KeyMsg:
 		// Global keys handled first.
@@ -248,7 +260,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewStack = append(m.viewStack, m.state)
 		m.state = message.ViewSourceManager
 		m.sources = sources.New(m.sourceGroups, &m.keys, m.config)
-		m.sources.SetSize(m.width, m.height)
+		m.sources.SetSize(m.width, m.childHeight())
 		if msg.SourceName != "" {
 			m.sources = m.sources.PreSelectSource(msg.SourceName)
 		}
@@ -346,49 +358,49 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	}
 
-	// Route to active child.
+	// Route to active child (using childMsg which has reduced height for WindowSizeMsg).
 	switch m.state {
 	case message.ViewDashboard:
 		var cmd tea.Cmd
-		m.dashboard, cmd = m.dashboard.Update(msg)
+		m.dashboard, cmd = m.dashboard.Update(childMsg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	case message.ViewProposalDetail:
 		var cmd tea.Cmd
-		m.detail, cmd = m.detail.Update(msg)
+		m.detail, cmd = m.detail.Update(childMsg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 		// Forward to chat only when the panel is visible (wide mode + enabled).
 		if m.width >= 120 && m.config.Detail.ChatPanelOpen {
 			var chatCmd tea.Cmd
-			m.chat, chatCmd = m.chat.Update(msg)
+			m.chat, chatCmd = m.chat.Update(childMsg)
 			if chatCmd != nil {
 				cmds = append(cmds, chatCmd)
 			}
 		}
 	case message.ViewFitnessDetail:
 		var cmd tea.Cmd
-		m.fitness, cmd = m.fitness.Update(msg)
+		m.fitness, cmd = m.fitness.Update(childMsg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	case message.ViewSourceManager, message.ViewSourceDetail:
 		var cmd tea.Cmd
-		m.sources, cmd = m.sources.Update(msg)
+		m.sources, cmd = m.sources.Update(childMsg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	case message.ViewPipelineMonitor:
 		var cmd tea.Cmd
-		m.pipelineMonitor, cmd = m.pipelineMonitor.Update(msg)
+		m.pipelineMonitor, cmd = m.pipelineMonitor.Update(childMsg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	case message.ViewLogViewer:
 		var cmd tea.Cmd
-		m.logViewer, cmd = m.logViewer.Update(msg)
+		m.logViewer, cmd = m.logViewer.Update(childMsg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -399,6 +411,14 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model.
 func (m reviewModel) View() string {
+	if m.width == 0 || m.height == 0 {
+		return ""
+	}
+
+	// Persistent header + separator.
+	header := dashboard.RenderHeader(m.stats, m.width)
+	separator := strings.Repeat("─", m.width)
+
 	var content string
 
 	switch m.state {
@@ -428,7 +448,7 @@ func (m reviewModel) View() string {
 		content = m.help.View(m.keys)
 	}
 
-	return content
+	return header + "\n" + separator + "\n" + content
 }
 
 func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool) {
@@ -477,12 +497,13 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 		p := m.dashboard.SelectedProposal()
 		if p != nil {
 			citations := buildCitations(p)
+			ch := m.childHeight()
 			m.detail = detail.New(p, citations, &m.keys, m.config)
-			m.detail.SetSize(m.width, m.height)
+			m.detail.SetSize(m.width, ch)
 
 			// Initialize chat for this proposal.
 			chips := defaultChips()
-			m.chat = chat.New(chips, "", chatWidth(m.width, m.config), m.height-6)
+			m.chat = chat.New(chips, "", chatWidth(m.width, m.config), ch-6)
 
 			// Trigger follow-up action if specified.
 			switch action {
@@ -511,18 +532,18 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 		// Initialize fitness detail from the dashboard's selected report.
 		report := m.dashboard.SelectedFitnessReport()
 		m.fitness = fitness_tui.New(report, &m.keys, m.config)
-		m.fitness.SetSize(m.width, m.height)
+		m.fitness.SetSize(m.width, m.childHeight())
 
 	case message.ViewSourceManager:
 		// Initialize source manager with current source groups.
 		m.sources = sources.New(m.sourceGroups, &m.keys, m.config)
-		m.sources.SetSize(m.width, m.height)
+		m.sources.SetSize(m.width, m.childHeight())
 		if action != "" {
 			m.sources = m.sources.PreSelectSource(action)
 		}
 
 	case message.ViewPipelineMonitor:
-		m.pipelineMonitor.SetSize(m.width, m.height)
+		m.pipelineMonitor.SetSize(m.width, m.childHeight())
 		cmds = append(cmds, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
 			return message.PipelineTickMsg{}
 		}))
@@ -532,7 +553,7 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 		content, _ := os.ReadFile(logPath)
 		m.logFileSize = int64(len(content))
 		m.logViewer = logview.New(string(content), &m.keys, m.config)
-		m.logViewer.SetSize(m.width, m.height)
+		m.logViewer.SetSize(m.width, m.childHeight())
 		if m.config.Pipeline.LogFollowMode {
 			cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg {
 				return message.LogTickMsg{}
@@ -541,6 +562,11 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+// childHeight returns the height available for child views (total minus persistent header).
+func (m reviewModel) childHeight() int {
+	return m.height - m.headerHeight
 }
 
 func (m reviewModel) popView() (tea.Model, tea.Cmd) {
