@@ -642,6 +642,14 @@ make the guarantee structural rather than behavioral.
 - Cabrero's own CLI sessions are never analyzed — env var sentinel, session ID blocklist, and skill path restriction work in concert
 - Failed sessions are marked "error" not retried infinitely — human reviews via `cabrero run`
 
+## Known Limitations / Future Work
+
+- **Blocklist growth.** The session ID blocklist (`blocklist.json`) is append-only. Every
+  pipeline invocation adds 1-2 entries (classifier + evaluator CC session IDs). No pruning
+  or expiration exists. At current rates this is negligible, but after large backfills the
+  file will grow. A retention policy (e.g., prune entries older than 90 days on daemon
+  startup, matching `run_history.jsonl` rotation) would keep it bounded.
+
 ---
 
 ---
