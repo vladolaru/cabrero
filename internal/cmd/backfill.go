@@ -30,6 +30,8 @@ func Backfill(args []string) error {
 	evaluatorMaxTurns := fs.Int("evaluator-max-turns", 0, "override Evaluator max turns")
 	classifierTimeout := fs.Duration("classifier-timeout", 0, "override Classifier timeout")
 	evaluatorTimeout := fs.Duration("evaluator-timeout", 0, "override Evaluator timeout")
+	classifierModel := fs.String("classifier-model", "", "override Classifier model")
+	evaluatorModel := fs.String("evaluator-model", "", "override Evaluator model")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -65,6 +67,12 @@ func Backfill(args []string) error {
 	}
 	if *evaluatorTimeout > 0 {
 		cfg.EvaluatorTimeout = *evaluatorTimeout
+	}
+	if *classifierModel != "" {
+		cfg.ClassifierModel = *classifierModel
+	}
+	if *evaluatorModel != "" {
+		cfg.EvaluatorModel = *evaluatorModel
 	}
 
 	// Show preview.

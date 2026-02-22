@@ -18,6 +18,8 @@ func Run(args []string) error {
 	evaluatorMaxTurns := fs.Int("evaluator-max-turns", defaults.EvaluatorMaxTurns, "max agentic turns for Evaluator")
 	classifierTimeout := fs.Duration("classifier-timeout", defaults.ClassifierTimeout, "timeout for Classifier")
 	evaluatorTimeout := fs.Duration("evaluator-timeout", defaults.EvaluatorTimeout, "timeout for Evaluator")
+	classifierModel := fs.String("classifier-model", defaults.ClassifierModel, "Claude model for Classifier")
+	evaluatorModel := fs.String("evaluator-model", defaults.EvaluatorModel, "Claude model for Evaluator")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -34,6 +36,8 @@ func Run(args []string) error {
 	cfg.EvaluatorMaxTurns = *evaluatorMaxTurns
 	cfg.ClassifierTimeout = *classifierTimeout
 	cfg.EvaluatorTimeout = *evaluatorTimeout
+	cfg.ClassifierModel = *classifierModel
+	cfg.EvaluatorModel = *evaluatorModel
 	cfg.Debug = *debug
 
 	runner := pipeline.NewRunner(cfg)

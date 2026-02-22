@@ -23,6 +23,8 @@ func Daemon(args []string) error {
 	evaluatorMaxTurns := fs.Int("evaluator-max-turns", cfg.Pipeline.EvaluatorMaxTurns, "max agentic turns for Evaluator")
 	classifierTimeout := fs.Duration("classifier-timeout", cfg.Pipeline.ClassifierTimeout, "timeout for Classifier")
 	evaluatorTimeout := fs.Duration("evaluator-timeout", cfg.Pipeline.EvaluatorTimeout, "timeout for Evaluator")
+	classifierModel := fs.String("classifier-model", cfg.Pipeline.ClassifierModel, "Claude model for Classifier")
+	evaluatorModel := fs.String("evaluator-model", cfg.Pipeline.EvaluatorModel, "Claude model for Evaluator")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -35,6 +37,8 @@ func Daemon(args []string) error {
 	cfg.Pipeline.EvaluatorMaxTurns = *evaluatorMaxTurns
 	cfg.Pipeline.ClassifierTimeout = *classifierTimeout
 	cfg.Pipeline.EvaluatorTimeout = *evaluatorTimeout
+	cfg.Pipeline.ClassifierModel = *classifierModel
+	cfg.Pipeline.EvaluatorModel = *evaluatorModel
 
 	d, err := daemon.New(cfg)
 	if err != nil {
