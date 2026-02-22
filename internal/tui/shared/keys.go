@@ -143,7 +143,7 @@ func NewKeyMap(nav string) KeyMap {
 // ShortHelp returns bindings for the short help view (dashboard context).
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.Up, k.Down, k.Open, k.Approve, k.Reject, k.Defer, k.Help,
+		k.Up, k.Down, k.Open, k.Approve, k.Reject, k.Defer, k.Sources, k.Pipeline, k.Help,
 	}
 }
 
@@ -151,8 +151,9 @@ func (k KeyMap) ShortHelp() []key.Binding {
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right, k.HalfPageUp, k.HalfPageDown, k.GotoTop, k.GotoBottom},
-		{k.Open, k.Approve, k.Reject, k.Defer, k.Filter, k.Sort},
+		{k.Open, k.Approve, k.Reject, k.Defer, k.Dismiss, k.Filter, k.Sort},
 		{k.Chat, k.UseRevision, k.Chip1, k.Chip2, k.Chip3, k.Chip4},
+		{k.Sources, k.Pipeline, k.ToggleApproach, k.SetOwnership, k.Rollback, k.Refresh},
 		{k.TabForward, k.TabBackward, k.Back, k.Quit, k.ForceQuit, k.Help},
 	}
 }
@@ -160,23 +161,23 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 // DetailShortHelp returns bindings for the detail view status bar.
 func (k KeyMap) DetailShortHelp() []key.Binding {
 	return []key.Binding{
-		k.Back, k.Approve, k.Reject, k.Defer, k.TabForward, k.Help,
+		k.Up, k.Down, k.Back, k.Approve, k.Reject, k.Defer, k.TabForward, k.Help,
 	}
 }
 
 // FitnessShortHelp returns help bindings for the fitness detail view.
 func (k KeyMap) FitnessShortHelp() []key.Binding {
-	return []key.Binding{k.Back, k.Dismiss, k.Sources, k.Chat, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Open, k.Back, k.Dismiss, k.Sources, k.Chat, k.Help}
 }
 
 // SourcesShortHelp returns help bindings for the source manager view.
 func (k KeyMap) SourcesShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Open, k.ToggleApproach, k.SetOwnership, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Open, k.ToggleApproach, k.SetOwnership, k.Back, k.Help}
 }
 
 // PipelineShortHelp returns help bindings for the pipeline monitor view.
 func (k KeyMap) PipelineShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Open, k.Retry, k.LogView, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Open, k.Retry, k.Refresh, k.LogView, k.Back, k.Help}
 }
 
 // LogViewShortHelp returns help bindings for the log viewer.
