@@ -116,6 +116,7 @@ func invokeClaude(cfg claudeConfig) (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
+	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from `/`
 	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
 
 	if !cfg.Agentic {
