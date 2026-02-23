@@ -5,17 +5,7 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-
-- **Incremental log entry parsing** — `AppendContent` now parses only the
-  new bytes and merges them into existing entries instead of re-parsing all
-  content from scratch on every 1-second poll tick. The redundant `m.content`
-  field is removed from the log viewer model.
-- **Daemon log max size reduced** — log rotation threshold lowered from 5 MB
-  to 2 MB per file, reducing the data the TUI log viewer reads and parses on
-  each follow-mode poll.
+## [0.15.0] - 2026-02-23
 
 ### Added
 
@@ -29,12 +19,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **JSON parse retry** — Classifier and Evaluator re-invoke on malformed JSON
   output (markdown fences, prose preamble) up to `MaxLLMRetries` times
   (default 1). Non-JSON errors are not retried.
+- **Search auto-expands all entries and jumps to latest match** — searching in
+  the log viewer now expands all multi-line entries and moves the cursor to the
+  last match for immediate context.
+
+### Changed
+
+- **Incremental log entry parsing** — `AppendContent` now parses only the
+  new bytes and merges them into existing entries instead of re-parsing all
+  content from scratch on every 1-second poll tick. The redundant `m.content`
+  field is removed from the log viewer model.
+- **Daemon log max size reduced** — log rotation threshold lowered from 5 MB
+  to 2 MB per file, reducing the data the TUI log viewer reads and parses on
+  each follow-mode poll.
 
 ### Fixed
 
 - **Queued sessions without transcript** — `ScanQueued` now skips sessions
   missing a `transcript.jsonl` file, preventing repeated pipeline failures
   from incomplete captures.
+- **Log viewer blank lines between entries** — removed spurious blank lines
+  and scroll to latest entry on open.
+- **Log viewer scroll after expand/collapse** — viewport now scrolls to keep
+  the cursor visible after toggling entry expansion.
+- **Log viewer collapse on search clear** — all entries collapse when clearing
+  a log search via Esc.
+- **Log viewer polling** — always polls for new content while the viewer is
+  open, regardless of follow mode state.
 
 ## [0.14.0] - 2026-02-23
 
@@ -550,6 +561,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.15.0]: https://github.com/vladolaru/cabrero/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/vladolaru/cabrero/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/vladolaru/cabrero/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/vladolaru/cabrero/compare/v0.12.0...v0.12.1
