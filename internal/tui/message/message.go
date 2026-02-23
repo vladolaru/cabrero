@@ -142,12 +142,6 @@ type SetOwnershipFinished struct {
 	Err          error
 }
 
-// ClassifyFinished carries the result of classifying a source.
-type ClassifyFinished struct {
-	SourceName string
-	Err        error
-}
-
 // RollbackFinished carries the result of rolling back a change.
 type RollbackFinished struct {
 	ChangeID string

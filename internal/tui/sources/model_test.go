@@ -289,21 +289,21 @@ func TestSources_ToggleApproach_Decline(t *testing.T) {
 	}
 }
 
-func TestSources_ToggleApproach_SkipsUnclassified(t *testing.T) {
+func TestSources_ToggleApproach_Unclassified(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 40)
 
 	// Navigate to unclassified source (cursor 6).
 	m.cursor = 6
 
-	// Press 't' — should be ignored for unclassified.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	// Press 't' — should work even for unclassified sources.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
 
-	if m.confirmState != ConfirmNone {
-		t.Error("toggle should not activate for unclassified source")
+	if m.confirmState != ConfirmToggleApproach {
+		t.Errorf("confirmState = %d, want ConfirmToggleApproach", m.confirmState)
 	}
-	if cmd != nil {
-		t.Error("no cmd expected for unclassified toggle")
+	if !m.confirm.Active {
+		t.Fatal("confirm should be active")
 	}
 }
 
@@ -499,19 +499,17 @@ func TestSources_OpenUnclassified(t *testing.T) {
 	// Navigate to unclassified source (cursor 6).
 	m.cursor = 6
 
-	// Enter should trigger classification, not open detail.
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	// Enter should open detail view for unclassified sources too.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
-	if cmd == nil {
-		t.Fatal("expected cmd from Enter on unclassified source")
+	if !m.detailOpen {
+		t.Fatal("detail should be open after Enter on unclassified source")
 	}
-	msg := cmd()
-	classify, ok := msg.(message.ClassifyFinished)
-	if !ok {
-		t.Fatalf("expected ClassifyFinished, got %T", msg)
+	if m.detailSource == nil {
+		t.Fatal("detailSource should not be nil")
 	}
-	if classify.SourceName != "unknown-skill" {
-		t.Errorf("SourceName = %q, want unknown-skill", classify.SourceName)
+	if m.detailSource.Name != "unknown-skill" {
+		t.Errorf("detailSource.Name = %q, want unknown-skill", m.detailSource.Name)
 	}
 }
 

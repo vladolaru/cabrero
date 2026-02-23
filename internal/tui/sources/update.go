@@ -103,35 +103,38 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleOpen opens the detail sub-view for the selected source, or triggers
-// classification for unclassified sources.
+// handleOpen opens the detail sub-view for the selected source, or toggles
+// expand/collapse when the cursor is on a group header.
 func (m Model) handleOpen() (Model, tea.Cmd) {
+	if m.cursor < 0 || m.cursor >= len(m.flatItems) {
+		return m, nil
+	}
+
+	item := m.flatItems[m.cursor]
+
+	// Group header: toggle expand/collapse.
+	if item.isHeader {
+		m.groups[item.groupIdx].Collapsed = !m.groups[item.groupIdx].Collapsed
+		m.rebuildFlatItems()
+		return m, nil
+	}
+
+	// Source row: open detail sub-view.
 	s := m.SelectedSource()
 	if s == nil {
 		return m, nil
 	}
 
-	if s.Ownership == "" {
-		// Unclassified source — trigger classification prompt.
-		name := s.Name
-		return m, func() tea.Msg {
-			return message.ClassifyFinished{SourceName: name}
-		}
-	}
-
-	// Open detail sub-view.
 	m.detailOpen = true
 	src := *s
 	m.detailSource = &src
-	// Changes would be loaded asynchronously in real usage;
-	// for now we store whatever was previously set.
 	return m, nil
 }
 
 // handleToggleApproach initiates the approach toggle with confirmation.
 func (m Model) handleToggleApproach() (Model, tea.Cmd) {
 	s := m.SelectedSource()
-	if s == nil || s.Ownership == "" {
+	if s == nil {
 		return m, nil
 	}
 
