@@ -1062,8 +1062,12 @@ for the full design specification.
 
 17. **Pipeline monitor** — daemon health, recent runs with per-stage timing,
     sparkline activity chart, prompt versions, retry flow, polling auto-refresh
-18. **Log viewer** — full-screen scrollable log with search (`/`), follow mode (`f`),
-    auto-refresh via polling. Accessible from the pipeline monitor via `l`.
+18. **Log viewer** — structured log view that parses daemon log entries into colored,
+    collapsible entries. Colored level badges (INFO=purple, ERROR=red), muted timestamps,
+    cursor-based entry navigation (up/down between entries, PgUp/PgDn for line scrolling),
+    expand/collapse for multi-line entries (Enter to toggle, `e`/`E` for all), blank-line
+    separators, search with auto-expand of matching collapsed entries, follow mode (`f`).
+    Accessible from the pipeline monitor via `L`.
 
 **Phase 5 — Iteration tooling** ✓
 

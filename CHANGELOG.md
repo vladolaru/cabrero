@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Structured log viewer** — log entries are now parsed from daemon format into
+  colored, structured entries with level badges (INFO=purple, ERROR=red), muted
+  timestamps, cursor-based entry navigation, and blank-line separators.
+- **Expand/collapse for multi-line log entries** — Enter toggles the current
+  entry, `e` expands all, `E` collapses all. Stack traces and continuation lines
+  are hidden by default with a `[+N]` indicator.
+- **Search auto-expands matching entries** — searching for text in collapsed
+  continuation lines auto-expands those entries. `n`/`N` moves cursor to
+  matching entries.
+- **Log viewer snapshot** — `log-viewer` added to the snapshot command for
+  visual regression testing.
 - **Source registry** — auto-discover skills and CLAUDE.md files from classifier
   outputs at TUI startup, persist ownership/approach classifications across
   sessions in `sources.json`, and group sources by origin (user, project, plugin)
@@ -22,6 +33,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   relevant to the current view, grouped into sections (Navigation, Actions,
   Views, Global) with full descriptions explaining what each key does. Replaces
   the generic help overlay that dumped all bindings from every view.
+
+### Changed
+
+- **Log viewer uses structured entries** — replaces raw text display with parsed
+  entries. Search navigation (`n`/`N`) now moves cursor to matching entry.
+  Help overlay updated with entry navigation and expand/collapse bindings.
 
 ### Fixed
 
