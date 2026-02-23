@@ -345,7 +345,7 @@ func (m Model) renderStatusBar() string {
 }
 
 func (m Model) renderDetailStatusBar() string {
-	bindings := []key.Binding{m.keys.Back, m.keys.Rollback, m.keys.Help}
+	bindings := []key.Binding{m.keys.SetOwnership, m.keys.ToggleApproach, m.keys.Rollback, m.keys.Back, m.keys.Help}
 	return components.RenderStatusBar(bindings, "", m.width)
 }
 

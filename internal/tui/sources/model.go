@@ -93,6 +93,15 @@ func (m Model) SelectedSource() *fitness.Source {
 	return &s
 }
 
+// activeSource returns the source currently being acted on — detailSource
+// when the detail sub-view is open, otherwise the cursor-selected source.
+func (m Model) activeSource() *fitness.Source {
+	if m.detailOpen && m.detailSource != nil {
+		return m.detailSource
+	}
+	return m.SelectedSource()
+}
+
 // PreSelectSource returns a new model with cursor positioned on the named source.
 func (m Model) PreSelectSource(name string) Model {
 	for i, item := range m.flatItems {

@@ -138,7 +138,7 @@ func (m Model) handleOpen() (Model, tea.Cmd) {
 
 // handleToggleApproach initiates the approach toggle with confirmation.
 func (m Model) handleToggleApproach() (Model, tea.Cmd) {
-	s := m.SelectedSource()
+	s := m.activeSource()
 	if s == nil {
 		return m, nil
 	}
@@ -155,7 +155,7 @@ func (m Model) handleToggleApproach() (Model, tea.Cmd) {
 
 // handleSetOwnership activates the ownership choice prompt.
 func (m Model) handleSetOwnership() (Model, tea.Cmd) {
-	s := m.SelectedSource()
+	s := m.activeSource()
 	if s == nil {
 		return m, nil
 	}
@@ -172,7 +172,7 @@ func (m Model) updateOwnershipPrompt(msg tea.Msg) (Model, tea.Cmd) {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("m", "M"))):
 			m.confirmState = ConfirmNone
 			m.ownershipPrompt = ""
-			s := m.SelectedSource()
+			s := m.activeSource()
 			if s == nil {
 				return m, nil
 			}
@@ -183,7 +183,7 @@ func (m Model) updateOwnershipPrompt(msg tea.Msg) (Model, tea.Cmd) {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("n", "N"))):
 			m.confirmState = ConfirmNone
 			m.ownershipPrompt = ""
-			s := m.SelectedSource()
+			s := m.activeSource()
 			if s == nil {
 				return m, nil
 			}
@@ -216,7 +216,7 @@ func (m Model) handleConfirmResult(result components.ConfirmResult) (Model, tea.
 		return m, nil
 	}
 
-	s := m.SelectedSource()
+	s := m.activeSource()
 
 	switch state {
 	case ConfirmToggleApproach:
@@ -256,6 +256,12 @@ func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
 			m.changes = nil
 			return m, nil
 
+		case key.Matches(msg, m.keys.SetOwnership):
+			return m.handleSetOwnership()
+
+		case key.Matches(msg, m.keys.ToggleApproach):
+			return m.handleToggleApproach()
+
 		case key.Matches(msg, m.keys.Rollback):
 			if len(m.changes) == 0 {
 				return m, nil
@@ -287,6 +293,10 @@ func (m Model) handleToggleFinished(msg message.ToggleApproachFinished) (Model, 
 		for si := range m.groups[gi].Sources {
 			if m.groups[gi].Sources[si].Name == msg.SourceName {
 				m.groups[gi].Sources[si].Approach = msg.NewApproach
+				// Update detail sub-view if open on this source.
+				if m.detailOpen && m.detailSource != nil && m.detailSource.Name == msg.SourceName {
+					m.detailSource.Approach = msg.NewApproach
+				}
 				// Persist to disk (non-fatal if it fails).
 				_ = store.UpdateSource(msg.SourceName, func(s *fitness.Source) {
 					s.Approach = msg.NewApproach
@@ -309,6 +319,10 @@ func (m Model) handleOwnershipFinished(msg message.SetOwnershipFinished) (Model,
 		for si := range m.groups[gi].Sources {
 			if m.groups[gi].Sources[si].Name == msg.SourceName {
 				m.groups[gi].Sources[si].Ownership = msg.NewOwnership
+				// Update detail sub-view if open on this source.
+				if m.detailOpen && m.detailSource != nil && m.detailSource.Name == msg.SourceName {
+					m.detailSource.Ownership = msg.NewOwnership
+				}
 				// Persist to disk (non-fatal if it fails).
 				now := time.Now().UTC()
 				_ = store.UpdateSource(msg.SourceName, func(s *fitness.Source) {

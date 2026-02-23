@@ -97,7 +97,7 @@ func NewKeyMap(nav string) KeyMap {
 		Dismiss: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "dismiss")),
 
 		// Source Manager.
-		ToggleApproach: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle mode")),
+		ToggleApproach: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle approach")),
 		SetOwnership:   key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "ownership")),
 		Rollback:       key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "rollback")),
 
