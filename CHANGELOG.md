@@ -7,8 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-02-23
+
 ### Added
 
+- **Chat panel toggle and vertical split** — pressing `c` toggles the AI chat
+  panel at any terminal width. Wide terminals (≥ 120 cols) use a horizontal
+  split (side-by-side), narrow terminals use a vertical split (chat underneath).
+  Tab switches focus between proposal and chat panes when chat is open.
 - **Structured log viewer** — log entries are now parsed from daemon format into
   colored, structured entries with level badges (INFO=purple, ERROR=red), muted
   timestamps, cursor-based entry navigation, and blank-line separators.
@@ -39,9 +45,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Log viewer uses structured entries** — replaces raw text display with parsed
   entries. Search navigation (`n`/`N`) now moves cursor to matching entry.
   Help overlay updated with entry navigation and expand/collapse bindings.
+- **Log viewer key binding** — changed from uppercase `L` to lowercase `l` for
+  consistency with other action keys.
+- **Session ID standardization** — consolidated all session ID shortening into
+  a single `store.ShortSessionID()` function returning the first 8 characters
+  (first UUID segment). Proposal IDs also use 8-char prefixes (was 6).
 
 ### Fixed
 
+- **Proposal detail text wrapping** — prose change descriptions and rationale
+  now word-wrap to the viewport width instead of being clipped at the terminal
+  edge. Content width correctly accounts for the chat panel split.
+- **Proposal detail shows full session ID** — the header now displays the
+  complete session UUID instead of a truncated 12-character version.
 - **Status bar no longer wraps at narrow widths** — `RenderStatusBar` now
   measures visual width and drops trailing bindings to guarantee a single-line
   status bar at any terminal width.
@@ -505,6 +521,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.14.0]: https://github.com/vladolaru/cabrero/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/vladolaru/cabrero/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/vladolaru/cabrero/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/vladolaru/cabrero/compare/v0.11.0...v0.12.0
