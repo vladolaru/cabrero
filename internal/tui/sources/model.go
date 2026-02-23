@@ -59,6 +59,9 @@ func New(groups []fitness.SourceGroup, keys *shared.KeyMap, cfg *shared.Config) 
 	return m
 }
 
+// DetailOpen returns true when the source detail sub-view is open.
+func (m Model) DetailOpen() bool { return m.detailOpen }
+
 // HasActivePrompt returns true when the view has internal state
 // (confirmation prompt, detail sub-view) that should handle Esc
 // before the global handler pops the view.

@@ -147,17 +147,6 @@ func (k KeyMap) ShortHelp() []key.Binding {
 	}
 }
 
-// FullHelp returns bindings grouped by category for the full help overlay.
-func (k KeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Up, k.Down, k.Left, k.Right, k.HalfPageUp, k.HalfPageDown, k.GotoTop, k.GotoBottom},
-		{k.Open, k.Approve, k.Reject, k.Defer, k.Dismiss, k.Filter, k.Sort},
-		{k.Chat, k.UseRevision, k.Chip1, k.Chip2, k.Chip3, k.Chip4},
-		{k.Sources, k.Pipeline, k.ToggleApproach, k.SetOwnership, k.Rollback, k.Refresh},
-		{k.TabForward, k.TabBackward, k.Back, k.Quit, k.ForceQuit, k.Help},
-	}
-}
-
 // DetailShortHelp returns bindings for the detail view status bar.
 func (k KeyMap) DetailShortHelp() []key.Binding {
 	return []key.Binding{

@@ -14,12 +14,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/chat"
+	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/dashboard"
 	"github.com/vladolaru/cabrero/internal/tui/detail"
 	fitness_tui "github.com/vladolaru/cabrero/internal/tui/fitness"
@@ -259,11 +259,11 @@ func renderPipelineMonitor(w, h int) (string, error) {
 func renderHelpOverlay(w, h int, nav string) (string, error) {
 	w, h = defaults(w, h)
 	stats := testdata.TestDashboardStats()
-	prefix, _ := renderWithHeader(stats, w)
+	prefix, prefixLines := renderWithHeader(stats, w)
 
 	keys := shared.NewKeyMap(nav)
-	hm := help.New()
-	hm.Width = w
-	hm.ShowAll = true
-	return prefix + hm.View(keys), nil
+	sections := shared.HelpForView(message.ViewDashboard, keys)
+	helpContent := components.RenderHelpOverlay(sections, w, h-prefixLines)
+
+	return prefix + helpContent, nil
 }

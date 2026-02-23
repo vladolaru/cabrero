@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -55,7 +54,6 @@ type reviewModel struct {
 	sourceGroups []fitness.SourceGroup
 
 	// Shared
-	help     help.Model
 	helpOpen bool
 	keys     shared.KeyMap
 
@@ -83,7 +81,6 @@ func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.
 		keys:            keys,
 		proposals:       proposals,
 		sourceGroups:    sourceGroups,
-		help:            newHelpModel(),
 		dashboard:       dashboard.New(proposals, reports, stats, &keys, cfg),
 		pipelineMonitor: pipeline_tui.New(runs, pipelineStats, prompts, stats, &keys, cfg),
 	}
@@ -105,7 +102,6 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.help.Width = msg.Width
 
 		// Compute persistent header height.
 		header := dashboard.RenderHeader(m.stats, m.width)
@@ -445,7 +441,12 @@ func (m reviewModel) View() string {
 
 	// Help overlay.
 	if m.helpOpen {
-		content = m.help.View(m.keys)
+		viewState := m.state
+		if m.state == message.ViewSourceManager && m.sources.DetailOpen() {
+			viewState = message.ViewSourceDetail
+		}
+		sections := shared.HelpForView(viewState, m.keys)
+		content = components.RenderHelpOverlay(sections, m.width, m.height)
 	}
 
 	return header + "\n" + separator + "\n" + content
@@ -465,7 +466,6 @@ func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool
 
 	case key.Matches(msg, m.keys.Help):
 		m.helpOpen = !m.helpOpen
-		m.help.ShowAll = m.helpOpen
 		return m, nil, true
 
 	case key.Matches(msg, m.keys.Back):
@@ -618,14 +618,6 @@ func chatWidth(totalWidth int, cfg *shared.Config) int {
 		pct = 35
 	}
 	return totalWidth * pct / 100
-}
-
-func newHelpModel() help.Model {
-	h := help.New()
-	h.Styles.FullKey = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
-	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(shared.ColorFgBold)
-	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	return h
 }
 
 func actionStatusText(msg tea.Msg) string {
