@@ -123,7 +123,7 @@ func TestLogModelSearchHighlighting(t *testing.T) {
 	}
 
 	// The highlighted content should differ from the raw content.
-	if highlighted == m.content {
+	if highlighted == strings.Join(m.lines, "\n") {
 		t.Error("highlighted content should differ from raw content when matches exist")
 	}
 

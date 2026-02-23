@@ -73,7 +73,6 @@ type lineMatch struct {
 
 // Model is the log viewer model.
 type Model struct {
-	content      string
 	lines        []string
 	entries      []LogEntry // parsed structured entries
 	cursor       int        // selected entry index
@@ -99,7 +98,6 @@ func New(content string, keys *shared.KeyMap, cfg *shared.Config) Model {
 	lines := strings.Split(content, "\n")
 
 	m := Model{
-		content:     content,
 		lines:       lines,
 		entries:     parseEntries(content),
 		followMode:  cfg.Pipeline.LogFollowMode,
@@ -133,7 +131,6 @@ func (m *Model) SetSize(width, height int) {
 
 // UpdateContent replaces the log content (for follow mode refresh).
 func (m *Model) UpdateContent(content string) {
-	m.content = content
 	m.lines = strings.Split(content, "\n")
 	m.entries = parseEntries(content)
 	m.clampCursor()
@@ -145,13 +142,12 @@ func (m *Model) UpdateContent(content string) {
 }
 
 // AppendContent adds new bytes to the end of the log content.
-// Incrementally updates the lines slice instead of re-splitting
+// Incrementally updates lines and entries instead of re-parsing
 // all content, which avoids O(n) overhead on every follow-mode tick.
 func (m *Model) AppendContent(newBytes string) {
 	if newBytes == "" {
 		return
 	}
-	m.content += newBytes
 
 	// Split only the new bytes and merge with the last existing line.
 	newLines := strings.Split(newBytes, "\n")
@@ -165,7 +161,19 @@ func (m *Model) AppendContent(newBytes string) {
 		m.lines = append(m.lines, newLines...)
 	}
 
-	m.entries = parseEntries(m.content)
+	// Incrementally parse only the new bytes and merge with existing entries.
+	newEntries := parseEntries(newBytes)
+	if len(newEntries) > 0 && len(m.entries) > 0 && newEntries[0].Timestamp == "" {
+		// First new entry is a continuation — merge into last existing entry.
+		last := &m.entries[len(m.entries)-1]
+		if newEntries[0].Message != "" {
+			last.Extra = append(last.Extra, newEntries[0].Message)
+		}
+		last.Extra = append(last.Extra, newEntries[0].Extra...)
+		newEntries = newEntries[1:]
+	}
+	m.entries = append(m.entries, newEntries...)
+
 	m.refreshViewportContent()
 	if m.followMode {
 		m.cursor = max(0, len(m.entries)-1)
@@ -304,7 +312,7 @@ func renderLevel(level string) string {
 // renderEntries builds the styled viewport content from parsed entries.
 func (m *Model) renderEntries() string {
 	if len(m.entries) == 0 {
-		return m.content // fallback to raw content
+		return strings.Join(m.lines, "\n")
 	}
 
 	var b strings.Builder
@@ -406,7 +414,7 @@ func (m *Model) applySearchHighlights(content string) string {
 // highlightedContent returns the content with search matches wrapped in highlight style.
 func (m *Model) highlightedContent() string {
 	if m.searchTerm == "" || len(m.matches) == 0 {
-		return m.content
+		return strings.Join(m.lines, "\n")
 	}
 	term := strings.ToLower(m.searchTerm)
 	termLen := len(m.searchTerm)
