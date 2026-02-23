@@ -32,6 +32,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.searchTerm = ""
 		m.matches = nil
 		m.matchIdx = -1
+		for i := range m.entries {
+			m.entries[i].Expanded = false
+		}
 		m.refreshViewportContent()
 		return m, nil
 	}
