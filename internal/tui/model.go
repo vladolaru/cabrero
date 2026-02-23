@@ -576,11 +576,10 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 		m.logFileSize = int64(len(content))
 		m.logViewer = logview.New(string(content), &m.keys, m.config)
 		m.logViewer.SetSize(m.width, m.childHeight())
-		if m.config.Pipeline.LogFollowMode {
-			cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg {
-				return message.LogTickMsg{}
-			}))
-		}
+		// Always poll for new log content while the viewer is open.
+		cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg {
+			return message.LogTickMsg{}
+		}))
 	}
 
 	return m, tea.Batch(cmds...)
