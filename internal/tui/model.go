@@ -472,9 +472,15 @@ func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool
 			m.helpOpen = false
 			return m, nil, true
 		}
-		// Let log viewer handle Esc first when it has active search matches.
+		// Let child views handle Esc when they have active prompts or searches.
 		if m.state == message.ViewLogViewer && m.logViewer.HasActiveSearch() {
-			return m, nil, false // not handled globally — child will handle
+			return m, nil, false
+		}
+		if m.state == message.ViewSourceManager && m.sources.HasActivePrompt() {
+			return m, nil, false
+		}
+		if m.state == message.ViewProposalDetail && m.detail.HasActivePrompt() {
+			return m, nil, false
 		}
 		if m.state != message.ViewDashboard {
 			return m, func() tea.Msg { return message.PopView{} }, true

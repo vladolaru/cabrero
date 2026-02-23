@@ -58,6 +58,13 @@ func New(groups []fitness.SourceGroup, keys *shared.KeyMap, cfg *shared.Config) 
 	return m
 }
 
+// HasActivePrompt returns true when the view has internal state
+// (confirmation prompt, detail sub-view) that should handle Esc
+// before the global handler pops the view.
+func (m Model) HasActivePrompt() bool {
+	return m.confirm.Active || m.detailOpen
+}
+
 // SetSize updates the viewport dimensions.
 func (m *Model) SetSize(width, height int) {
 	m.width = width

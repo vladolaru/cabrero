@@ -163,3 +163,12 @@ func (m Model) HasRevision() bool {
 	return m.revision != nil
 }
 
+// HasActivePrompt returns true when a confirmation prompt is active
+// and the view should handle Esc itself (to dismiss the prompt).
+func (m Model) HasActivePrompt() bool {
+	return m.applyState == ApplyConfirming ||
+		m.applyState == ApplyRejectConfirming ||
+		m.applyState == ApplyDeferConfirming ||
+		m.applyState == ApplyReviewing
+}
+
