@@ -207,20 +207,21 @@ func (m Model) renderActivityStats() string {
 			formatCost(m.stats.TotalCostUSD)))
 	} else {
 		// Wide/standard: 2-column layout.
-		b.WriteString(fmt.Sprintf("  Sessions captured:  %-6d Proposals generated:  %d\n",
+		// Right column starts at column 31 (matching token row width).
+		b.WriteString(fmt.Sprintf("  Sessions captured:  %-8d Proposals generated:  %d\n",
 			m.stats.SessionsCaptured, m.stats.ProposalsGenerated))
-		b.WriteString(fmt.Sprintf("  Sessions processed: %-6d Proposals approved:   %d\n",
+		b.WriteString(fmt.Sprintf("  Sessions processed: %-8d Proposals approved:   %d\n",
 			m.stats.SessionsProcessed, m.stats.ProposalsApproved))
-		b.WriteString(fmt.Sprintf("  Sessions queued:    %-6d Proposals rejected:   %d\n",
+		b.WriteString(fmt.Sprintf("  Sessions queued:    %-8d Proposals rejected:   %d\n",
 			m.stats.SessionsQueued, m.stats.ProposalsRejected))
-		b.WriteString(fmt.Sprintf("  Sessions errored:   %-6d Proposals pending:    %d\n",
+		b.WriteString(fmt.Sprintf("  Sessions errored:   %-8d Proposals pending:    %d\n",
 			m.stats.SessionsErrored, m.stats.ProposalsPending))
 		tokenLeft := fmt.Sprintf("  Tokens: %s in / %s out",
 			formatTokenCount(m.stats.TotalInputTokens),
 			formatTokenCount(m.stats.TotalOutputTokens))
 		costRight := fmt.Sprintf("Cost: %s", formatCost(m.stats.TotalCostUSD))
-		// Align "Cost:" with "Proposals" labels (column 29).
-		if gap := 29 - len([]rune(tokenLeft)); gap > 0 {
+		// Align "Cost:" with "Proposals" labels (column 31).
+		if gap := 31 - len([]rune(tokenLeft)); gap > 0 {
 			tokenLeft += strings.Repeat(" ", gap)
 		} else {
 			tokenLeft += " "
