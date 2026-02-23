@@ -42,7 +42,8 @@ func Run(version string) error {
 	// Future: reports := fitness.ListReports()
 	var reports []fitness.Report
 
-	var sourceGroups []fitness.SourceGroup
+	mergedSources, _ := store.LoadAndMergeSources()
+	sourceGroups := store.GroupSources(mergedSources)
 
 	runs, err := pipeline.ListPipelineRunsFromHistory(sessions, cfg.Pipeline.RecentRunsLimit)
 	if err != nil {

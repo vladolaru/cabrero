@@ -1,9 +1,13 @@
 package sources
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/vladolaru/cabrero/internal/fitness"
+	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 )
@@ -251,6 +255,10 @@ func (m Model) handleToggleFinished(msg message.ToggleApproachFinished) (Model, 
 		for si := range m.groups[gi].Sources {
 			if m.groups[gi].Sources[si].Name == msg.SourceName {
 				m.groups[gi].Sources[si].Approach = msg.NewApproach
+				// Persist to disk (non-fatal if it fails).
+				_ = store.UpdateSource(msg.SourceName, func(s *fitness.Source) {
+					s.Approach = msg.NewApproach
+				})
 				return m, nil
 			}
 		}
@@ -269,6 +277,12 @@ func (m Model) handleOwnershipFinished(msg message.SetOwnershipFinished) (Model,
 		for si := range m.groups[gi].Sources {
 			if m.groups[gi].Sources[si].Name == msg.SourceName {
 				m.groups[gi].Sources[si].Ownership = msg.NewOwnership
+				// Persist to disk (non-fatal if it fails).
+				now := time.Now().UTC()
+				_ = store.UpdateSource(msg.SourceName, func(s *fitness.Source) {
+					s.Ownership = msg.NewOwnership
+					s.ClassifiedAt = &now
+				})
 				return m, nil
 			}
 		}
