@@ -43,6 +43,7 @@ type PipelineConfig struct {
 	ClassifierTimeout  time.Duration
 	EvaluatorTimeout   time.Duration
 	MaxConcurrentInvocations int    // 0 means unlimited; daemon default is 3
+	MaxLLMRetries           int    // max retries for retriable LLM failures (JSON parse errors); 0 = no retry
 	Logger                  Logger // nil defaults to stdLogger (stdout/stderr)
 	Debug                   bool   // persist CC sessions for classifier/evaluator
 }
@@ -75,6 +76,7 @@ func DefaultPipelineConfig() PipelineConfig {
 		ClassifierTimeout:       2 * time.Minute,
 		EvaluatorTimeout:        5 * time.Minute,
 		MaxConcurrentInvocations: 3,
+		MaxLLMRetries:           1,
 	}
 }
 

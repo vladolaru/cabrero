@@ -393,6 +393,12 @@ func cleanLLMJSON(raw string) string {
 	return s[braceStart : braceEnd+1]
 }
 
+// isRetriableJSONError returns true if the error message indicates a JSON parse
+// failure from LLM output — these are non-deterministic and worth retrying.
+func isRetriableJSONError(errMsg string) bool {
+	return strings.Contains(errMsg, "invalid JSON:")
+}
+
 func truncateForLog(s string, max int) string {
 	r := []rune(s)
 	if len(r) <= max {

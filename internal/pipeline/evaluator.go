@@ -67,28 +67,42 @@ func runEvaluatorCore(sessionID string, digest *parser.Digest, classifierOutput 
 	// Scope filesystem access: ~/.cabrero + project dir + ~/.claude.
 	allowedTools := evaluatorAllowedTools(digest.Shape.Cwd)
 
-	cr, err := invokeClaude(claudeConfig{
-		Model:          cfg.EvaluatorModel,
-		SystemPrompt:   systemPrompt,
-		Effort:         "high",
-		Agentic:        true,
-		Prompt:         data,
-		AllowedTools:   allowedTools,
-		MaxTurns:       cfg.EvaluatorMaxTurns,
-		Timeout:        cfg.EvaluatorTimeout,
-		Debug:          cfg.Debug,
-		Logger:         cfg.logger(),
-		PermissionMode: "dontAsk",
-		SettingSources: &emptyStr,
-	})
-	if err != nil {
-		return nil, cr, fmt.Errorf("invoking evaluator: %w", err)
-	}
+	log := cfg.logger()
+	var cr *ClaudeResult
+	var output *EvaluatorOutput
+	maxAttempts := 1 + cfg.MaxLLMRetries
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			log.Info("  Evaluator: retrying after JSON parse failure (attempt %d/%d)", attempt+1, maxAttempts)
+		}
 
-	// Parse JSON output (instructed via system prompt, cleaned defensively).
-	output, err := parseEvaluatorOutput(cr.Result)
-	if err != nil {
-		return nil, cr, fmt.Errorf("parsing evaluator output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
+		cr, err = invokeClaude(claudeConfig{
+			Model:          cfg.EvaluatorModel,
+			SystemPrompt:   systemPrompt,
+			Effort:         "high",
+			Agentic:        true,
+			Prompt:         data,
+			AllowedTools:   allowedTools,
+			MaxTurns:       cfg.EvaluatorMaxTurns,
+			Timeout:        cfg.EvaluatorTimeout,
+			Debug:          cfg.Debug,
+			Logger:         cfg.logger(),
+			PermissionMode: "dontAsk",
+			SettingSources: &emptyStr,
+		})
+		if err != nil {
+			return nil, cr, fmt.Errorf("invoking evaluator: %w", err)
+		}
+
+		output, err = parseEvaluatorOutput(cr.Result)
+		if err != nil {
+			if attempt < maxAttempts-1 && isRetriableJSONError(err.Error()) {
+				log.Error("  Evaluator: JSON parse failed (attempt %d/%d): %v", attempt+1, maxAttempts, err)
+				continue
+			}
+			return nil, cr, fmt.Errorf("parsing evaluator output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
+		}
+		break
 	}
 
 	output.SessionID = sessionID

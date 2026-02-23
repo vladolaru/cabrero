@@ -62,27 +62,41 @@ func runClassifierCore(sessionID string, digest *parser.Digest, aggregatorOutput
 	cabreroRoot := store.Root()
 	allowedTools := fmt.Sprintf("Read(//%s/**),Grep(//%s/**)", cabreroRoot, cabreroRoot)
 
-	cr, err := invokeClaude(claudeConfig{
-		Model:          cfg.ClassifierModel,
-		SystemPrompt:   systemPrompt,
-		Agentic:        true,
-		Prompt:         data,
-		AllowedTools:   allowedTools,
-		MaxTurns:       cfg.ClassifierMaxTurns,
-		Timeout:        cfg.ClassifierTimeout,
-		Debug:          cfg.Debug,
-		Logger:         cfg.logger(),
-		PermissionMode: "dontAsk",
-		SettingSources: &emptyStr,
-	})
-	if err != nil {
-		return nil, cr, fmt.Errorf("invoking classifier: %w", err)
-	}
+	log := cfg.logger()
+	var cr *ClaudeResult
+	var output *ClassifierOutput
+	maxAttempts := 1 + cfg.MaxLLMRetries
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			log.Info("  Classifier: retrying after JSON parse failure (attempt %d/%d)", attempt+1, maxAttempts)
+		}
 
-	// Parse JSON output (instructed via system prompt, cleaned defensively).
-	output, err := parseClassifierOutput(cr.Result)
-	if err != nil {
-		return nil, cr, fmt.Errorf("parsing classifier output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
+		cr, err = invokeClaude(claudeConfig{
+			Model:          cfg.ClassifierModel,
+			SystemPrompt:   systemPrompt,
+			Agentic:        true,
+			Prompt:         data,
+			AllowedTools:   allowedTools,
+			MaxTurns:       cfg.ClassifierMaxTurns,
+			Timeout:        cfg.ClassifierTimeout,
+			Debug:          cfg.Debug,
+			Logger:         cfg.logger(),
+			PermissionMode: "dontAsk",
+			SettingSources: &emptyStr,
+		})
+		if err != nil {
+			return nil, cr, fmt.Errorf("invoking classifier: %w", err)
+		}
+
+		output, err = parseClassifierOutput(cr.Result)
+		if err != nil {
+			if attempt < maxAttempts-1 && isRetriableJSONError(err.Error()) {
+				log.Error("  Classifier: JSON parse failed (attempt %d/%d): %v", attempt+1, maxAttempts, err)
+				continue
+			}
+			return nil, cr, fmt.Errorf("parsing classifier output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
+		}
+		break
 	}
 
 	output.SessionID = sessionID
