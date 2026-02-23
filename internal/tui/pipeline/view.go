@@ -215,10 +215,17 @@ func (m Model) renderActivityStats() string {
 			m.stats.SessionsQueued, m.stats.ProposalsRejected))
 		b.WriteString(fmt.Sprintf("  Sessions errored:   %-6d Proposals pending:    %d\n",
 			m.stats.SessionsErrored, m.stats.ProposalsPending))
-		b.WriteString(fmt.Sprintf("  Tokens: %s in / %s out         Cost: %s",
+		tokenLeft := fmt.Sprintf("  Tokens: %s in / %s out",
 			formatTokenCount(m.stats.TotalInputTokens),
-			formatTokenCount(m.stats.TotalOutputTokens),
-			formatCost(m.stats.TotalCostUSD)))
+			formatTokenCount(m.stats.TotalOutputTokens))
+		costRight := fmt.Sprintf("Cost: %s", formatCost(m.stats.TotalCostUSD))
+		// Align "Cost:" with "Proposals" labels (column 29).
+		if gap := 29 - len([]rune(tokenLeft)); gap > 0 {
+			tokenLeft += strings.Repeat(" ", gap)
+		} else {
+			tokenLeft += " "
+		}
+		b.WriteString(tokenLeft + costRight)
 
 		if len(m.stats.SessionsPerDay) > 0 {
 			sparkline := components.RenderSparkline(m.stats.SessionsPerDay, m.width-4)
