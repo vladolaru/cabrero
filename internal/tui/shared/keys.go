@@ -58,6 +58,8 @@ type KeyMap struct {
 	SearchNext   key.Binding
 	SearchPrev   key.Binding
 	FollowToggle key.Binding
+	ExpandAll    key.Binding
+	CollapseAll  key.Binding
 
 	// Future views
 	Sources  key.Binding
@@ -111,6 +113,8 @@ func NewKeyMap(nav string) KeyMap {
 		SearchNext:   key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next")),
 		SearchPrev:   key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev")),
 		FollowToggle: key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "follow")),
+		ExpandAll:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "expand all")),
+		CollapseAll:  key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "collapse all")),
 
 		// Future views.
 		Sources:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sources")),
@@ -173,5 +177,5 @@ func (k KeyMap) PipelineShortHelp() []key.Binding {
 
 // LogViewShortHelp returns help bindings for the log viewer.
 func (k KeyMap) LogViewShortHelp() []key.Binding {
-	return []key.Binding{k.Search, k.SearchNext, k.SearchPrev, k.FollowToggle, k.Back, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Open, k.ExpandAll, k.CollapseAll, k.Search, k.FollowToggle, k.Back, k.Help}
 }

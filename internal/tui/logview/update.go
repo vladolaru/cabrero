@@ -67,6 +67,32 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.gotoMatch(prev)
 		}
 		return m, nil
+	// Expand/collapse current entry.
+	case key.Matches(msg, m.keys.Open):
+		if m.cursor >= 0 && m.cursor < len(m.entries) && m.entries[m.cursor].IsMultiLine() {
+			m.entries[m.cursor].Expanded = !m.entries[m.cursor].Expanded
+			m.refreshViewportContent()
+		}
+		return m, nil
+
+	// Expand all multi-line entries.
+	case key.Matches(msg, m.keys.ExpandAll):
+		for i := range m.entries {
+			if m.entries[i].IsMultiLine() {
+				m.entries[i].Expanded = true
+			}
+		}
+		m.refreshViewportContent()
+		return m, nil
+
+	// Collapse all entries.
+	case key.Matches(msg, m.keys.CollapseAll):
+		for i := range m.entries {
+			m.entries[i].Expanded = false
+		}
+		m.refreshViewportContent()
+		return m, nil
+
 	// Entry-level cursor navigation (Up/Down).
 	case key.Matches(msg, m.keys.Up):
 		if m.cursor > 0 {

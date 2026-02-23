@@ -521,3 +521,77 @@ func TestCursorStaysInBounds(t *testing.T) {
 		t.Errorf("cursor should clamp to last entry (%d), got %d", len(m.entries)-1, m.cursor)
 	}
 }
+
+func TestToggleExpand(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogMultiLine, &keys, cfg)
+	m.SetSize(120, 40)
+
+	// Move cursor to the multi-line entry (index 1).
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.cursor != 1 {
+		t.Fatalf("cursor should be 1, got %d", m.cursor)
+	}
+
+	// Press Enter to expand.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.entries[1].Expanded {
+		t.Error("entry should be expanded after Enter")
+	}
+
+	// View should now show continuation lines.
+	stripped := ansi.Strip(m.View())
+	if !strings.Contains(stripped, "config.Load") {
+		t.Error("expanded view should show continuation lines")
+	}
+
+	// Press Enter again to collapse.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.entries[1].Expanded {
+		t.Error("entry should be collapsed after second Enter")
+	}
+}
+
+func TestToggleExpandSingleLine(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// All entries are single-line in testLogContent.
+	// Enter on single-line entry should be a no-op.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	// No crash, no change.
+}
+
+func TestExpandAll(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogMultiLine, &keys, cfg)
+	m.SetSize(120, 40)
+
+	// Press 'e' to expand all.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	for i, entry := range m.entries {
+		if entry.IsMultiLine() && !entry.Expanded {
+			t.Errorf("entry[%d] should be expanded after 'e'", i)
+		}
+	}
+}
+
+func TestCollapseAll(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogMultiLine, &keys, cfg)
+	m.SetSize(120, 40)
+
+	// Expand all first.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+
+	// Press 'E' to collapse all.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'E'}})
+	for i, entry := range m.entries {
+		if entry.Expanded {
+			t.Errorf("entry[%d] should be collapsed after 'E'", i)
+		}
+	}
+}
