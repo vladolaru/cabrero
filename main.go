@@ -45,8 +45,12 @@ func main() {
 	}
 
 	if len(os.Args) < 2 {
-		printHelp()
-		os.Exit(0)
+		// No subcommand: launch the dashboard TUI.
+		if err := cmdDashboard(nil); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	sub := os.Args[1]
