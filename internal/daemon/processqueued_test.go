@@ -189,6 +189,37 @@ func TestProcessQueued_MultipleSessions_NotifiesOnceDrained(t *testing.T) {
 	}
 }
 
+func TestProcessOne_SkipsWhenSemaphoreFull(t *testing.T) {
+	d, spy := setupTestDaemon(t)
+
+	// Initialize semaphore with 1 slot and fill it.
+	pipeline.ResetInvokeSemaphoreForTest()
+	pipeline.InitInvokeSemaphore(1)
+	if !pipeline.TryAcquireInvokeSemaphore() {
+		t.Fatal("failed to acquire semaphore slot")
+	}
+	defer pipeline.ReleaseInvokeSemaphore()
+
+	createQueuedSession(t, "session-blocked")
+
+	// processOne should skip — semaphore is full.
+	d.processOne(context.Background(), "session-blocked")
+
+	// Session should NOT have been processed (no classifier call).
+	if spy.count() != 0 {
+		t.Errorf("expected no notifications (session skipped), got: %v", spy.messages)
+	}
+
+	// Session should still be queued (not marked as error or processed).
+	meta, err := store.ReadMetadata("session-blocked")
+	if err != nil {
+		t.Fatalf("ReadMetadata: %v", err)
+	}
+	if meta.Status != store.StatusQueued {
+		t.Errorf("status = %q, want %q (session should remain queued)", meta.Status, store.StatusQueued)
+	}
+}
+
 func TestScanQueued_SkipsSessionsWithoutTranscript(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)

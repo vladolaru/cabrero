@@ -914,6 +914,51 @@ func TestInvokeSemaphore_ZeroMeansUnlimited(t *testing.T) {
 	releaseInvokeSemaphore()
 }
 
+func TestTryAcquireInvokeSemaphore_Succeeds(t *testing.T) {
+	resetInvokeSemaphore()
+	InitInvokeSemaphore(1)
+
+	if !TryAcquireInvokeSemaphore() {
+		t.Fatal("TryAcquire returned false on empty semaphore")
+	}
+	ReleaseInvokeSemaphore()
+}
+
+func TestTryAcquireInvokeSemaphore_FailsWhenFull(t *testing.T) {
+	resetInvokeSemaphore()
+	InitInvokeSemaphore(1)
+
+	// Fill the single slot.
+	if !TryAcquireInvokeSemaphore() {
+		t.Fatal("first TryAcquire failed")
+	}
+
+	// Second attempt should fail immediately.
+	if TryAcquireInvokeSemaphore() {
+		t.Fatal("TryAcquire returned true on full semaphore")
+	}
+
+	ReleaseInvokeSemaphore()
+
+	// After release, should succeed again.
+	if !TryAcquireInvokeSemaphore() {
+		t.Fatal("TryAcquire failed after release")
+	}
+	ReleaseInvokeSemaphore()
+}
+
+func TestTryAcquireInvokeSemaphore_UnlimitedAlwaysSucceeds(t *testing.T) {
+	resetInvokeSemaphore()
+	InitInvokeSemaphore(0)
+
+	for i := 0; i < 10; i++ {
+		if !TryAcquireInvokeSemaphore() {
+			t.Fatalf("TryAcquire returned false with unlimited semaphore (iteration %d)", i)
+		}
+	}
+	// No release needed — unlimited mode is a no-op.
+}
+
 // --- Test helpers ---
 
 // assertContains checks that args contains the given flag followed by value.

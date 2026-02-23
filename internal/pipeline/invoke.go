@@ -32,6 +32,29 @@ func InitInvokeSemaphore(limit int) {
 	})
 }
 
+// TryAcquireInvokeSemaphore attempts to acquire a semaphore slot without
+// blocking. Returns true if acquired (caller must call ReleaseInvokeSemaphore),
+// false if all slots are busy. When no semaphore is configured, always returns true.
+func TryAcquireInvokeSemaphore() bool {
+	if invokeSem == nil {
+		return true
+	}
+	select {
+	case invokeSem <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+// ReleaseInvokeSemaphore releases a slot previously acquired via
+// TryAcquireInvokeSemaphore. Must not be called without a matching acquire.
+func ReleaseInvokeSemaphore() {
+	if invokeSem != nil {
+		<-invokeSem
+	}
+}
+
 func acquireInvokeSemaphore() {
 	if invokeSem != nil {
 		invokeSem <- struct{}{}
@@ -39,15 +62,19 @@ func acquireInvokeSemaphore() {
 }
 
 func releaseInvokeSemaphore() {
-	if invokeSem != nil {
-		<-invokeSem
-	}
+	ReleaseInvokeSemaphore()
 }
 
-// resetInvokeSemaphore resets the semaphore for testing. Not thread-safe.
-func resetInvokeSemaphore() {
+// ResetInvokeSemaphoreForTest resets the semaphore for testing. Not thread-safe.
+// Exported so daemon tests can reset state between test cases.
+func ResetInvokeSemaphoreForTest() {
 	invokeSem = nil
 	invokeSemOnce = sync.Once{}
+}
+
+// resetInvokeSemaphore is the internal alias used by pipeline tests.
+func resetInvokeSemaphore() {
+	ResetInvokeSemaphoreForTest()
 }
 
 // ClaudeResult holds the parsed output from a claude CLI JSON response.

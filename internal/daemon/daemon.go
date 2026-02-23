@@ -210,6 +210,12 @@ func (d *Daemon) processQueued(ctx context.Context) {
 // processProjectBatch runs the Classifier individually on each session in a project,
 // then batches sessions flagged as "evaluate" into a single Evaluator invocation.
 func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessions []QueuedSession) {
+	if !pipeline.TryAcquireInvokeSemaphore() {
+		d.log.Info("skipping batch for %s: all invoke slots busy", store.ProjectDisplayName(project))
+		return
+	}
+	pipeline.ReleaseInvokeSemaphore()
+
 	d.log.Info("batch: %d session(s) for project %s", len(sessions), store.ProjectDisplayName(project))
 
 	batchSessions := make([]pipeline.BatchSession, len(sessions))
@@ -251,6 +257,15 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 }
 
 func (d *Daemon) processOne(ctx context.Context, sessionID string) {
+	// Try to acquire a semaphore slot without blocking. If all slots are
+	// busy (e.g. concurrent CLI invocations), skip this session — it stays
+	// queued and will be picked up on the next poll cycle.
+	if !pipeline.TryAcquireInvokeSemaphore() {
+		d.log.Info("skipping session %s: all invoke slots busy", sessionID)
+		return
+	}
+	pipeline.ReleaseInvokeSemaphore()
+
 	d.log.Info("processing session %s", sessionID)
 
 	result, err := d.runner.RunOne(ctx, sessionID, false)
