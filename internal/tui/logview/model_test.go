@@ -270,3 +270,111 @@ func TestParseEntriesUnparseable(t *testing.T) {
 		t.Errorf("unparseable entry should have empty level, got %q", entries[0].Level)
 	}
 }
+
+func TestModelHasEntries(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+	if len(m.entries) == 0 {
+		t.Fatal("model should parse content into entries")
+	}
+	if m.cursor != 0 {
+		t.Errorf("cursor should start at 0, got %d", m.cursor)
+	}
+}
+
+func TestModelMultiLineEntries(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogMultiLine, &keys, cfg)
+	m.SetSize(120, 40)
+
+	if len(m.entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(m.entries))
+	}
+	if !m.entries[1].IsMultiLine() {
+		t.Error("entry[1] should be multi-line")
+	}
+	if m.entries[1].Expanded {
+		t.Error("multi-line entries should be collapsed by default")
+	}
+}
+
+func TestModelUpdateContentReParsesEntries(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	originalCount := len(m.entries)
+	if originalCount == 0 {
+		t.Fatal("model should start with entries")
+	}
+
+	// Update with different content.
+	m.UpdateContent(testLogMultiLine)
+	if len(m.entries) != 3 {
+		t.Fatalf("after UpdateContent, expected 3 entries, got %d", len(m.entries))
+	}
+}
+
+func TestModelAppendContentReParsesEntries(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	originalCount := len(m.entries)
+	m.AppendContent("2026-02-20T10:20:00 [WARN] disk space low\n")
+	if len(m.entries) != originalCount+1 {
+		t.Fatalf("after AppendContent, expected %d entries, got %d", originalCount+1, len(m.entries))
+	}
+}
+
+func TestModelCursorClamped(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// Set cursor past the end.
+	m.cursor = 999
+	m.clampCursor()
+	if m.cursor != len(m.entries)-1 {
+		t.Errorf("cursor should be clamped to %d, got %d", len(m.entries)-1, m.cursor)
+	}
+
+	// Set cursor negative.
+	m.cursor = -5
+	m.clampCursor()
+	if m.cursor != 0 {
+		t.Errorf("cursor should be clamped to 0, got %d", m.cursor)
+	}
+}
+
+func TestModelFollowModeMovesToLastEntry(t *testing.T) {
+	cfg := testdata.TestConfig()
+	cfg.Pipeline.LogFollowMode = true
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogContent, &keys, cfg)
+	m.SetSize(120, 40)
+
+	// In follow mode, UpdateContent should move cursor to last entry.
+	m.UpdateContent(testLogMultiLine)
+	if m.cursor != len(m.entries)-1 {
+		t.Errorf("follow mode: cursor should be %d, got %d", len(m.entries)-1, m.cursor)
+	}
+
+	// AppendContent should also move cursor to last entry.
+	m.AppendContent("2026-02-20T10:20:00 [WARN] disk space low\n")
+	if m.cursor != len(m.entries)-1 {
+		t.Errorf("follow mode after append: cursor should be %d, got %d", len(m.entries)-1, m.cursor)
+	}
+}
+
+func TestModelEmptyContentHasNoEntries(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New("", &keys, cfg)
+	m.SetSize(120, 40)
+
+	if len(m.entries) != 0 {
+		t.Errorf("empty content should have 0 entries, got %d", len(m.entries))
+	}
+	if m.cursor != 0 {
+		t.Errorf("cursor should be 0 for empty content, got %d", m.cursor)
+	}
+}

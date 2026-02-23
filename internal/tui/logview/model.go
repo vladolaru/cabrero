@@ -71,6 +71,8 @@ type lineMatch struct {
 type Model struct {
 	content      string
 	lines        []string
+	entries      []LogEntry // parsed structured entries
+	cursor       int        // selected entry index
 	viewport     viewport.Model
 	searchInput  textinput.Model
 	searchActive bool
@@ -95,6 +97,7 @@ func New(content string, keys *shared.KeyMap, cfg *shared.Config) Model {
 	m := Model{
 		content:     content,
 		lines:       lines,
+		entries:     parseEntries(content),
 		followMode:  cfg.Pipeline.LogFollowMode,
 		matchIdx:    -1,
 		keys:        keys,
@@ -128,8 +131,11 @@ func (m *Model) SetSize(width, height int) {
 func (m *Model) UpdateContent(content string) {
 	m.content = content
 	m.lines = strings.Split(content, "\n")
+	m.entries = parseEntries(content)
+	m.clampCursor()
 	m.refreshViewportContent()
 	if m.followMode {
+		m.cursor = max(0, len(m.entries)-1)
 		m.viewport.GotoBottom()
 	}
 }
@@ -155,9 +161,21 @@ func (m *Model) AppendContent(newBytes string) {
 		m.lines = append(m.lines, newLines...)
 	}
 
+	m.entries = parseEntries(m.content)
 	m.refreshViewportContent()
 	if m.followMode {
+		m.cursor = max(0, len(m.entries)-1)
 		m.viewport.GotoBottom()
+	}
+}
+
+// clampCursor ensures the cursor stays within the valid range of entries.
+func (m *Model) clampCursor() {
+	if m.cursor >= len(m.entries) {
+		m.cursor = max(0, len(m.entries)-1)
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
 	}
 }
 
