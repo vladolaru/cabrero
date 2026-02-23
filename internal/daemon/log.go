@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultMaxSize  = 5 * 1024 * 1024 // 5 MB
+	defaultMaxSize  = 2 * 1024 * 1024 // 2 MB
 	maxRotatedFiles = 2               // .1 and .2
 )
 
@@ -21,7 +21,7 @@ type Logger struct {
 }
 
 // NewLogger creates a logger writing to path, rotating when the file exceeds maxSize.
-// Pass 0 for maxSize to use the default (5 MB).
+// Pass 0 for maxSize to use the default (2 MB).
 func NewLogger(path string, maxSize int64) (*Logger, error) {
 	if maxSize <= 0 {
 		maxSize = defaultMaxSize
