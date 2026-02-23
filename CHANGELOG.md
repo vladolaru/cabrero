@@ -30,6 +30,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   inside the viewport, capping output to exactly the declared height.
 - **Chat panel respects terminal height** — fixed viewport sizing to account
   for bordered chip chrome and added fill-to-height logic.
+- **Pipeline Monitor columns align vertically** — session ID, age, project,
+  and timing columns in the Recent Runs list now use fixed-width formatting
+  so values line up across rows. Run detail labels (Session, Project, Status,
+  etc.) also align consistently.
+- **Parse duration no longer shows 0.0s** — the parse stage was never timed
+  separately; its duration was lumped into the classifier. Parse and classifier
+  are now recorded as independent durations in run history.
+- **Project name appears in Pipeline Monitor** — capture hooks wrote `work_dir`
+  but not `project` to session metadata, leaving the project column blank.
+  Hooks now derive the project slug from the working directory. Existing
+  sessions are backfilled from `work_dir` on read.
 
 ## [0.13.0] - 2026-02-22
 
