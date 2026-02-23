@@ -465,6 +465,7 @@ func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool
 
 	case key.Matches(msg, m.keys.Help):
 		m.helpOpen = !m.helpOpen
+		m.help.ShowAll = m.helpOpen
 		return m, nil, true
 
 	case key.Matches(msg, m.keys.Back):
