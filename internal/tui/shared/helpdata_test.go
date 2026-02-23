@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/vladolaru/cabrero/internal/tui/message"
@@ -73,6 +74,22 @@ func TestHelpForView_KeysMatchNavMode(t *testing.T) {
 	}
 	if !found {
 		t.Error("arrows mode: expected navigation entry with key \"↑\"")
+	}
+}
+
+func TestLogViewerHelpHasExpandCollapse(t *testing.T) {
+	km := NewKeyMap("vim")
+	sections := HelpForView(message.ViewLogViewer, km)
+	found := false
+	for _, sec := range sections {
+		for _, entry := range sec.Entries {
+			if strings.Contains(entry.Desc, "expand") || strings.Contains(entry.Desc, "Expand") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("log viewer help should include expand/collapse entries")
 	}
 }
 

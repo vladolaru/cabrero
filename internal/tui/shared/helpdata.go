@@ -254,6 +254,25 @@ func pipelineHelp(km KeyMap) []HelpSection {
 func logViewerHelp(km KeyMap) []HelpSection {
 	return []HelpSection{
 		{
+			Title: "Navigation",
+			Entries: []HelpEntry{
+				{km.Up.Help().Key, "Move to previous entry"},
+				{km.Down.Help().Key, "Move to next entry"},
+				{km.HalfPageUp.Help().Key, "Scroll up (line-level)"},
+				{km.HalfPageDown.Help().Key, "Scroll down (line-level)"},
+				{km.GotoTop.Help().Key, "Jump to first entry"},
+				{km.GotoBottom.Help().Key, "Jump to last entry"},
+			},
+		},
+		{
+			Title: "Expand / Collapse",
+			Entries: []HelpEntry{
+				{km.Open.Help().Key, "Toggle expand/collapse current entry"},
+				{km.ExpandAll.Help().Key, "Expand all multi-line entries"},
+				{km.CollapseAll.Help().Key, "Collapse all entries"},
+			},
+		},
+		{
 			Title: "Search",
 			Entries: []HelpEntry{
 				{km.Search.Help().Key, "Start search"},
