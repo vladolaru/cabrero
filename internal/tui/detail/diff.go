@@ -46,7 +46,32 @@ func RenderDiff(change *string, flaggedEntry *string, proposalType string, width
 		return renderScaffold(diff, width)
 	}
 
-	return renderUnifiedDiff(diff, width)
+	// If the content looks like a unified diff, render with syntax highlighting.
+	// Otherwise treat as prose and word-wrap it.
+	if looksLikeDiff(diff) {
+		return renderUnifiedDiff(diff, width)
+	}
+	return renderProse(diff, width)
+}
+
+// looksLikeDiff returns true if the content appears to be a unified diff
+// (contains +/- line markers or @@ hunk headers).
+func looksLikeDiff(s string) bool {
+	for _, line := range strings.Split(s, "\n") {
+		if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, "@@") {
+			return true
+		}
+	}
+	return false
+}
+
+// renderProse word-wraps a prose change description to fit within width.
+func renderProse(text string, width int) string {
+	wrapWidth := width - 4 // account for indent + prefix
+	if wrapWidth < 20 {
+		wrapWidth = 20
+	}
+	return lipgloss.NewStyle().Width(wrapWidth).Render(text)
 }
 
 func renderUnifiedDiff(diff string, width int) string {

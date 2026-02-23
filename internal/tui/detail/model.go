@@ -26,6 +26,7 @@ type Model struct {
 	revConfirm   components.RevisionConfirmModel
 	width        int
 	height       int
+	contentWidth int // viewport width for text wrapping
 	keys         *shared.KeyMap
 	config       *shared.Config
 }
@@ -69,6 +70,7 @@ func (m *Model) SetSize(width, height int) {
 		contentWidth = width*(100-chatPct)/100 - 2
 	}
 
+	m.contentWidth = contentWidth
 	m.bodyViewport = viewport.New(contentWidth, bodyHeight)
 	m.bodyViewport.SetContent(m.renderBodyContent())
 }
@@ -92,7 +94,7 @@ func (m Model) renderBodyContent() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("─", 17))
 	b.WriteString("\n")
-	b.WriteString(shared.IndentBlock(RenderDiff(p.Change, p.FlaggedEntry, p.Type, m.width), 2))
+	b.WriteString(shared.IndentBlock(RenderDiff(p.Change, p.FlaggedEntry, p.Type, m.contentWidth), 2))
 	b.WriteString("\n\n")
 
 	// RATIONALE section.
@@ -100,7 +102,7 @@ func (m Model) renderBodyContent() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("─", 17))
 	b.WriteString("\n")
-	b.WriteString(shared.WrapIndent(p.Rationale, m.width, 2))
+	b.WriteString(shared.WrapIndent(p.Rationale, m.contentWidth, 2))
 	b.WriteString("\n\n")
 
 	// CITATION CHAIN.
