@@ -28,7 +28,7 @@ func Prompts(args []string) error {
 	promptsDir := filepath.Join(store.Root(), "prompts")
 
 	for _, v := range versions {
-		age := formatAge(v.LastUsed)
+		age := formatAge(v.UpdatedAt)
 
 		filename := v.Name
 		if v.Version != "" {

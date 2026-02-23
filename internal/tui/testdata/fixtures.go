@@ -432,8 +432,8 @@ func TestLogContent() string {
 // TestPromptVersions returns prompt version fixtures.
 func TestPromptVersions() []pipeline.PromptVersion {
 	return []pipeline.PromptVersion{
-		{Name: "classifier", Version: "v3", LastUsed: time.Now().Add(-12 * time.Minute)},
-		{Name: "evaluator", Version: "v3", LastUsed: time.Now().Add(-12 * time.Minute)},
-		{Name: "apply", Version: "v1", LastUsed: time.Now().Add(-3 * 24 * time.Hour)},
+		{Name: "classifier", Version: "v3", UpdatedAt: time.Now().Add(-12 * time.Minute)},
+		{Name: "evaluator", Version: "v3", UpdatedAt: time.Now().Add(-12 * time.Minute)},
+		{Name: "apply", Version: "v1", UpdatedAt: time.Now().Add(-3 * 24 * time.Hour)},
 	}
 }

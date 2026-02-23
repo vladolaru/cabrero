@@ -45,11 +45,11 @@ type PipelineStats struct {
 	SessionsPerDay     []int // for sparkline, index 0 = today
 }
 
-// PromptVersion represents a prompt file with its version and last-used time.
+// PromptVersion represents a prompt file with its version and last-modified time.
 type PromptVersion struct {
-	Name     string
-	Version  string
-	LastUsed time.Time
+	Name      string
+	Version   string
+	UpdatedAt time.Time
 }
 
 // ListPipelineRunsFromSessions reconstructs run data from pre-loaded session
@@ -423,9 +423,9 @@ func ListPromptVersions() ([]PromptVersion, error) {
 			continue
 		}
 		versions = append(versions, PromptVersion{
-			Name:     name,
-			Version:  ver,
-			LastUsed: info.ModTime(),
+			Name:      name,
+			Version:   ver,
+			UpdatedAt: info.ModTime(),
 		})
 	}
 	return versions, nil

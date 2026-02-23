@@ -307,8 +307,8 @@ func (m Model) renderPrompts() string {
 	b.WriteString(sectionHeaderStyle.Render("PROMPTS"))
 	b.WriteString("\n")
 	for i, p := range m.prompts {
-		age := relativeTime(p.LastUsed)
-		b.WriteString(fmt.Sprintf("  %-20s %-4s  last used: %s", p.Name, p.Version, age))
+		age := relativeTime(p.UpdatedAt)
+		b.WriteString(fmt.Sprintf("  %-20s %-4s  updated: %s", p.Name, p.Version, age))
 		if i < len(m.prompts)-1 {
 			b.WriteString("\n")
 		}
