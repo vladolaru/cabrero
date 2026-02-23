@@ -124,11 +124,11 @@ func (m *Model) SetSize(width, height int) {
 	}
 
 	m.viewport = viewport.New(width, viewHeight)
-	m.refreshViewportContent()
 
-	if m.followMode {
-		m.viewport.GotoBottom()
-	}
+	// Always start at the latest entry.
+	m.cursor = max(0, len(m.entries)-1)
+	m.refreshViewportContent()
+	m.viewport.GotoBottom()
 }
 
 // UpdateContent replaces the log content (for follow mode refresh).
@@ -261,7 +261,6 @@ func (m *Model) scrollToCursor() {
 		if m.entries[i].Expanded {
 			lineNum += len(m.entries[i].Extra)
 		}
-		lineNum++ // blank separator line
 	}
 
 	m.viewport.SetYOffset(lineNum)
@@ -309,10 +308,6 @@ func (m *Model) renderEntries() string {
 
 	var b strings.Builder
 	for i, entry := range m.entries {
-		if i > 0 {
-			b.WriteString("\n") // blank line between entries
-		}
-
 		// Cursor prefix.
 		prefix := "  "
 		if i == m.cursor {

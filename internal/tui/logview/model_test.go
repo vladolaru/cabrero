@@ -277,8 +277,9 @@ func TestModelHasEntries(t *testing.T) {
 	if len(m.entries) == 0 {
 		t.Fatal("model should parse content into entries")
 	}
-	if m.cursor != 0 {
-		t.Errorf("cursor should start at 0, got %d", m.cursor)
+	// SetSize scrolls to the latest entry.
+	if m.cursor != len(m.entries)-1 {
+		t.Errorf("cursor should start at last entry (%d), got %d", len(m.entries)-1, m.cursor)
 	}
 }
 
@@ -410,21 +411,18 @@ func TestViewShowsCursorIndicator(t *testing.T) {
 	}
 }
 
-func TestViewShowsBlankLineSeparators(t *testing.T) {
+func TestViewHasNoBlankLineSeparators(t *testing.T) {
 	m := newTestLogModel()
 	m.SetSize(120, 40)
-	stripped := ansi.Strip(m.View())
 
-	lines := strings.Split(stripped, "\n")
-	hasBlankLine := false
-	for _, line := range lines {
+	// Render entries directly (skip title/status lines from View).
+	rendered := ansi.Strip(m.renderEntries())
+	lines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+
+	for i, line := range lines {
 		if strings.TrimSpace(line) == "" {
-			hasBlankLine = true
-			break
+			t.Errorf("unexpected blank line at position %d between entries", i)
 		}
-	}
-	if !hasBlankLine {
-		t.Error("view should contain blank lines between entries")
 	}
 }
 
@@ -471,26 +469,28 @@ func TestCursorNavigation(t *testing.T) {
 	m := newTestLogModel()
 	m.SetSize(120, 40)
 
-	if m.cursor != 0 {
-		t.Fatalf("cursor should start at 0, got %d", m.cursor)
-	}
-
-	// Move down.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	if m.cursor != 1 {
-		t.Errorf("cursor should be 1 after Down, got %d", m.cursor)
+	// Cursor starts at the last entry after SetSize.
+	last := len(m.entries) - 1
+	if m.cursor != last {
+		t.Fatalf("cursor should start at last entry (%d), got %d", last, m.cursor)
 	}
 
 	// Move up.
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
-	if m.cursor != 0 {
-		t.Errorf("cursor should be 0 after Up, got %d", m.cursor)
+	if m.cursor != last-1 {
+		t.Errorf("cursor should be %d after Up, got %d", last-1, m.cursor)
 	}
 
-	// Can't go above 0.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
-	if m.cursor != 0 {
-		t.Errorf("cursor should stay at 0, got %d", m.cursor)
+	// Move down.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.cursor != last {
+		t.Errorf("cursor should be %d after Down, got %d", last, m.cursor)
+	}
+
+	// Can't go below last.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.cursor != last {
+		t.Errorf("cursor should stay at %d, got %d", last, m.cursor)
 	}
 }
 
@@ -503,7 +503,7 @@ func TestCursorNavigationDisablesFollow(t *testing.T) {
 	}
 
 	// Moving cursor should disable follow mode.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	if m.followMode {
 		t.Error("cursor navigation should disable follow mode")
 	}
@@ -513,12 +513,12 @@ func TestCursorStaysInBounds(t *testing.T) {
 	m := newTestLogModel()
 	m.SetSize(120, 40)
 
-	// Move to last entry.
+	// Move past the first entry.
 	for i := 0; i < len(m.entries)+5; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	}
-	if m.cursor != len(m.entries)-1 {
-		t.Errorf("cursor should clamp to last entry (%d), got %d", len(m.entries)-1, m.cursor)
+	if m.cursor != 0 {
+		t.Errorf("cursor should clamp to first entry (0), got %d", m.cursor)
 	}
 }
 
@@ -529,7 +529,8 @@ func TestToggleExpand(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Move cursor to the multi-line entry (index 1).
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	// Cursor starts at last entry (2), so move up once.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	if m.cursor != 1 {
 		t.Fatalf("cursor should be 1, got %d", m.cursor)
 	}
