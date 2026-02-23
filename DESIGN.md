@@ -856,6 +856,10 @@ ID (first 8 characters — the first UUID segment) everywhere else (dashboard ro
 pipeline runs, CLI output). A canonical `store.ShortSessionID()` function is used
 throughout to ensure consistency.
 
+Target paths (skill file locations) replace the user's home directory prefix with `~`
+in both the dashboard list and detail header, keeping the meaningful suffix visible
+within the column width. A canonical `shared.ShortenHome()` function handles this.
+
 ### AI Chat Integration
 
 The detail view includes an AI chat panel for interrogating proposals you want to
