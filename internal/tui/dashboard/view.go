@@ -67,20 +67,14 @@ func (m Model) View() string {
 	return content
 }
 
-// RenderHeader renders the persistent header bar (title, version, stats, daemon status, hooks).
+// RenderHeader renders the persistent header bar (title, version, daemon status, hooks).
 // It is called by the root model to render above every child view.
 func RenderHeader(stats message.DashboardStats, width int) string {
-	titleText := "  Cabrero Review"
+	titleText := "  Cabrero"
 	if stats.Version != "" {
 		titleText += "  " + mutedStyle.Render(stats.Version)
 	}
 	title := headerStyle.Render(titleText)
-
-	statsLine := fmt.Sprintf("  %d proposals awaiting review  ·  %d approved  ·  %d rejected",
-		stats.PendingCount, stats.ApprovedCount, stats.RejectedCount)
-	if stats.FitnessReportCount > 0 {
-		statsLine += fmt.Sprintf("  ·  %d fitness reports", stats.FitnessReportCount)
-	}
 
 	var daemonStatus string
 	if stats.DaemonRunning {
@@ -104,10 +98,8 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 	}
 
 	if width >= 120 {
-		// Wide: stats on left, daemon/hooks on right.
-		// Style labels individually — wrapping the whole block in mutedStyle
-		// overrides ANSI colors on the first styled element (checkmarks, dots).
-		left := title + "\n" + statsLine
+		// Wide: title on left, daemon/hooks on right.
+		left := title
 		rightLines := []string{
 			mutedStyle.Render("Daemon:") + " " + daemonStatus,
 			lastCapture,
@@ -121,7 +113,7 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 	if lastCapture != "" {
 		daemonLine += "  " + mutedStyle.Render("│") + "  " + lastCapture
 	}
-	return title + "\n" + mutedStyle.Render(statsLine) + "\n" +
+	return title + "\n" +
 		daemonLine + "\n" +
 		"  " + hooks + debugIndicator
 }

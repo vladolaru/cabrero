@@ -41,7 +41,7 @@ func TestFullNavigationFlow(t *testing.T) {
 
 	// Dashboard should render.
 	view := ansi.Strip(m.View())
-	if !strings.Contains(view, "Cabrero Review") {
+	if !strings.Contains(view, "Cabrero") {
 		t.Error("dashboard missing title")
 	}
 
