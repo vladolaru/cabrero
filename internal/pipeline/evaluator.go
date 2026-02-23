@@ -14,7 +14,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
-const evaluatorPromptFile = "evaluator-v3.txt"
+const evaluatorPromptFile = "evaluator-v4.txt"
 
 // DefaultEvaluatorModel is the compile-time default Claude model for evaluation.
 const DefaultEvaluatorModel = "claude-sonnet-4-6"

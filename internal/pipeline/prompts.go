@@ -228,7 +228,7 @@ Output ONLY valid JSON. No markdown fences, no preamble, no explanation. Just th
 {
   "version": 2,
   "sessionId": "string (copy from digest)",
-  "promptVersion": "evaluator-v3",
+  "promptVersion": "evaluator-v4",
   "classifierPromptVersion": "string (copy from classifier output)",
 
   "proposals": [
@@ -239,11 +239,11 @@ Output ONLY valid JSON. No markdown fences, no preamble, no explanation. Just th
 
       "target": "string (file path — the skill file path or CLAUDE.md path to modify)",
 
-      "change": "string or null (precise description of proposed change — for skill_improvement, claude_addition, and skill_scaffold)",
+      "change": "string or null (proposed change — use \\n for paragraph breaks; see Formatting rule)",
       "flaggedEntry": "string or null (the specific CLAUDE.md entry that needs review — for claude_review)",
       "assessmentSummary": "string or null (why this entry needs review — for claude_review)",
 
-      "rationale": "string (citing specific classification signals and turn UUIDs that justify this proposal)",
+      "rationale": "string (justification citing classification signals and UUIDs — use \\n for paragraph breaks; see Formatting rule)",
       "citedUuids": ["string (UUIDs from the classifier output that support this proposal)"],
       "citedSkillSignals": ["string (skill names from classifier skillSignals that support this)"],
       "citedClaudeMdSignals": ["string (CLAUDE.md paths from classifier claudeMdSignals that support this)"],
@@ -289,4 +289,11 @@ A recurring error-prone pattern across sessions suggests creating a new skill. T
 8. The "target" field must be a plausible file path. For skills, use the skill name as referenced in the digest. For CLAUDE.md files, use the path from the digest's claudeMd.loaded[] or claudeMd.interactions[].
 
 9. For skill_scaffold proposals: only generate when the classifier's patternAssessments contains a "confirmed" pattern. The scaffoldSkillName field is required. Base the proposal on cross-session evidence, not single-session observations.
+
+## Formatting
+
+The "change" and "rationale" fields are displayed in a terminal TUI. Use literal newline characters (\n) to separate logical paragraphs — a wall of text is hard to read. Aim for 2-4 short paragraphs:
+
+- **change**: Start with what to modify, then explain the content. For claude_addition, separate the context paragraph from the actual entry text.
+- **rationale**: First paragraph states the core evidence (UUIDs, signals). Second paragraph explains why this matters or what risk it mitigates. Keep each paragraph to 2-3 sentences.
 `
