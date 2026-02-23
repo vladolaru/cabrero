@@ -5,6 +5,21 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-02-23
+
+### Added
+- **Help overlay descriptions** — the help overlay (`?` key) now renders
+  multi-paragraph descriptions above the key binding sections, explaining
+  each view's purpose, what actions do, and how features connect. Dashboard
+  help explains what proposals and fitness reports are, approval effects,
+  and rollback availability.
+
+### Fixed
+- **Fitness help: Open key mislabeled** — was "Open linked source", actually
+  toggles evidence group expand/collapse.
+- **Detail help: chat toggle said "wide mode only"** — chat panel works at
+  all terminal widths (horizontal split at >=120, vertical below).
+
 ## [0.16.1] - 2026-02-23
 
 ### Fixed
@@ -613,6 +628,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.17.0]: https://github.com/vladolaru/cabrero/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/vladolaru/cabrero/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vladolaru/cabrero/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/vladolaru/cabrero/compare/v0.14.0...v0.15.0
