@@ -50,7 +50,7 @@ func (m Model) View() string {
 	var sections []string
 
 	// Title.
-	title := titleStyle.Render("Pipeline Monitor")
+	title := "  " + titleStyle.Render("Pipeline Monitor")
 	sections = append(sections, title)
 
 	// Daemon header.
@@ -98,7 +98,7 @@ func (m Model) renderDaemonHeader() string {
 
 	// Build left column: DAEMON section.
 	var left strings.Builder
-	left.WriteString(sectionHeaderStyle.Render("DAEMON"))
+	left.WriteString("  " + sectionHeaderStyle.Render("DAEMON"))
 	left.WriteString("\n")
 	if m.dashStats.DaemonRunning {
 		left.WriteString(fmt.Sprintf("  Status:  %s (PID %d)\n", successStyle.Render("● running"), m.dashStats.DaemonPID))
@@ -120,14 +120,14 @@ func (m Model) renderDaemonHeader() string {
 
 	// Build right column: HOOKS + STORE (store hidden in narrow).
 	var right strings.Builder
-	right.WriteString(sectionHeaderStyle.Render("HOOKS"))
+	right.WriteString("  " + sectionHeaderStyle.Render("HOOKS"))
 	right.WriteString("\n")
 	right.WriteString(fmt.Sprintf("  pre-compact:  %s\n", checkmark(m.dashStats.HookPreCompact)))
 	right.WriteString(fmt.Sprintf("  session-end:  %s", checkmark(m.dashStats.HookSessionEnd)))
 
 	if mode != layoutNarrow {
 		right.WriteString("\n\n")
-		right.WriteString(sectionHeaderStyle.Render("STORE"))
+		right.WriteString("  " + sectionHeaderStyle.Render("STORE"))
 		right.WriteString("\n")
 		right.WriteString(fmt.Sprintf("  Path: %s\n", m.dashStats.StorePath))
 		right.WriteString(fmt.Sprintf("  Raw:  %d sessions\n", m.dashStats.SessionCount))
@@ -193,7 +193,7 @@ func (m Model) renderActivityStats() string {
 	mode := m.layoutMode()
 	var b strings.Builder
 	days := m.config.Pipeline.SparklineDays
-	b.WriteString(sectionHeaderStyle.Render(fmt.Sprintf("PIPELINE ACTIVITY (last %d days)", days)))
+	b.WriteString("  " + sectionHeaderStyle.Render(fmt.Sprintf("PIPELINE ACTIVITY (last %d days)", days)))
 	b.WriteString("\n")
 
 	if mode == layoutNarrow {
@@ -268,7 +268,7 @@ func (m Model) runLayout() (idLen int, projectMax int) {
 
 func (m Model) renderRecentRuns() string {
 	var b strings.Builder
-	b.WriteString(sectionHeaderStyle.Render("RECENT RUNS"))
+	b.WriteString("  " + sectionHeaderStyle.Render("RECENT RUNS"))
 	b.WriteString("\n")
 
 	idLen, projectMax := m.runLayout()
@@ -319,7 +319,7 @@ func (m Model) renderRunDetail(run pl.PipelineRun) string {
 
 func (m Model) renderModels() string {
 	var b strings.Builder
-	b.WriteString(sectionHeaderStyle.Render("MODELS"))
+	b.WriteString("  " + sectionHeaderStyle.Render("MODELS"))
 	b.WriteString("\n")
 
 	cfg := pl.DefaultPipelineConfig()
@@ -337,7 +337,7 @@ func (m Model) renderModels() string {
 
 func (m Model) renderPrompts() string {
 	var b strings.Builder
-	b.WriteString(sectionHeaderStyle.Render("PROMPTS"))
+	b.WriteString("  " + sectionHeaderStyle.Render("PROMPTS"))
 	b.WriteString("\n")
 	for i, p := range m.prompts {
 		age := relativeTime(p.UpdatedAt)
