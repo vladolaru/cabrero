@@ -12,14 +12,14 @@ func TestRenderHelpOverlay_ContainsSectionTitles(t *testing.T) {
 		{
 			Title: "Navigation",
 			Entries: []shared.HelpEntry{
-				{"↑", "Move up"},
-				{"↓", "Move down"},
+				{Key: "↑", Desc: "Move up"},
+				{Key: "↓", Desc: "Move down"},
 			},
 		},
 		{
 			Title: "Actions",
 			Entries: []shared.HelpEntry{
-				{"a", "Approve"},
+				{Key: "a", Desc: "Approve"},
 			},
 		},
 	}
@@ -38,8 +38,8 @@ func TestRenderHelpOverlay_ContainsKeys(t *testing.T) {
 		{
 			Title: "Test",
 			Entries: []shared.HelpEntry{
-				{"ctrl+c", "Force quit"},
-				{"?", "Help"},
+				{Key: "ctrl+c", Desc: "Force quit"},
+				{Key: "?", Desc: "Help"},
 			},
 		},
 	}
