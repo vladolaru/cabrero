@@ -5,17 +5,30 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.16.0] - 2026-02-23
+
+### Added
+- **Cross-navigation between top-level views** — Sources and Pipeline now have
+  `s`/`p` shortcuts to jump directly to each other. Uses a `SwitchView` message
+  that replaces the current view without growing the navigation stack, so Esc
+  always returns to Proposals. Help overlays and status bars updated with the
+  new bindings.
+- **Source detail Info section** — drilling into a source now shows a full Info
+  section (origin, ownership, approach, session count, health score, classification
+  date) above the Recent Changes list. Sub-header simplified to just the source name.
+- **Bare `cabrero` launches the dashboard** — running `cabrero` without arguments
+  now opens the dashboard TUI (same as `cabrero dashboard`).
 
 ### Changed
-- Bare `cabrero` command now launches the dashboard TUI (same as `cabrero dashboard`)
-- Renamed `review` CLI command to `dashboard`
-- Simplified persistent header from "Cabrero Review" to "Cabrero"
-- All views now have a consistent sub-header with title and contextual stats
-- Help overlay preserves the sub-header, only replacing the content area
+- Renamed `review` CLI command to `dashboard`.
+- Simplified persistent header from "Cabrero Review" to "Cabrero".
+- All views now have a consistent sub-header with title and contextual stats.
+- Help overlay preserves the sub-header, only replacing the content area.
+- Source manager shows "unknown" for unset ownership and "not set" for unset
+  approach instead of `⚠` and `-`.
 
 ### Removed
-- Proposal stats from the persistent header (moved to dashboard sub-header)
+- Proposal stats from the persistent header (moved to dashboard sub-header).
 
 ## [0.15.0] - 2026-02-23
 
@@ -592,6 +605,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.16.0]: https://github.com/vladolaru/cabrero/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/vladolaru/cabrero/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/vladolaru/cabrero/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/vladolaru/cabrero/compare/v0.12.1...v0.13.0

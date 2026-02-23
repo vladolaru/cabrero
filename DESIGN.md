@@ -1012,6 +1012,11 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - Unclassified sources are flagged — Cabrero pauses processing them until classified
 - New source discovery triggers a macOS notification prompting classification
 
+**Source Detail** — drilling into a source shows an Info section (origin, ownership,
+approach, session count, health score, classification date) followed by recent changes
+with rollback support. Unset values display as "unknown" (ownership) or "not set"
+(approach) rather than blank or cryptic symbols.
+
 ---
 
 ## Progress & Next Steps
@@ -1075,6 +1080,13 @@ chat panel width, confirmation toggles). Context-aware help overlay (`?` key)
 shows a view title, brief description, and only the key bindings relevant to the
 current view, grouped into sections with full descriptions. See `docs/plans/2026-02-20-review-tui-design.md`
 for the full design specification.
+
+**TUI uniformization:** All views share a persistent header and a consistent
+sub-header (title + contextual stats). Bare `cabrero` launches the dashboard
+(same as `cabrero dashboard`). The three top-level sections (Proposals, Sources,
+Pipeline) are cross-navigable — `s`/`p` shortcuts jump directly between them
+via a `SwitchView` message that replaces the current view without growing the
+navigation stack. Esc from any top-level section always returns to Proposals.
 
 **Phase 4b — TUI (assessment & management)** ✅
 
