@@ -21,15 +21,31 @@ var (
 	helpEntryDescStyle = lipgloss.NewStyle().
 				Foreground(shared.ColorFgBold).
 				PaddingLeft(2)
+
+	helpDescStyle = lipgloss.NewStyle().
+			Foreground(shared.ColorMuted).
+			PaddingLeft(2)
 )
 
-// RenderHelpOverlay renders key binding sections for the help overlay.
-// The view title and description are provided by the sub-header, so this
-// function renders only the key binding sections.
+// RenderHelpOverlay renders the help overlay with description and key binding sections.
 func RenderHelpOverlay(hc shared.HelpContent, width, height int) string {
 	var b strings.Builder
 
 	b.WriteString("\n") // top padding
+
+	// Description paragraphs.
+	if hc.Description != "" {
+		wrapW := width - 6 // padding + margin
+		if wrapW < 40 {
+			wrapW = 40
+		}
+		wrapStyle := helpDescStyle.Width(wrapW)
+		for _, para := range strings.Split(hc.Description, "\n\n") {
+			b.WriteString(wrapStyle.Render(strings.TrimSpace(para)))
+			b.WriteString("\n")
+		}
+		b.WriteString("\n")
+	}
 
 	for i, section := range hc.Sections {
 		if i > 0 {

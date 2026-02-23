@@ -37,8 +37,8 @@ func TestSnapshot_HeightInvariant(t *testing.T) {
 		{"pipeline-monitor", 120, 40, true},
 
 		// Views that don't fill to height.
-		{"help-overlay", 120, 40, false},
-		{"help-overlay-vim", 120, 40, false},
+		{"help-overlay", 120, 50, false},
+		{"help-overlay-vim", 120, 50, false},
 	}
 
 	for _, tt := range tests {

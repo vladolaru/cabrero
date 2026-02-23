@@ -71,9 +71,9 @@ func TestRenderHelpOverlay_Empty(t *testing.T) {
 	}
 }
 
-func TestRenderHelpOverlay_SectionsOnly(t *testing.T) {
-	// Help overlay no longer renders title/description (sub-header provides those).
-	// It renders only key binding sections.
+func TestRenderHelpOverlay_DescriptionAndSections(t *testing.T) {
+	// Help overlay renders description paragraphs and key binding sections.
+	// Title is provided by the sub-header, not the overlay.
 	hc := shared.HelpContent{
 		Title:       "Dashboard Help",
 		Description: "Lists all pending proposals.",
@@ -89,12 +89,14 @@ func TestRenderHelpOverlay_SectionsOnly(t *testing.T) {
 
 	output := RenderHelpOverlay(hc, 120, 40)
 
-	// Title and description should NOT be in the output (they're in the sub-header now).
+	// Title should NOT be in the output (it's in the sub-header).
 	if strings.Contains(output, "Dashboard Help") {
 		t.Error("output should not contain view title (now in sub-header)")
 	}
-	if strings.Contains(output, "Lists all pending proposals.") {
-		t.Error("output should not contain description (now in sub-header)")
+
+	// Description should be rendered in the overlay.
+	if !strings.Contains(output, "Lists all pending proposals.") {
+		t.Error("output missing description")
 	}
 
 	// Section titles and entries should still be present.
