@@ -409,6 +409,26 @@ func TestPipelineStats() pipeline.PipelineStats {
 	}
 }
 
+// TestLogContent returns realistic log content with mixed levels and multi-line entries.
+func TestLogContent() string {
+	return "2026-02-20T10:15:03 [INFO] daemon started (PID 4821)\n" +
+		"2026-02-20T10:15:03 [INFO] poll=2m0s stale=30m0s delay=30s\n" +
+		"2026-02-20T10:15:03 [INFO] processing session e7f2a103\n" +
+		"2026-02-20T10:15:04 [INFO] pre-parser: 142 entries, 0.8s\n" +
+		"2026-02-20T10:15:12 [INFO] classifier: classified, triage=evaluate\n" +
+		"2026-02-20T10:15:24 [INFO] evaluator: 1 proposal generated\n" +
+		"2026-02-20T10:15:24 [ERROR] evaluator: failed to write proposal\n" +
+		"  at evaluator.Run (evaluator.go:89)\n" +
+		"  at pipeline.Execute (pipeline.go:142)\n" +
+		"  caused by: disk full\n" +
+		"2026-02-20T10:17:05 [INFO] poll: 0 pending sessions\n" +
+		"2026-02-20T10:19:07 [INFO] processing session 3bc891ff\n" +
+		"2026-02-20T10:19:08 [INFO] pre-parser: 98 entries, 0.6s\n" +
+		"2026-02-20T10:19:15 [INFO] classifier: classified, triage=iterate\n" +
+		"2026-02-20T10:19:20 [INFO] evaluator: 0 proposals (iterate source)\n" +
+		"2026-02-20T10:21:05 [INFO] poll: 0 pending sessions\n"
+}
+
 // TestPromptVersions returns prompt version fixtures.
 func TestPromptVersions() []pipeline.PromptVersion {
 	return []pipeline.PromptVersion{

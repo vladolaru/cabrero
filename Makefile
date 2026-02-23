@@ -21,7 +21,8 @@ test-v:
 
 SNAPSHOT_VIEWS := dashboard dashboard-narrow dashboard-empty \
 	proposal-detail proposal-detail-chat fitness-report \
-	source-manager pipeline-monitor help-overlay help-overlay-vim
+	source-manager pipeline-monitor help-overlay help-overlay-vim \
+	log-viewer
 
 # freeze v0.2.2: --config flag breaks --language ansi, so use CLI flags.
 FREEZE_FLAGS := --language ansi --window --padding 20,40,20,40 \

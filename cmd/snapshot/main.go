@@ -23,6 +23,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/dashboard"
 	"github.com/vladolaru/cabrero/internal/tui/detail"
 	fitness_tui "github.com/vladolaru/cabrero/internal/tui/fitness"
+	"github.com/vladolaru/cabrero/internal/tui/logview"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	pipeline_tui "github.com/vladolaru/cabrero/internal/tui/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
@@ -43,6 +44,7 @@ var views = []string{
 	"pipeline-monitor",
 	"help-overlay",
 	"help-overlay-vim",
+	"log-viewer",
 }
 
 func main() {
@@ -114,6 +116,8 @@ func render(view string, w, h int) (string, error) {
 		return renderHelpOverlay(w, h, "arrows")
 	case "help-overlay-vim":
 		return renderHelpOverlay(w, h, "vim")
+	case "log-viewer":
+		return renderLogViewer(w, h)
 	default:
 		return "", fmt.Errorf("unknown view %q, available: %s", view, strings.Join(views, ", "))
 	}
@@ -252,6 +256,20 @@ func renderPipelineMonitor(w, h int) (string, error) {
 	prompts := testdata.TestPromptVersions()
 
 	m := pipeline_tui.New(runs, stats, prompts, dashStats, &keys, cfg)
+	m.SetSize(w, h-hh)
+	return prefix + m.View(), nil
+}
+
+func renderLogViewer(w, h int) (string, error) {
+	w, h = defaults(w, h)
+	stats := testdata.TestDashboardStats()
+	prefix, hh := renderWithHeader(stats, w)
+
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	content := testdata.TestLogContent()
+
+	m := logview.New(content, &keys, cfg)
 	m.SetSize(w, h-hh)
 	return prefix + m.View(), nil
 }
