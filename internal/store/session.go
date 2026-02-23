@@ -85,7 +85,20 @@ func ReadMetadata(sessionID string) (Metadata, error) {
 	if err := json.Unmarshal(data, &meta); err != nil {
 		return Metadata{}, fmt.Errorf("parsing metadata for %s: %w", sessionID, err)
 	}
+	// Backfill: derive project slug from WorkDir when Project is missing.
+	if meta.Project == "" && meta.WorkDir != "" {
+		meta.Project = ProjectSlugFromPath(meta.WorkDir)
+	}
 	return meta, nil
+}
+
+// ProjectSlugFromPath converts an absolute filesystem path into a CC-style
+// project slug by replacing '/' and '.' with '-'.
+// Example: "/Users/vladolaru/Work/a8c/cabrero" → "-Users-vladolaru-Work-a8c-cabrero"
+func ProjectSlugFromPath(path string) string {
+	s := strings.ReplaceAll(path, "/", "-")
+	s = strings.ReplaceAll(s, ".", "-")
+	return s
 }
 
 // MarkProcessed sets a session's status to "processed".

@@ -17,6 +17,8 @@ PAYLOAD=$(cat)
 SESSION_ID=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 SESSION_CWD=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+# Derive project slug from cwd: replace / and . with - (matches CC encoding).
+PROJECT_SLUG=$(printf '%s' "$SESSION_CWD" | sed 's/[\/.]/-/g')
 # Escape backslashes and quotes for safe JSON interpolation in heredoc.
 SESSION_CWD=$(printf '%s' "$SESSION_CWD" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
@@ -56,6 +58,7 @@ cat > "${SESSION_DIR}/metadata.json" << METAEOF
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "capture_trigger": "pre-compact",
   "cc_version": "${CC_VERSION}",
+  "project": "${PROJECT_SLUG}",
   "work_dir": "${SESSION_CWD}",
   "status": "queued"
 }
