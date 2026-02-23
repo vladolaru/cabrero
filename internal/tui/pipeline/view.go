@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	pl "github.com/vladolaru/cabrero/internal/pipeline"
+	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
@@ -228,7 +229,7 @@ func (m Model) runLayout() (idLen int, projectMax int) {
 	case layoutStandard:
 		return 8, 15
 	default: // narrow
-		return 6, 10
+		return 8, 10
 	}
 }
 
@@ -247,7 +248,7 @@ func (m Model) renderRecentRuns() string {
 		}
 
 		status := statusIndicator(run.Status)
-		shortID := shared.TruncateID(run.SessionID, idLen)
+		shortID := store.ShortSessionID(run.SessionID)
 		age := relativeTime(run.Timestamp)
 		project := shared.Truncate(run.Project, projectMax)
 		timing := formatTimingForMode(run, mode)

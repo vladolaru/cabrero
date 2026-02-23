@@ -243,21 +243,14 @@ func TestModelViewRunRowNarrow(t *testing.T) {
 	m.SetSize(70, 40)
 	view := ansi.Strip(m.View())
 
-	// Narrow: 6-char ID.
-	if !strings.Contains(view, "e7f2a1") {
-		t.Error("narrow view should show 6-char session ID")
+	// Narrow: 8-char short session ID.
+	if !strings.Contains(view, "e7f2a103") {
+		t.Error("narrow view should show 8-char session ID")
 	}
-	// Ensure the full 8-char ID is NOT shown (would mean no truncation).
+	// Narrow: total-only timing (no stage names).
 	lines := strings.Split(view, "\n")
 	for _, line := range lines {
 		if strings.Contains(line, "e7f2a103") {
-			t.Error("narrow view should truncate session ID to 6 chars, not 8")
-			break
-		}
-	}
-	// Narrow: total-only timing (no stage names).
-	for _, line := range lines {
-		if strings.Contains(line, "e7f2a1") {
 			if strings.Contains(line, "parse") || strings.Contains(line, "cls") || strings.Contains(line, "eval") {
 				t.Error("narrow view should show total timing only, not per-stage")
 			}
