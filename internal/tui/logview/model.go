@@ -195,6 +195,12 @@ func (m *Model) performSearch() {
 	term := strings.ToLower(m.searchTerm)
 
 	if len(m.entries) > 0 {
+		// Auto-expand all multi-line entries so full content is visible.
+		for i := range m.entries {
+			if m.entries[i].IsMultiLine() {
+				m.entries[i].Expanded = true
+			}
+		}
 		for i, entry := range m.entries {
 			entryText := strings.ToLower(entry.Message)
 			for _, extra := range entry.Extra {
@@ -202,12 +208,6 @@ func (m *Model) performSearch() {
 			}
 			if strings.Contains(entryText, term) {
 				m.matches = append(m.matches, lineMatch{entryIdx: i})
-				// Auto-expand entries with matches in continuation lines.
-				if entry.IsMultiLine() {
-					if !strings.Contains(strings.ToLower(entry.Message), term) {
-						m.entries[i].Expanded = true
-					}
-				}
 			}
 		}
 	} else {
@@ -219,8 +219,9 @@ func (m *Model) performSearch() {
 	}
 
 	if len(m.matches) > 0 {
-		m.matchIdx = 0
-		m.gotoMatch(0)
+		// Jump to the latest (last) match.
+		last := len(m.matches) - 1
+		m.gotoMatch(last)
 	}
 	m.refreshViewportContent()
 }
