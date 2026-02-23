@@ -72,6 +72,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if m.cursor >= 0 && m.cursor < len(m.entries) && m.entries[m.cursor].IsMultiLine() {
 			m.entries[m.cursor].Expanded = !m.entries[m.cursor].Expanded
 			m.refreshViewportContent()
+			m.scrollToCursor()
 		}
 		return m, nil
 
