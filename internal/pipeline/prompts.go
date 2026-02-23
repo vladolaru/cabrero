@@ -233,7 +233,7 @@ Output ONLY valid JSON. No markdown fences, no preamble, no explanation. Just th
 
   "proposals": [
     {
-      "id": "string (format: prop-{first 6 chars of sessionId}-{index starting at 1})",
+      "id": "string (format: prop-{first 8 chars of sessionId}-{index starting at 1})",
       "type": "skill_improvement|claude_review|claude_addition|skill_scaffold",
       "confidence": "high|medium",
 
@@ -284,7 +284,7 @@ A recurring error-prone pattern across sessions suggests creating a new skill. T
 
 6. All citedUuids must come from UUIDs present in the classifier output (keyTurns, errorClassification, skillSignals).
 
-7. Proposal IDs must be unique within the output. Format: prop-{first 6 chars of sessionId}-{1-based index}.
+7. Proposal IDs must be unique within the output. Format: prop-{first 8 chars of sessionId}-{1-based index}.
 
 8. The "target" field must be a plausible file path. For skills, use the skill name as referenced in the digest. For CLAUDE.md files, use the path from the digest's claudeMd.loaded[] or claudeMd.interactions[].
 

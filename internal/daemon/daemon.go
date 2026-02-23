@@ -220,10 +220,10 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 		switch event.Type {
 		case "classifier_done":
 			if event.Triage == "clean" {
-				d.log.Info("session %s triaged as clean", shortID(sessionID))
+				d.log.Info("session %s triaged as clean", store.ShortSessionID(sessionID))
 			}
 		case "error":
-			d.log.Error("pipeline error for %s: %v", shortID(sessionID), event.Error)
+			d.log.Error("pipeline error for %s: %v", store.ShortSessionID(sessionID), event.Error)
 		}
 	}
 
@@ -269,7 +269,7 @@ func (d *Daemon) processOne(ctx context.Context, sessionID string) {
 	d.log.Info("processed %s: %d proposals", sessionID, proposalCount)
 
 	if proposalCount > 0 {
-		msg := fmt.Sprintf("%d new proposal(s) from session %s", proposalCount, shortID(sessionID))
+		msg := fmt.Sprintf("%d new proposal(s) from session %s", proposalCount, store.ShortSessionID(sessionID))
 		if err := d.notify("Cabrero", msg); err != nil {
 			d.log.Error("notification failed: %v", err)
 		}
@@ -323,9 +323,3 @@ func (d *Daemon) notify(title, message string) error {
 	return Notify(title, message)
 }
 
-func shortID(id string) string {
-	if len(id) > 8 {
-		return id[:8]
-	}
-	return id
-}

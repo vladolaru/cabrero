@@ -569,7 +569,7 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 	}
 
 	// Partition proposals by session: proposal IDs encode their session
-	// via the format "prop-{first 6 chars of sessionId}-{index}".
+	// via the format "prop-{first 8 chars of sessionId}-{index}".
 	totalMatched := 0
 	for i, s := range chunk {
 		idx := indexByID[s.SessionID]

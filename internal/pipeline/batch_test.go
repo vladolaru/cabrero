@@ -17,9 +17,9 @@ func TestShortID(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"longer than 6 truncates", "abcdef1234567890", "abcdef"},
-		{"exactly 6 unchanged", "abcdef", "abcdef"},
-		{"shorter than 6 unchanged", "abc", "abc"},
+		{"longer than 8 truncates", "abcdef1234567890", "abcdef12"},
+		{"exactly 8 unchanged", "abcdef12", "abcdef12"},
+		{"shorter than 8 unchanged", "abc", "abc"},
 		{"empty string", "", ""},
 	}
 	for _, tc := range tests {

@@ -161,6 +161,16 @@ func ListSessions() ([]Metadata, error) {
 	return sessions, nil
 }
 
+// ShortSessionID returns the first 8 characters of a session ID (the first
+// UUID segment). Use this for display in logs, CLI output, and TUI views.
+// For proposal ID prefixes, use pipeline.shortID which may differ.
+func ShortSessionID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
+}
+
 // ProjectDisplayName returns a short, recognizable form of a CC project slug.
 //
 // CC encodes project paths by replacing both '/' and '.' with '-', making the

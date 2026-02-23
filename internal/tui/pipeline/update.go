@@ -4,9 +4,9 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
-	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 // Update handles messages for the pipeline monitor.
@@ -61,7 +61,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		run := m.SelectedRun()
 		if run != nil && run.Status == "error" {
 			if m.config.Confirmations.RetryRequiresConfirm {
-				m.confirm = components.NewConfirm("Retry session " + shared.TruncateID(run.SessionID, 8) + "?")
+				m.confirm = components.NewConfirm("Retry session " + store.ShortSessionID(run.SessionID) + "?")
 				return m, nil
 			}
 			// Skip confirmation — retry immediately.

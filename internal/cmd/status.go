@@ -64,11 +64,7 @@ func Status(args []string) error {
 		if err == nil {
 			capDisplay = ts.Local().Format("2006-01-02 15:04")
 		}
-		shortID := latest.SessionID
-		if len(shortID) > 8 {
-			shortID = shortID[:8]
-		}
-		fmt.Printf("  %s  %s %s\n", cli.Bold("Last capture:"), capDisplay, cli.Muted("(session "+shortID+")"))
+		fmt.Printf("  %s  %s %s\n", cli.Bold("Last capture:"), capDisplay, cli.Muted("(session "+store.ShortSessionID(latest.SessionID)+")"))
 	} else {
 		fmt.Printf("  %s  %s\n", cli.Bold("Last capture:"), cli.Muted("none"))
 	}

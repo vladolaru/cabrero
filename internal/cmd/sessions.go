@@ -72,10 +72,7 @@ func Sessions(args []string) error {
 	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────────")
 
 	for _, s := range sessions {
-		shortID := s.SessionID
-		if len(shortID) > 8 {
-			shortID = shortID[:8]
-		}
+		shortID := store.ShortSessionID(s.SessionID)
 
 		captured := s.Timestamp
 		if ts, err := time.Parse(time.RFC3339, s.Timestamp); err == nil {
