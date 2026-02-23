@@ -8,6 +8,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- Bare `cabrero` command now launches the dashboard TUI (same as `cabrero dashboard`)
 - Renamed `review` CLI command to `dashboard`
 - Simplified persistent header from "Cabrero Review" to "Cabrero"
 - All views now have a consistent sub-header with title and contextual stats
