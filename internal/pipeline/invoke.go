@@ -154,7 +154,12 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 		cfg.Logger.Info("  [debug] claude args: %v", args)
 	}
 
-	// Always create a context so we can detect timeout in error handling.
+	// Acquire semaphore before starting the timeout so wait time in the
+	// queue doesn't eat into the actual execution budget.
+	acquireInvokeSemaphore()
+
+	// Create timeout context after acquiring the semaphore so the full
+	// timeout applies to execution, not queuing.
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if cfg.Timeout > 0 {
@@ -172,7 +177,6 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 		cmd.Stdin = cfg.Stdin
 	}
 
-	acquireInvokeSemaphore()
 	out, err := cmd.Output()
 	releaseInvokeSemaphore()
 	if err != nil {
