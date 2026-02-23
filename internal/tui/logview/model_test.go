@@ -378,3 +378,91 @@ func TestModelEmptyContentHasNoEntries(t *testing.T) {
 		t.Errorf("cursor should be 0 for empty content, got %d", m.cursor)
 	}
 }
+
+func TestViewShowsColoredLevels(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+	view := m.View()
+
+	// Should contain ANSI escape sequences (colored output).
+	if !strings.Contains(view, "\x1b[") {
+		t.Error("view should contain ANSI color codes for level badges")
+	}
+
+	// Stripped view should still have the content.
+	stripped := ansi.Strip(view)
+	if !strings.Contains(stripped, "INFO") {
+		t.Error("stripped view should contain INFO level")
+	}
+	if !strings.Contains(stripped, "daemon started") {
+		t.Error("stripped view should contain message text")
+	}
+}
+
+func TestViewShowsCursorIndicator(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+	stripped := ansi.Strip(m.View())
+
+	// First entry (cursor=0) should have ">" prefix.
+	if !strings.Contains(stripped, ">") {
+		t.Error("view should show cursor indicator '>'")
+	}
+}
+
+func TestViewShowsBlankLineSeparators(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+	stripped := ansi.Strip(m.View())
+
+	lines := strings.Split(stripped, "\n")
+	hasBlankLine := false
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			hasBlankLine = true
+			break
+		}
+	}
+	if !hasBlankLine {
+		t.Error("view should contain blank lines between entries")
+	}
+}
+
+func TestViewCollapsedMultiLineEntry(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogMultiLine, &keys, cfg)
+	m.SetSize(120, 40)
+
+	stripped := ansi.Strip(m.View())
+
+	if !strings.Contains(stripped, "[+3]") {
+		t.Error("collapsed multi-line entry should show [+3] indicator")
+	}
+
+	if strings.Contains(stripped, "config.Load") {
+		t.Error("continuation lines should not be visible when entry is collapsed")
+	}
+}
+
+func TestViewExpandedMultiLineEntry(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogMultiLine, &keys, cfg)
+	m.SetSize(120, 40)
+
+	// Expand the second entry (the ERROR with extra lines).
+	m.cursor = 1
+	m.entries[1].Expanded = true
+	m.refreshViewportContent()
+
+	stripped := ansi.Strip(m.View())
+
+	if !strings.Contains(stripped, "config.Load") {
+		t.Error("expanded entry should show continuation lines")
+	}
+
+	if !strings.Contains(stripped, "[-]") {
+		t.Error("expanded entry should show [-] indicator")
+	}
+}

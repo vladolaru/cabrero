@@ -3,12 +3,15 @@
 package logview
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 
 	"github.com/vladolaru/cabrero/internal/tui/shared"
@@ -214,6 +217,146 @@ func (m Model) HasActiveSearch() bool {
 	return m.searchTerm != "" && len(m.matches) > 0
 }
 
+// Color helper functions that read the adaptive colors.
+func mutedColor() string {
+	if lipgloss.HasDarkBackground() {
+		return shared.ColorMuted.Dark
+	}
+	return shared.ColorMuted.Light
+}
+
+func errorColor() string {
+	if lipgloss.HasDarkBackground() {
+		return shared.ColorError.Dark
+	}
+	return shared.ColorError.Light
+}
+
+func accentColor() string {
+	if lipgloss.HasDarkBackground() {
+		return shared.ColorAccent.Dark
+	}
+	return shared.ColorAccent.Light
+}
+
+// renderLevel returns a colored level badge.
+func renderLevel(level string) string {
+	var color string
+	switch level {
+	case "ERROR":
+		color = errorColor()
+	default:
+		color = accentColor()
+	}
+	return highlightOutput.String(level).Foreground(highlightOutput.Color(color)).String()
+}
+
+// renderEntries builds the styled viewport content from parsed entries.
+func (m *Model) renderEntries() string {
+	if len(m.entries) == 0 {
+		return m.content // fallback to raw content
+	}
+
+	var b strings.Builder
+	for i, entry := range m.entries {
+		if i > 0 {
+			b.WriteString("\n") // blank line between entries
+		}
+
+		// Cursor prefix.
+		prefix := "  "
+		if i == m.cursor {
+			prefix = "> "
+		}
+
+		// Timestamp (muted).
+		ts := ""
+		if entry.Timestamp != "" {
+			ts = highlightOutput.String(entry.Timestamp).
+				Foreground(highlightOutput.Color(mutedColor())).String() + "  "
+		}
+
+		// Level badge (colored).
+		lvl := ""
+		if entry.Level != "" {
+			lvl = renderLevel(entry.Level) + "  "
+		}
+
+		// First line: prefix + timestamp + level + message.
+		b.WriteString(prefix)
+		b.WriteString(ts)
+		b.WriteString(lvl)
+		b.WriteString(entry.Message)
+
+		// Multi-line indicator.
+		if entry.IsMultiLine() {
+			if entry.Expanded {
+				b.WriteString(" ")
+				b.WriteString(highlightOutput.String("[-]").
+					Foreground(highlightOutput.Color(mutedColor())).String())
+			} else {
+				b.WriteString(" ")
+				indicator := fmt.Sprintf("[+%d]", len(entry.Extra))
+				b.WriteString(highlightOutput.String(indicator).
+					Foreground(highlightOutput.Color(mutedColor())).String())
+			}
+		}
+		b.WriteString("\n")
+
+		// Extra lines (only when expanded).
+		if entry.Expanded && entry.IsMultiLine() {
+			indent := "  " // align with message (after prefix)
+			for _, extra := range entry.Extra {
+				b.WriteString(indent)
+				b.WriteString(extra)
+				b.WriteString("\n")
+			}
+		}
+	}
+
+	return b.String()
+}
+
+// applySearchHighlights overlays search match highlighting onto rendered content.
+func (m *Model) applySearchHighlights(content string) string {
+	if m.searchTerm == "" {
+		return content
+	}
+	term := strings.ToLower(m.searchTerm)
+	termLen := len(m.searchTerm)
+
+	lines := strings.Split(content, "\n")
+	var b strings.Builder
+	for i, line := range lines {
+		stripped := ansi.Strip(line)
+		lower := strings.ToLower(stripped)
+		if strings.Contains(lower, term) {
+			last := 0
+			for {
+				idx := strings.Index(lower[last:], term)
+				if idx < 0 {
+					b.WriteString(line[last:])
+					break
+				}
+				pos := last + idx
+				b.WriteString(line[last:pos])
+				styled := highlightOutput.String(stripped[pos : pos+termLen]).
+					Foreground(highlightOutput.Color(shared.HighlightFg())).
+					Background(highlightOutput.Color(shared.HighlightBg())).
+					String()
+				b.WriteString(styled)
+				last = pos + termLen
+			}
+		} else {
+			b.WriteString(line)
+		}
+		if i < len(lines)-1 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
 // highlightedContent returns the content with search matches wrapped in highlight style.
 func (m *Model) highlightedContent() string {
 	if m.searchTerm == "" || len(m.matches) == 0 {
@@ -247,7 +390,17 @@ func (m *Model) highlightedContent() string {
 	return b.String()
 }
 
-// refreshViewportContent sets the viewport content with highlighting if a search is active.
+// refreshViewportContent sets the viewport content from structured entries
+// (with optional search highlighting), falling back to raw content for
+// unparsed logs.
 func (m *Model) refreshViewportContent() {
-	m.viewport.SetContent(m.highlightedContent())
+	if len(m.entries) > 0 {
+		content := m.renderEntries()
+		if m.searchTerm != "" && len(m.matches) > 0 {
+			content = m.applySearchHighlights(content)
+		}
+		m.viewport.SetContent(content)
+	} else {
+		m.viewport.SetContent(m.highlightedContent())
+	}
 }
