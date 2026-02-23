@@ -255,7 +255,7 @@ func (m Model) renderRecentRuns() string {
 		project := shared.Truncate(run.Project, projectMax)
 		timing := formatTimingForMode(run, mode)
 
-		line := fmt.Sprintf("%s%s %s  %-8s  %-*s  %s", cursor, status, shortID, age, projectMax, project, timing)
+		line := fmt.Sprintf("%s%s %-*s  %-8s  %-*s  %s", cursor, status, idLen, shortID, age, projectMax, project, timing)
 		b.WriteString(line)
 
 		// Inline expansion.
@@ -274,14 +274,14 @@ func (m Model) renderRecentRuns() string {
 
 func (m Model) renderRunDetail(run pl.PipelineRun) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("      Session: %s\n", run.SessionID))
-	b.WriteString(fmt.Sprintf("      Project: %s\n", run.Project))
-	b.WriteString(fmt.Sprintf("      Status:  %s", run.Status))
+	b.WriteString(fmt.Sprintf("      Session:    %s\n", run.SessionID))
+	b.WriteString(fmt.Sprintf("      Project:    %s\n", run.Project))
+	b.WriteString(fmt.Sprintf("      Status:     %s", run.Status))
 	if run.ProposalCount > 0 {
-		b.WriteString(fmt.Sprintf("\n      Proposals: %d", run.ProposalCount))
+		b.WriteString(fmt.Sprintf("\n      Proposals:  %d", run.ProposalCount))
 	}
 	if run.ErrorDetail != "" {
-		b.WriteString(fmt.Sprintf("\n      Error: %s", run.ErrorDetail))
+		b.WriteString(fmt.Sprintf("\n      Error:      %s", run.ErrorDetail))
 	}
 	return b.String()
 }
@@ -356,20 +356,20 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 	}
 
 	var parts []string
-	if run.HasDigest {
-		parts = append(parts, fmt.Sprintf("%.1fs parse", run.ParseDuration.Seconds()))
+	if run.HasDigest && run.ParseDuration > 0 {
+		parts = append(parts, fmt.Sprintf("%5.1fs parse", run.ParseDuration.Seconds()))
 	}
 	if mode == layoutWide {
 		if run.HasClassifier {
-			parts = append(parts, fmt.Sprintf("%.1fs cls", run.ClassifierDuration.Seconds()))
+			parts = append(parts, fmt.Sprintf("%5.1fs cls", run.ClassifierDuration.Seconds()))
 		} else if run.Status == "error" && run.HasDigest {
-			parts = append(parts, errorStyle.Render("✗ cls failed"))
+			parts = append(parts, errorStyle.Render("  ✗ cls failed"))
 		}
 	}
 	if run.HasEvaluator {
-		parts = append(parts, fmt.Sprintf("%.0fs eval", run.EvaluatorDuration.Seconds()))
+		parts = append(parts, fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds()))
 	} else if run.Status == "error" && run.HasClassifier {
-		parts = append(parts, errorStyle.Render("✗ eval failed"))
+		parts = append(parts, errorStyle.Render(" ✗ eval failed"))
 	}
 	return strings.Join(parts, "  ")
 }
