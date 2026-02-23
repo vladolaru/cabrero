@@ -415,11 +415,11 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 
 		evalCol := ""
 		if run.HasEvaluator {
-			evalCol = fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds())
+			evalCol = fmt.Sprintf("%6.0fs eval", run.EvaluatorDuration.Seconds())
 		} else if run.Status == "error" && run.HasClassifier {
-			evalCol = errorStyle.Render("  eval failed")
+			evalCol = errorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
 		} else if run.Status == "processed" && run.HasClassifier {
-			evalCol = mutedStyle.Render("skipped eval")
+			evalCol = mutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
 		}
 
 		return parseCol + clsCol + evalCol
@@ -428,11 +428,11 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 	// Standard: parse + eval (cls omitted).
 	evalCol := ""
 	if run.HasEvaluator {
-		evalCol = fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds())
+		evalCol = fmt.Sprintf("%6.0fs eval", run.EvaluatorDuration.Seconds())
 	} else if run.Status == "error" && run.HasClassifier {
-		evalCol = errorStyle.Render("  eval failed")
+		evalCol = errorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
 	} else if run.Status == "processed" && run.HasClassifier {
-		evalCol = mutedStyle.Render("skipped eval")
+		evalCol = mutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
 	}
 
 	return parseCol + evalCol
