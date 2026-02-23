@@ -716,7 +716,8 @@ cabrero run <session_id>        Run the full pipeline on a session
 cabrero sessions                List captured sessions with status (processed/pending/error)
 cabrero status                  Show pipeline health: sessions, daemon, hooks
 cabrero proposals               List pending proposals
-cabrero dashboard               Interactive TUI for reviewing proposals
+cabrero                         Launch the dashboard TUI (default when no subcommand given)
+cabrero dashboard               Interactive dashboard (same as bare cabrero)
 cabrero inspect <proposal_id>   Show full proposal with citation chain
 cabrero approve <proposal_id>   Approve and apply a proposal (same flow as app)
 cabrero reject <proposal_id>    Reject with optional reason
