@@ -2,6 +2,7 @@ package store
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -123,5 +124,44 @@ func TestMarkProcessed_NotFound(t *testing.T) {
 	err := MarkProcessed("nonexistent-session")
 	if err == nil {
 		t.Error("expected error for nonexistent session")
+	}
+}
+
+func TestTranscriptExists_True(t *testing.T) {
+	setupTestStore(t)
+
+	sid := "transcript-exists-1"
+	rawDir := RawDir(sid)
+	if err := os.MkdirAll(rawDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rawDir, "transcript.jsonl"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !TranscriptExists(sid) {
+		t.Error("TranscriptExists = false, want true")
+	}
+}
+
+func TestTranscriptExists_False_NoFile(t *testing.T) {
+	setupTestStore(t)
+
+	sid := "transcript-missing-1"
+	rawDir := RawDir(sid)
+	if err := os.MkdirAll(rawDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if TranscriptExists(sid) {
+		t.Error("TranscriptExists = true, want false")
+	}
+}
+
+func TestTranscriptExists_False_NoDir(t *testing.T) {
+	setupTestStore(t)
+
+	if TranscriptExists("nonexistent-session") {
+		t.Error("TranscriptExists = true, want false")
 	}
 }

@@ -33,6 +33,9 @@ func ScanQueued() ([]QueuedSession, error) {
 		if blocked[s.SessionID] {
 			continue
 		}
+		if !store.TranscriptExists(s.SessionID) {
+			continue
+		}
 		ready = append(ready, QueuedSession{
 			SessionID: s.SessionID,
 			Project:   s.Project,

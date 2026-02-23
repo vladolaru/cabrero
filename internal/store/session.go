@@ -36,6 +36,13 @@ func SessionExists(sessionID string) bool {
 	return err == nil
 }
 
+// TranscriptExists returns true if a transcript.jsonl file exists for the session.
+func TranscriptExists(sessionID string) bool {
+	path := filepath.Join(RawDir(sessionID), "transcript.jsonl")
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // WriteSession copies a transcript JSONL file into the store and writes metadata.
 // The timestamp should reflect the original session time, not the import time.
 func WriteSession(sessionID, transcriptSrc, trigger, ccVersion string, ts time.Time, project string) error {

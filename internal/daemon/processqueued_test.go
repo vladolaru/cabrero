@@ -188,3 +188,40 @@ func TestProcessQueued_MultipleSessions_NotifiesOnceDrained(t *testing.T) {
 		t.Errorf("expected exactly 1 queue-drain notification, got %d; messages: %v", drainCount, spy.messages)
 	}
 }
+
+func TestScanQueued_SkipsSessionsWithoutTranscript(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	// Session with transcript — should be included.
+	createQueuedSession(t, "has-transcript-001")
+
+	// Session without transcript — should be skipped.
+	rawDir := store.RawDir("no-transcript-001")
+	if err := os.MkdirAll(rawDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := store.Metadata{
+		SessionID: "no-transcript-001",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Status:    store.StatusQueued,
+	}
+	if err := store.WriteMetadata(rawDir, meta); err != nil {
+		t.Fatal(err)
+	}
+
+	queued, err := ScanQueued()
+	if err != nil {
+		t.Fatalf("ScanQueued: %v", err)
+	}
+
+	if len(queued) != 1 {
+		t.Fatalf("got %d queued sessions, want 1", len(queued))
+	}
+	if queued[0].SessionID != "has-transcript-001" {
+		t.Errorf("SessionID = %q, want %q", queued[0].SessionID, "has-transcript-001")
+	}
+}
