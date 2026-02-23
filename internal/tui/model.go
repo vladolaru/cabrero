@@ -83,7 +83,7 @@ func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.
 		keys:            keys,
 		proposals:       proposals,
 		sourceGroups:    sourceGroups,
-		help:            help.New(),
+		help:            newHelpModel(),
 		dashboard:       dashboard.New(proposals, reports, stats, &keys, cfg),
 		pipelineMonitor: pipeline_tui.New(runs, pipelineStats, prompts, stats, &keys, cfg),
 	}
@@ -618,6 +618,14 @@ func chatWidth(totalWidth int, cfg *shared.Config) int {
 		pct = 35
 	}
 	return totalWidth * pct / 100
+}
+
+func newHelpModel() help.Model {
+	h := help.New()
+	h.Styles.FullKey = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
+	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(shared.ColorFgBold)
+	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(shared.ColorMuted)
+	return h
 }
 
 func actionStatusText(msg tea.Msg) string {
