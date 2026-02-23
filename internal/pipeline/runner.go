@@ -65,7 +65,9 @@ func (r *Runner) classify(sessionID string) (*ClassifierResult, *ClaudeResult, e
 
 	log := r.log()
 
+	parseStart := time.Now()
 	pre, err := r.runPreParseAndAggregate(sessionID)
+	parseDuration := time.Since(parseStart)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,6 +91,7 @@ func (r *Runner) classify(sessionID string) (*ClassifierResult, *ClaudeResult, e
 		Digest:           pre.Digest,
 		AggregatorOutput: pre.AggregatorOutput,
 		ClassifierOutput: classifierOutput,
+		ParseDuration:    parseDuration,
 	}, cr, nil
 }
 
@@ -192,12 +195,20 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	classifierResult, classifierCR, err := r.classify(sessionID)
 	classifyDuration := time.Since(classifyStart)
 
+	// Split parse vs classifier timing: classify() measures pre-parse internally.
+	var parseDuration time.Duration
+	if classifierResult != nil {
+		parseDuration = classifierResult.ParseDuration
+	}
+	classifierOnly := classifyDuration - parseDuration
+
 	rec.ClassifierUsage = usageFromResult(classifierCR)
 
 	if err != nil {
 		rec.Status = "error"
 		rec.ErrorDetail = err.Error()
-		rec.ClassifierDurationNs = int64(classifyDuration)
+		rec.ParseDurationNs = int64(parseDuration)
+		rec.ClassifierDurationNs = int64(classifierOnly)
 		rec.computeUsageTotals()
 		rec.TotalDurationNs = int64(time.Since(runStart))
 		_ = AppendHistory(rec)
@@ -210,7 +221,8 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	result.AggregatorOutput = classifierResult.AggregatorOutput
 	result.ClassifierOutput = classifierResult.ClassifierOutput
 
-	rec.ClassifierDurationNs = int64(classifyDuration)
+	rec.ParseDurationNs = int64(parseDuration)
+	rec.ClassifierDurationNs = int64(classifierOnly)
 	if classifierResult.ClassifierOutput != nil && classifierResult.ClassifierOutput.PromptVersion != "" {
 		rec.ClassifierPromptVersion = classifierResult.ClassifierOutput.PromptVersion
 	}
@@ -373,8 +385,16 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		classifierResult, classifierCR, err := r.classify(s.SessionID)
 		classifyDuration := time.Since(classifyStart)
 
+		// Split parse vs classifier timing.
+		var parseDuration time.Duration
+		if classifierResult != nil {
+			parseDuration = classifierResult.ParseDuration
+		}
+		classifierOnly := classifyDuration - parseDuration
+
 		rec := records[s.SessionID]
-		rec.ClassifierDurationNs = int64(classifyDuration)
+		rec.ParseDurationNs = int64(parseDuration)
+		rec.ClassifierDurationNs = int64(classifierOnly)
 		rec.ClassifierUsage = usageFromResult(classifierCR)
 
 		if err != nil {

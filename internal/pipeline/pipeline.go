@@ -92,6 +92,7 @@ type ClassifierResult struct {
 	Digest           *parser.Digest
 	AggregatorOutput *patterns.AggregatorOutput
 	ClassifierOutput *ClassifierOutput
+	ParseDuration    time.Duration // wall-clock time for pre-parse + aggregation
 }
 
 // preParseResult holds the output of the pre-parse and aggregation stages.
