@@ -826,13 +826,26 @@ Raw turns are readable inline. "Open in viewer" link opens the full session
 JSONL in a dedicated session browser (separate lightweight window).
 
 Diffs render as actual colored diffs — red/green, line numbers — not code blocks.
+Prose change descriptions (non-diff content) are word-wrapped to fit the viewport width.
 Raw turns cited by the AI are expandable inline without leaving the view.
+
+Session IDs are displayed in two forms: full UUID in the proposal header, and short
+ID (first 8 characters — the first UUID segment) everywhere else (dashboard rows,
+pipeline runs, CLI output). A canonical `store.ShortSessionID()` function is used
+throughout to ensure consistency.
 
 ### AI Chat Integration
 
 The detail view includes an AI chat panel for interrogating proposals you want to
 understand before deciding. This is not a general-purpose chatbot — it is scoped
 entirely to the current proposal.
+
+**Layout** — the chat panel is togglable via the `c` key. In wide terminals (≥ 120
+columns), the chat panel appears beside the proposal detail in a horizontal split.
+In narrow terminals, the chat panel appears below the proposal in a vertical split.
+Both layouts use the `ChatPanelWidth` config percentage (default 35%) for the chat's
+share of the available space (width in horizontal mode, height in vertical mode).
+`Tab` switches focus between the proposal and chat panes when the chat panel is open.
 
 **Cold start** — the panel never opens blank. The Classifier generates 3–4 proposal-specific
 question chips as part of its classification output, e.g.:
@@ -1030,7 +1043,9 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 Phase 4a delivers the core value proposition: interactive proposal review with
 AI chat. Implemented with Bubble Tea v1.x, Bubbles v1.x, Lip Gloss v1.x.
 Configurable via `~/.cabrero/config.json` (arrow/vim navigation, theme,
-chat panel width, confirmation toggles). See `docs/plans/2026-02-20-review-tui-design.md`
+chat panel width, confirmation toggles). Context-aware help overlay (`?` key)
+shows only the key bindings relevant to the current view, grouped into sections
+with full descriptions. See `docs/plans/2026-02-20-review-tui-design.md`
 for the full design specification.
 
 **Phase 4b — Review TUI (assessment & management)** ✅
@@ -1047,8 +1062,8 @@ for the full design specification.
 
 17. **Pipeline monitor** — daemon health, recent runs with per-stage timing,
     sparkline activity chart, prompt versions, retry flow, polling auto-refresh
-18. **Log viewer** — full-screen scrollable log with search, follow mode,
-    auto-refresh via polling
+18. **Log viewer** — full-screen scrollable log with search (`/`), follow mode (`f`),
+    auto-refresh via polling. Accessible from the pipeline monitor via `l`.
 
 **Phase 5 — Iteration tooling** ✓
 
