@@ -37,7 +37,7 @@ func (m Model) View() string {
 	b.WriteString(fmt.Sprintf("  Target: %s\n", p.Target))
 	b.WriteString(fmt.Sprintf("  Confidence: %s  │  Session: %s\n",
 		detailAccent.Render(p.Confidence),
-		detailMuted.Render(shared.TruncateID(m.proposal.SessionID, 12))))
+		detailMuted.Render(m.proposal.SessionID)))
 	b.WriteString("\n")
 
 	// Scrollable body viewport.

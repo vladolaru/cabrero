@@ -247,10 +247,7 @@ func (m Model) renderRecentRuns() string {
 		}
 
 		status := statusIndicator(run.Status)
-		shortID := shared.TruncateID(run.SessionID, 8)
-		if len(shortID) > idLen {
-			shortID = shortID[:idLen]
-		}
+		shortID := shared.TruncateID(run.SessionID, idLen)
 		age := relativeTime(run.Timestamp)
 		project := shared.Truncate(run.Project, projectMax)
 		timing := formatTimingForMode(run, mode)

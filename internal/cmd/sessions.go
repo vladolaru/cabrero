@@ -73,8 +73,8 @@ func Sessions(args []string) error {
 
 	for _, s := range sessions {
 		shortID := s.SessionID
-		if len(shortID) > 12 {
-			shortID = shortID[:12]
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
 		}
 
 		captured := s.Timestamp
