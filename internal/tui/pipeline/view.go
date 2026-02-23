@@ -418,6 +418,8 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 			evalCol = fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds())
 		} else if run.Status == "error" && run.HasClassifier {
 			evalCol = errorStyle.Render(fmt.Sprintf("%-*s", evalW, "✗ eval failed"))
+		} else if run.Status == "processed" && run.HasClassifier {
+			evalCol = mutedStyle.Render("eval skipped")
 		}
 
 		return parseCol + clsCol + evalCol
@@ -429,6 +431,8 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 		evalCol = fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds())
 	} else if run.Status == "error" && run.HasClassifier {
 		evalCol = errorStyle.Render(fmt.Sprintf("%-*s", evalW, "✗ eval failed"))
+	} else if run.Status == "processed" && run.HasClassifier {
+		evalCol = mutedStyle.Render("eval skipped")
 	}
 
 	return parseCol + evalCol

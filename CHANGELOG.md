@@ -45,6 +45,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of which stages completed. Error indicators ("✗ cls failed", "✗ eval failed")
   stay in their column. Project name column widened from 20 to 25 chars in wide
   mode to prevent truncation of longer names.
+- **Parse timing preserved on errored runs** — `classify()` now returns a
+  partial `ClassifierResult` carrying `ParseDuration` on all error paths,
+  so the TUI shows parse timing even when the classifier or pre-parse fails.
+- **"eval skipped" shown for clean-triaged runs** — processed sessions that
+  passed the classifier but skipped evaluation (clean triage) now display
+  "eval skipped" in muted style instead of a blank eval column.
 - **Queued sessions without transcript** — `ScanQueued` now skips sessions
   missing a `transcript.jsonl` file, preventing repeated pipeline failures
   from incomplete captures.

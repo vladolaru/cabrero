@@ -68,17 +68,22 @@ func (r *Runner) classify(sessionID string) (*ClassifierResult, *ClaudeResult, e
 	parseStart := time.Now()
 	pre, err := r.runPreParseAndAggregate(sessionID)
 	parseDuration := time.Since(parseStart)
+
+	// Partial result carries parse timing through error paths so the TUI
+	// can display it even for failed runs.
+	partial := &ClassifierResult{ParseDuration: parseDuration}
+
 	if err != nil {
-		return nil, nil, err
+		return partial, nil, err
 	}
 
 	log.Info("  Running Classifier...")
 	classifierOutput, cr, err := RunClassifier(sessionID, pre.Digest, pre.AggregatorOutput, r.Config)
 	if err != nil {
-		return nil, cr, fmt.Errorf("classifier failed: %w", err)
+		return partial, cr, fmt.Errorf("classifier failed: %w", err)
 	}
 	if err := WriteClassifierOutput(sessionID, classifierOutput); err != nil {
-		return nil, cr, fmt.Errorf("writing classifier output: %w", err)
+		return partial, cr, fmt.Errorf("writing classifier output: %w", err)
 	}
 	log.Info("  Classifier: goal=%q, %d errors, %d key turns, %d skill signals, triage=%s",
 		classifierOutput.Goal.Summary,
