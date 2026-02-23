@@ -200,7 +200,11 @@ func (m Model) renderActivityStats() string {
 		// Stacked: one stat per line.
 		b.WriteString(fmt.Sprintf("  Captured:  %d   Processed: %d\n", m.stats.SessionsCaptured, m.stats.SessionsProcessed))
 		b.WriteString(fmt.Sprintf("  Queued:    %d   Errored:   %d\n", m.stats.SessionsQueued, m.stats.SessionsErrored))
-		b.WriteString(fmt.Sprintf("  Proposals: %d gen  %d ok  %d rej", m.stats.ProposalsGenerated, m.stats.ProposalsApproved, m.stats.ProposalsRejected))
+		b.WriteString(fmt.Sprintf("  Proposals: %d gen  %d ok  %d rej\n", m.stats.ProposalsGenerated, m.stats.ProposalsApproved, m.stats.ProposalsRejected))
+		b.WriteString(fmt.Sprintf("  Tokens:    %s in / %s out  %s",
+			formatTokenCount(m.stats.TotalInputTokens),
+			formatTokenCount(m.stats.TotalOutputTokens),
+			formatCost(m.stats.TotalCostUSD)))
 	} else {
 		// Wide/standard: 2-column layout.
 		b.WriteString(fmt.Sprintf("  Sessions captured:  %-6d Proposals generated:  %d\n",
@@ -209,8 +213,12 @@ func (m Model) renderActivityStats() string {
 			m.stats.SessionsProcessed, m.stats.ProposalsApproved))
 		b.WriteString(fmt.Sprintf("  Sessions queued:    %-6d Proposals rejected:   %d\n",
 			m.stats.SessionsQueued, m.stats.ProposalsRejected))
-		b.WriteString(fmt.Sprintf("  Sessions errored:   %-6d Proposals pending:    %d",
+		b.WriteString(fmt.Sprintf("  Sessions errored:   %-6d Proposals pending:    %d\n",
 			m.stats.SessionsErrored, m.stats.ProposalsPending))
+		b.WriteString(fmt.Sprintf("  Tokens: %s in / %s out         Cost: %s",
+			formatTokenCount(m.stats.TotalInputTokens),
+			formatTokenCount(m.stats.TotalOutputTokens),
+			formatCost(m.stats.TotalCostUSD)))
 
 		if len(m.stats.SessionsPerDay) > 0 {
 			sparkline := components.RenderSparkline(m.stats.SessionsPerDay, m.width-4)
@@ -219,6 +227,23 @@ func (m Model) renderActivityStats() string {
 	}
 
 	return b.String()
+}
+
+// formatTokenCount formats a token count as a compact string: "0", "1.2K", "45.6K", "1.2M".
+func formatTokenCount(tokens int) string {
+	switch {
+	case tokens >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(tokens)/1_000_000)
+	case tokens >= 1_000:
+		return fmt.Sprintf("%.1fK", float64(tokens)/1_000)
+	default:
+		return fmt.Sprintf("%d", tokens)
+	}
+}
+
+// formatCost formats a USD cost as "$0.42" or "$0.00" when zero.
+func formatCost(cost float64) string {
+	return fmt.Sprintf("$%.2f", cost)
 }
 
 // runLayout returns the display parameters for a run row based on terminal width.

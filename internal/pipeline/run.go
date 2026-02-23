@@ -30,6 +30,11 @@ type PipelineRun struct {
 	// Results.
 	ProposalCount int
 	ErrorDetail   string
+
+	// LLM usage (from history records).
+	InputTokens  int
+	OutputTokens int
+	CostUSD      float64
 }
 
 // PipelineStats holds aggregated pipeline statistics.
@@ -43,6 +48,11 @@ type PipelineStats struct {
 	ProposalsRejected  int
 	ProposalsPending   int
 	SessionsPerDay     []int // for sparkline, index 0 = today
+
+	// LLM usage totals (aggregated from runs in the time window).
+	TotalInputTokens  int
+	TotalOutputTokens int
+	TotalCostUSD      float64
 }
 
 // PromptVersion represents a prompt file with its version and last-modified time.
@@ -163,6 +173,9 @@ func ListPipelineRunsFromHistory(sessions []store.Metadata, limit int) ([]Pipeli
 				EvaluatorDuration:  rec.EvaluatorDuration(),
 				ProposalCount:      rec.ProposalCount,
 				ErrorDetail:        rec.ErrorDetail,
+				InputTokens:        rec.TotalInputTokens,
+				OutputTokens:       rec.TotalOutputTokens,
+				CostUSD:            rec.TotalCostUSD,
 			}
 			runs = append(runs, run)
 			continue
@@ -371,10 +384,13 @@ func GatherPipelineStatsFromSessions(sessions []store.Metadata, runs []PipelineR
 	proposals, _ := ListProposals()
 	stats.ProposalsPending = len(proposals)
 
-	// Count generated proposals from pre-loaded runs (avoids re-reading evaluator files).
+	// Count generated proposals and aggregate token/cost from pre-loaded runs.
 	for _, run := range runs {
 		if !run.Timestamp.Before(cutoff) {
 			stats.ProposalsGenerated += run.ProposalCount
+			stats.TotalInputTokens += run.InputTokens
+			stats.TotalOutputTokens += run.OutputTokens
+			stats.TotalCostUSD += run.CostUSD
 		}
 	}
 

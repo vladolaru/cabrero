@@ -345,6 +345,9 @@ func TestPipelineRun(overrides ...func(*pipeline.PipelineRun)) pipeline.Pipeline
 		ClassifierDuration: 8400 * time.Millisecond,
 		EvaluatorDuration:  12 * time.Second,
 		ProposalCount:      1,
+		InputTokens:        12_450,
+		OutputTokens:       4_320,
+		CostUSD:            0.18,
 	}
 	for _, fn := range overrides {
 		fn(&run)
@@ -364,6 +367,9 @@ func TestPipelineRuns() []pipeline.PipelineRun {
 			r.ClassifierDuration = 6100 * time.Millisecond
 			r.EvaluatorDuration = 9 * time.Second
 			r.ProposalCount = 0
+			r.InputTokens = 9_800
+			r.OutputTokens = 3_100
+			r.CostUSD = 0.14
 		}),
 		TestPipelineRun(func(r *pipeline.PipelineRun) {
 			r.SessionID = "91cd02ab"
@@ -376,6 +382,9 @@ func TestPipelineRuns() []pipeline.PipelineRun {
 			r.ClassifierDuration = 0
 			r.EvaluatorDuration = 0
 			r.ProposalCount = 0
+			r.InputTokens = 2_100
+			r.OutputTokens = 450
+			r.CostUSD = 0.03
 			r.ErrorDetail = "classifier timeout after 2m"
 		}),
 		TestPipelineRun(func(r *pipeline.PipelineRun) {
@@ -390,6 +399,9 @@ func TestPipelineRuns() []pipeline.PipelineRun {
 			r.ClassifierDuration = 0
 			r.EvaluatorDuration = 0
 			r.ProposalCount = 0
+			r.InputTokens = 0
+			r.OutputTokens = 0
+			r.CostUSD = 0
 		}),
 	}
 }
@@ -406,6 +418,9 @@ func TestPipelineStats() pipeline.PipelineStats {
 		ProposalsRejected:  1,
 		ProposalsPending:   1,
 		SessionsPerDay:     []int{3, 2, 1, 4, 2, 3, 3},
+		TotalInputTokens:   24_350,
+		TotalOutputTokens:  7_870,
+		TotalCostUSD:       0.35,
 	}
 }
 

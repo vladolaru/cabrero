@@ -219,8 +219,10 @@ search/fetch requests), usage totals (`total_cost_usd`, `total_input_tokens`,
 **Rotation:** On daemon startup, records older than 90 days are removed via
 `RotateHistory`. Uses atomic rewrite to prevent partial reads.
 
-**TUI integration:** `ListPipelineRunsFromHistory` prefers history data for timing;
-falls back to mtime-based estimation for sessions predating the history file.
+**TUI integration:** `ListPipelineRunsFromHistory` prefers history data for timing
+and token usage; falls back to mtime-based estimation for sessions predating the
+history file. Token counts (input/output) and cost flow from `HistoryRecord` through
+`PipelineRun` and `PipelineStats` to the Pipeline Activity section of the TUI.
 
 ### Store Write Invariants
 
@@ -1081,7 +1083,8 @@ for the full design specification.
 **Phase 4c — Review TUI (operational monitoring)** ✓
 
 17. **Pipeline monitor** — daemon health, recent runs with per-stage timing,
-    sparkline activity chart, prompt versions, retry flow, polling auto-refresh
+    token usage and cost stats, sparkline activity chart, prompt versions, retry
+    flow, polling auto-refresh
 18. **Log viewer** — structured log view that parses daemon log entries into colored,
     collapsible entries. Colored level badges (INFO=purple, ERROR=red), muted timestamps,
     cursor-based entry navigation (up/down between entries, PgUp/PgDn for line scrolling),

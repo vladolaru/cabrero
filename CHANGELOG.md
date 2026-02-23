@@ -9,6 +9,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Token usage stats in Pipeline Activity** — the pipeline monitor now shows
+  aggregate LLM token consumption (input/output) and cost in the activity section.
+  Data flows from `HistoryRecord` through `PipelineRun` and `PipelineStats` to
+  the TUI. Tokens formatted as compact values (e.g. "12.3K in / 4.5K out"),
+  cost as USD (e.g. "$0.35"). Displayed in both narrow and standard/wide layouts.
 - **Concurrent invocation limiter** — caps the number of simultaneous `claude`
   CLI processes via a channel-based semaphore in `invokeClaude()`. Default
   limit: 3 (configurable via `PipelineConfig.MaxConcurrentInvocations`; 0 =
