@@ -183,7 +183,12 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 
 	// Acquire semaphore before starting the timeout so wait time in the
 	// queue doesn't eat into the actual execution budget.
-	acquireInvokeSemaphore()
+	if !TryAcquireInvokeSemaphore() {
+		if cfg.Logger != nil {
+			cfg.Logger.Info("  Waiting for a claude process slot (%d already running)...", cap(invokeSem))
+		}
+		acquireInvokeSemaphore()
+	}
 
 	// Create timeout context after acquiring the semaphore so the full
 	// timeout applies to execution, not queuing.
