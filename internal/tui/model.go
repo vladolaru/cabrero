@@ -482,6 +482,9 @@ func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool
 		if m.state == message.ViewProposalDetail && m.detail.HasActivePrompt() {
 			return m, nil, false
 		}
+		if m.state == message.ViewPipelineMonitor && m.pipelineMonitor.HasActivePrompt() {
+			return m, nil, false
+		}
 		if m.state != message.ViewDashboard {
 			return m, func() tea.Msg { return message.PopView{} }, true
 		}

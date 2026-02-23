@@ -60,6 +60,12 @@ func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts [
 	}
 }
 
+// HasActivePrompt returns true when a confirmation prompt is active
+// and the view should handle Esc itself (to dismiss the prompt).
+func (m Model) HasActivePrompt() bool {
+	return m.confirm.Active
+}
+
 // SelectedRun returns the run at the current cursor position, or nil.
 func (m Model) SelectedRun() *pl.PipelineRun {
 	if m.cursor < 0 || m.cursor >= len(m.runs) {
