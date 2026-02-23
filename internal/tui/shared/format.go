@@ -1,10 +1,26 @@
 package shared
 
 import (
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+// homeDir is resolved once at init for ShortenHome.
+var homeDir string
+
+func init() {
+	homeDir, _ = os.UserHomeDir()
+}
+
+// ShortenHome replaces the current user's home directory prefix with "~".
+func ShortenHome(path string) string {
+	if homeDir != "" && strings.HasPrefix(path, homeDir) {
+		return "~" + path[len(homeDir):]
+	}
+	return path
+}
 
 // Truncate shortens s to maxLen runes, appending "..." if truncated.
 // If maxLen is <= 0, returns empty. If maxLen <= 3, returns a raw slice.

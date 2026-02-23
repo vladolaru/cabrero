@@ -144,7 +144,7 @@ func (m Model) renderItemList() string {
 		}
 
 		typeName := shared.PadRight(item.TypeName(), 18)
-		target := shared.TruncatePad(item.Target(), m.targetWidth())
+		target := shared.TruncatePad(shared.ShortenHome(item.Target()), m.targetWidth())
 		confidence := mutedStyle.Render(item.Confidence())
 
 		line := fmt.Sprintf("%s %s %s  %s  %s", prefix, indicator, typeName, target, confidence)

@@ -34,7 +34,7 @@ func (m Model) View() string {
 	p := &m.proposal.Proposal
 	b.WriteString(detailHeader.Render(fmt.Sprintf("  Proposal: %s", p.Type)))
 	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("  Target: %s\n", p.Target))
+	b.WriteString(fmt.Sprintf("  Target: %s\n", shared.ShortenHome(p.Target)))
 	b.WriteString(fmt.Sprintf("  Confidence: %s  │  Session: %s\n",
 		detailAccent.Render(p.Confidence),
 		detailMuted.Render(m.proposal.SessionID)))
