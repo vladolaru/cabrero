@@ -11,14 +11,23 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
 )
 
-var testLogContent = `2026-02-20T10:15:03Z INFO  daemon started (PID 4821)
-2026-02-20T10:15:03Z INFO  poll=2m0s stale=30m0s delay=30s
-2026-02-20T10:15:03Z INFO  processing session e7f2a103
-2026-02-20T10:15:04Z INFO  pre-parser: 142 entries, 0.8s
-2026-02-20T10:15:12Z INFO  classifier: classified, triage=evaluate
-2026-02-20T10:15:24Z INFO  evaluator: 1 proposal generated
-2026-02-20T10:17:05Z INFO  poll: 0 pending sessions
-`
+// testLogContent uses the real daemon log format produced by internal/daemon/log.go:63
+// Format: "2006-01-02T15:04:05 [LEVEL] message"
+var testLogContent = "2026-02-20T10:15:03 [INFO] daemon started (PID 4821)\n" +
+	"2026-02-20T10:15:03 [INFO] poll=2m0s stale=30m0s delay=30s\n" +
+	"2026-02-20T10:15:03 [INFO] processing session e7f2a103\n" +
+	"2026-02-20T10:15:04 [INFO] pre-parser: 142 entries, 0.8s\n" +
+	"2026-02-20T10:15:12 [INFO] classifier: classified, triage=evaluate\n" +
+	"2026-02-20T10:15:24 [INFO] evaluator: 1 proposal generated\n" +
+	"2026-02-20T10:17:05 [INFO] poll: 0 pending sessions\n"
+
+// testLogMultiLine contains multi-line entries (e.g. stack traces) for testing.
+var testLogMultiLine = "2026-02-20T10:15:03 [INFO] daemon started (PID 4821)\n" +
+	"2026-02-20T10:15:04 [ERROR] failed to read config\n" +
+	"  at config.Load (config.go:42)\n" +
+	"  at main.init (main.go:15)\n" +
+	"  caused by: file not found\n" +
+	"2026-02-20T10:15:05 [INFO] pipeline run completed\n"
 
 func newTestLogModel() Model {
 	cfg := testdata.TestConfig()
@@ -202,4 +211,62 @@ func TestLogModelTwoStageEsc(t *testing.T) {
 	// Second Esc: log viewer has no matches, so it should NOT handle Esc.
 	// (The root model's global key handler will produce PopView.)
 	// Since we're testing the logview in isolation, Esc just falls through to viewport.
+}
+
+func TestParseEntries(t *testing.T) {
+	entries := parseEntries(testLogContent)
+	if len(entries) != 7 {
+		t.Fatalf("expected 7 entries, got %d", len(entries))
+	}
+	if entries[0].Level != "INFO" {
+		t.Errorf("entry[0].Level = %q, want INFO", entries[0].Level)
+	}
+	if entries[0].Message != "daemon started (PID 4821)" {
+		t.Errorf("entry[0].Message = %q, want 'daemon started (PID 4821)'", entries[0].Message)
+	}
+	if entries[0].Timestamp != "2026-02-20T10:15:03" {
+		t.Errorf("entry[0].Timestamp = %q", entries[0].Timestamp)
+	}
+}
+
+func TestParseEntriesMultiLine(t *testing.T) {
+	entries := parseEntries(testLogMultiLine)
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+
+	e := entries[1]
+	if e.Level != "ERROR" {
+		t.Errorf("entry[1].Level = %q, want ERROR", e.Level)
+	}
+	if e.Message != "failed to read config" {
+		t.Errorf("entry[1].Message = %q", e.Message)
+	}
+	if len(e.Extra) != 3 {
+		t.Fatalf("entry[1].Extra len = %d, want 3", len(e.Extra))
+	}
+	if e.Extra[0] != "  at config.Load (config.go:42)" {
+		t.Errorf("entry[1].Extra[0] = %q", e.Extra[0])
+	}
+
+	if len(entries[2].Extra) != 0 {
+		t.Errorf("entry[2] should have no extra lines, got %d", len(entries[2].Extra))
+	}
+}
+
+func TestParseEntriesEmpty(t *testing.T) {
+	entries := parseEntries("")
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries for empty input, got %d", len(entries))
+	}
+}
+
+func TestParseEntriesUnparseable(t *testing.T) {
+	entries := parseEntries("some random text\nanother line\n")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry for unparseable content, got %d", len(entries))
+	}
+	if entries[0].Level != "" {
+		t.Errorf("unparseable entry should have empty level, got %q", entries[0].Level)
+	}
 }

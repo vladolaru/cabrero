@@ -4,6 +4,7 @@ package logview
 
 import (
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -16,6 +17,50 @@ import (
 // highlightOutput is the termenv output used for search match highlighting.
 // Uses os.Stderr with TrueColor forced so highlighting works reliably.
 var highlightOutput = termenv.NewOutput(os.Stderr, termenv.WithProfile(termenv.TrueColor))
+
+// logLineRe matches daemon log lines: "2026-02-20T10:15:03 [INFO] message"
+var logLineRe = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\s+\[(\w+)\]\s+(.*)`)
+
+// LogEntry represents a parsed log line with optional continuation lines.
+type LogEntry struct {
+	Timestamp string   // "2026-02-20T10:15:03"
+	Level     string   // "INFO", "ERROR"
+	Message   string   // first line of the message
+	Extra     []string // continuation lines (stack traces, JSON, etc.)
+	Expanded  bool     // whether Extra is visible (default: false)
+}
+
+// IsMultiLine reports whether this entry has continuation lines.
+func (e LogEntry) IsMultiLine() bool {
+	return len(e.Extra) > 0
+}
+
+// parseEntries splits raw log content into structured entries.
+func parseEntries(content string) []LogEntry {
+	if content == "" {
+		return nil
+	}
+	lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+	if len(lines) == 0 {
+		return nil
+	}
+
+	var entries []LogEntry
+	for _, line := range lines {
+		if m := logLineRe.FindStringSubmatch(line); m != nil {
+			entries = append(entries, LogEntry{
+				Timestamp: m[1],
+				Level:     m[2],
+				Message:   m[3],
+			})
+		} else if len(entries) > 0 {
+			entries[len(entries)-1].Extra = append(entries[len(entries)-1].Extra, line)
+		} else {
+			entries = append(entries, LogEntry{Message: line})
+		}
+	}
+	return entries
+}
 
 // lineMatch records the line number of a search match.
 type lineMatch struct {
