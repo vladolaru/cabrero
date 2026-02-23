@@ -18,6 +18,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of only the dashboard. Navigating to proposal detail, source manager,
   pipeline monitor, fitness report, log viewer, or help overlay retains the
   header context. Snapshots also include the header for all views.
+- **Context-aware help overlay** — pressing `?` now shows only the key bindings
+  relevant to the current view, grouped into sections (Navigation, Actions,
+  Views, Global) with full descriptions explaining what each key does. Replaces
+  the generic help overlay that dumped all bindings from every view.
 
 ### Fixed
 
