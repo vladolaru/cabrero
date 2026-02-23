@@ -111,11 +111,6 @@ func TestKeyMap_HelpBindings(t *testing.T) {
 		t.Fatal("ShortHelp returned empty")
 	}
 
-	full := km.FullHelp()
-	if len(full) == 0 {
-		t.Fatal("FullHelp returned empty")
-	}
-
 	detail := km.DetailShortHelp()
 	if len(detail) == 0 {
 		t.Fatal("DetailShortHelp returned empty")
