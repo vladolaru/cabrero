@@ -40,6 +40,11 @@ func (m Model) View() string {
 		return ""
 	}
 
+	// Ownership choice prompt overlay.
+	if m.confirmState == ConfirmSetOwnership && m.ownershipPrompt != "" {
+		return m.ownershipPrompt
+	}
+
 	// Confirmation prompt overlay.
 	if m.confirm.Active {
 		return m.confirm.View()

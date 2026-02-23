@@ -11,18 +11,19 @@ import (
 
 // Model is the source manager view model.
 type Model struct {
-	groups       []fitness.SourceGroup
-	flatItems    []flatItem // flattened for cursor navigation
-	cursor       int
-	detailOpen   bool
-	detailSource *fitness.Source
-	changes      []fitness.ChangeEntry
-	confirm      components.ConfirmModel
-	confirmState ConfirmState
-	width        int
-	height       int
-	keys         *shared.KeyMap
-	config       *shared.Config
+	groups          []fitness.SourceGroup
+	flatItems       []flatItem // flattened for cursor navigation
+	cursor          int
+	detailOpen      bool
+	detailSource    *fitness.Source
+	changes         []fitness.ChangeEntry
+	confirm         components.ConfirmModel
+	confirmState    ConfirmState
+	ownershipPrompt string // prompt text for ownership choice (m/n/esc)
+	width           int
+	height          int
+	keys            *shared.KeyMap
+	config          *shared.Config
 }
 
 // flatItem maps a visible row to either a group header or source entry.
@@ -62,7 +63,7 @@ func New(groups []fitness.SourceGroup, keys *shared.KeyMap, cfg *shared.Config) 
 // (confirmation prompt, detail sub-view) that should handle Esc
 // before the global handler pops the view.
 func (m Model) HasActivePrompt() bool {
-	return m.confirm.Active || m.detailOpen
+	return m.confirm.Active || m.confirmState == ConfirmSetOwnership || m.detailOpen
 }
 
 // SetSize updates the viewport dimensions.

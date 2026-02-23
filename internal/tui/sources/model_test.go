@@ -528,35 +528,25 @@ func TestSources_BackEmitsPopView(t *testing.T) {
 	}
 }
 
-func TestSources_OwnershipConfirm(t *testing.T) {
+func TestSources_OwnershipMine(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper".
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 
-	// Press 'o' for ownership change. Note: 'o' is bound to SetOwnership in source manager context.
+	// Press 'o' for ownership change.
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
 
 	if m.confirmState != ConfirmSetOwnership {
 		t.Fatalf("confirmState = %d, want ConfirmSetOwnership", m.confirmState)
 	}
-	if !m.confirm.Active {
-		t.Fatal("confirm prompt should be active")
-	}
 
-	// Confirm with 'y' — produces ConfirmResult.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	// Press 'm' for mine.
+	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
 
 	if cmd == nil {
-		t.Fatal("expected cmd after pressing y")
-	}
-	// Feed the ConfirmResult back.
-	confirmMsg := cmd()
-	m, cmd = m.Update(confirmMsg)
-
-	if cmd == nil {
-		t.Fatal("expected cmd after ownership confirmation")
+		t.Fatal("expected cmd after pressing m")
 	}
 	msg := cmd()
 	own, ok := msg.(message.SetOwnershipFinished)
@@ -565,6 +555,56 @@ func TestSources_OwnershipConfirm(t *testing.T) {
 	}
 	if own.SourceName != "docx-helper" {
 		t.Errorf("SourceName = %q, want docx-helper", own.SourceName)
+	}
+	if own.NewOwnership != "mine" {
+		t.Errorf("NewOwnership = %q, want mine", own.NewOwnership)
+	}
+}
+
+func TestSources_OwnershipNotMine(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	// Navigate to "docx-helper".
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+
+	// Press 'o' for ownership change.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+
+	// Press 'n' for not mine.
+	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+
+	if cmd == nil {
+		t.Fatal("expected cmd after pressing n")
+	}
+	msg := cmd()
+	own, ok := msg.(message.SetOwnershipFinished)
+	if !ok {
+		t.Fatalf("expected SetOwnershipFinished, got %T", msg)
+	}
+	if own.NewOwnership != "not_mine" {
+		t.Errorf("NewOwnership = %q, want not_mine", own.NewOwnership)
+	}
+}
+
+func TestSources_OwnershipCancel(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	// Navigate to "docx-helper".
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+
+	// Press 'o' for ownership change.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+
+	// Press Esc to cancel.
+	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+
+	if m.confirmState != ConfirmNone {
+		t.Errorf("confirmState = %d, want ConfirmNone after cancel", m.confirmState)
+	}
+	if cmd != nil {
+		t.Error("no cmd expected after cancelling ownership prompt")
 	}
 }
 

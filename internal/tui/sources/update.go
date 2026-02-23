@@ -37,6 +37,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleConfirmResult(result)
 	}
 
+	// Ownership prompt uses custom m/n/esc keys, not the generic confirm.
+	if m.confirmState == ConfirmSetOwnership {
+		return m.updateOwnershipPrompt(msg)
+	}
+
 	// When a confirmation prompt is active, route input there.
 	if m.confirm.Active {
 		return m.updateConfirm(msg)
@@ -148,7 +153,7 @@ func (m Model) handleToggleApproach() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleSetOwnership prompts for ownership change.
+// handleSetOwnership activates the ownership choice prompt.
 func (m Model) handleSetOwnership() (Model, tea.Cmd) {
 	s := m.SelectedSource()
 	if s == nil {
@@ -156,7 +161,42 @@ func (m Model) handleSetOwnership() (Model, tea.Cmd) {
 	}
 
 	m.confirmState = ConfirmSetOwnership
-	m.confirm = components.NewConfirm("Set " + s.Name + " ownership: [m]ine or [n]ot mine?")
+	m.ownershipPrompt = "Set " + s.Name + " ownership: [m]ine / [n]ot mine / [esc] cancel"
+	return m, nil
+}
+
+// updateOwnershipPrompt handles the ownership choice prompt (m/n/esc).
+func (m Model) updateOwnershipPrompt(msg tea.Msg) (Model, tea.Cmd) {
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		switch {
+		case key.Matches(msg, key.NewBinding(key.WithKeys("m", "M"))):
+			m.confirmState = ConfirmNone
+			m.ownershipPrompt = ""
+			s := m.SelectedSource()
+			if s == nil {
+				return m, nil
+			}
+			name := s.Name
+			return m, func() tea.Msg {
+				return message.SetOwnershipFinished{SourceName: name, NewOwnership: "mine"}
+			}
+		case key.Matches(msg, key.NewBinding(key.WithKeys("n", "N"))):
+			m.confirmState = ConfirmNone
+			m.ownershipPrompt = ""
+			s := m.SelectedSource()
+			if s == nil {
+				return m, nil
+			}
+			name := s.Name
+			return m, func() tea.Msg {
+				return message.SetOwnershipFinished{SourceName: name, NewOwnership: "not_mine"}
+			}
+		case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
+			m.confirmState = ConfirmNone
+			m.ownershipPrompt = ""
+			return m, nil
+		}
+	}
 	return m, nil
 }
 
@@ -191,17 +231,6 @@ func (m Model) handleConfirmResult(result components.ConfirmResult) (Model, tea.
 		approach := newApproach
 		return m, func() tea.Msg {
 			return message.ToggleApproachFinished{SourceName: name, NewApproach: approach}
-		}
-
-	case ConfirmSetOwnership:
-		// For now, this emits a finished message. In real usage, a sub-prompt
-		// would ask for [m]ine / [n]ot mine. Simplified for this phase.
-		if s == nil {
-			return m, nil
-		}
-		name := s.Name
-		return m, func() tea.Msg {
-			return message.SetOwnershipFinished{SourceName: name, NewOwnership: "mine"}
 		}
 
 	case ConfirmRollback:
