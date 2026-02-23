@@ -15,6 +15,19 @@ var (
 	followOffStyle = lipgloss.NewStyle().Foreground(shared.ColorMuted)
 )
 
+// SubHeader returns the view title and stats for the log viewer.
+func (m Model) SubHeader() string {
+	var followIndicator string
+	if m.followMode {
+		followIndicator = followOnStyle.Render("●")
+	} else {
+		followIndicator = followOffStyle.Render("○")
+	}
+	title := "  " + titleStyle.Render("Log Viewer")
+	statsLine := fmt.Sprintf("  %d entries  ·  follow %s", len(m.entries), followIndicator)
+	return title + "\n" + statsLine
+}
+
 // View renders the log viewer.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {

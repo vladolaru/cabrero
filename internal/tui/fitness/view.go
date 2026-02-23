@@ -17,6 +17,18 @@ var (
 	fitnessAccent  = lipgloss.NewStyle().Foreground(shared.ColorAccent)
 )
 
+// SubHeader returns the view title and contextual stats for the fitness report.
+func (m Model) SubHeader() string {
+	title := fitnessHeader.Render("  Fitness Report")
+	if m.report == nil {
+		return title
+	}
+	r := m.report
+	statsLine := fmt.Sprintf("  %s  ·  ownership: %s  ·  %d sessions",
+		r.SourceName, r.Ownership, r.ObservedCount)
+	return title + "\n" + fitnessMuted.Render(statsLine)
+}
+
 // View renders the fitness report detail view.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {

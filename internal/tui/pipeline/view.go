@@ -41,6 +41,14 @@ func (m Model) layoutMode() layout {
 	}
 }
 
+// SubHeader returns the view title and stats line for the pipeline monitor.
+func (m Model) SubHeader() string {
+	title := "  " + titleStyle.Render("Pipeline Monitor")
+	statsLine := fmt.Sprintf("  captured: %d  ·  processed: %d  ·  queued: %d",
+		m.stats.SessionsCaptured, m.stats.SessionsProcessed, m.stats.SessionsQueued)
+	return title + "\n" + mutedStyle.Render(statsLine)
+}
+
 // View renders the pipeline monitor.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {

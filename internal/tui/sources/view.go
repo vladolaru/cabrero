@@ -34,6 +34,25 @@ var (
 	errorStyle    = shared.ErrorStyle
 )
 
+// SubHeader returns the sub-header for the current source view (list or detail).
+func (m Model) SubHeader() string {
+	if m.detailOpen {
+		return m.detailSubHeader()
+	}
+	return m.renderHeader()
+}
+
+// detailSubHeader returns the sub-header for the source detail sub-view.
+func (m Model) detailSubHeader() string {
+	title := headerStyle.Render("  Source Detail")
+	if m.detailSource == nil {
+		return title
+	}
+	src := m.detailSource
+	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s", src.Name, src.Ownership, src.Approach)
+	return title + "\n" + mutedStyle.Render(statsLine)
+}
+
 // View renders the source manager.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {

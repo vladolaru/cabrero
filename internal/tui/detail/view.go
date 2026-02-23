@@ -19,6 +19,20 @@ var (
 	detailAccent  = lipgloss.NewStyle().Foreground(shared.ColorAccent)
 )
 
+// SubHeader returns the view title and contextual stats for the proposal detail.
+func (m Model) SubHeader() string {
+	title := detailHeader.Render("  Proposal Detail")
+	if m.proposal == nil {
+		return title
+	}
+	p := &m.proposal.Proposal
+	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s",
+		p.Type,
+		shared.ShortenHome(p.Target),
+		p.Confidence)
+	return title + "\n" + detailMuted.Render(statsLine)
+}
+
 // View renders the proposal detail view.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {
