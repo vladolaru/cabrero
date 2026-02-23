@@ -173,7 +173,7 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
   config.json                # TUI and daemon settings (debug toggle, navigation, theme, model overrides, etc.)
   blocklist.json             # session IDs to never process (loop prevention)
   run_history.jsonl          # append-only pipeline run history (one JSON object per line)
-  daemon.log                 # background daemon log (rotated, 5MB × 3)
+  daemon.log                 # background daemon log (rotated, 2MB × 3)
   daemon.pid                 # PID file for single-instance enforcement
 ```
 
@@ -525,7 +525,7 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Notifications** — macOS notification via `osascript` when new proposals are generated
   and when queue processing completes
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
-  (5 MB × 3 files)
+  (2 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
 - **Concurrency limiting** — caps simultaneous `claude` CLI invocations via a shared
   semaphore (default 3, configurable via `MaxConcurrentInvocations`). Daemon uses

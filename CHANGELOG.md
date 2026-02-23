@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Incremental log entry parsing** — `AppendContent` now parses only the
+  new bytes and merges them into existing entries instead of re-parsing all
+  content from scratch on every 1-second poll tick. The redundant `m.content`
+  field is removed from the log viewer model.
+- **Daemon log max size reduced** — log rotation threshold lowered from 5 MB
+  to 2 MB per file, reducing the data the TUI log viewer reads and parses on
+  each follow-mode poll.
+
 ### Added
 
 - **Concurrent invocation limiter** — caps the number of simultaneous `claude`
