@@ -20,6 +20,7 @@ type Model struct {
 	expandedIdx int // -1 means no run expanded
 	confirm     components.ConfirmModel
 	retrying    string // session ID being retried, "" if none
+	statusMsg   string // timed status bar message (e.g. "Refreshing…")
 	width       int
 	height      int
 	keys        *shared.KeyMap
@@ -51,6 +52,7 @@ func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts [
 	m.stats = stats
 	m.prompts = prompts
 	m.dashStats = dashStats
+	m.statusMsg = ""
 	// Clamp cursor to the new data bounds.
 	if m.cursor >= len(m.runs) {
 		m.cursor = max(0, len(m.runs)-1)

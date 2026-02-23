@@ -88,7 +88,7 @@ func (m Model) View() string {
 	}
 
 	// Status bar — 3 args: bindings, timedMsg, width.
-	statusBar := components.RenderStatusBar(m.keys.PipelineShortHelp(), "", m.width)
+	statusBar := components.RenderStatusBar(m.keys.PipelineShortHelp(), m.statusMsg, m.width)
 
 	return content + statusBar
 }

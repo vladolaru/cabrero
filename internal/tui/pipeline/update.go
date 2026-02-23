@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"time"
-
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -81,10 +79,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, m.keys.Refresh):
-		return m, tea.Batch(
-			func() tea.Msg { return message.StatusMessage{Text: "Refreshing…", Duration: 2 * time.Second} },
-			func() tea.Msg { return message.PipelineTickMsg{} },
-		)
+		m.statusMsg = "Refreshing…"
+		return m, func() tea.Msg { return message.PipelineTickMsg{} }
 	}
 
 	return m, nil
