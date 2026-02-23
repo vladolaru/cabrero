@@ -171,8 +171,10 @@ func (k KeyMap) FitnessShortHelp() []key.Binding {
 }
 
 // SourcesShortHelp returns help bindings for the source manager view.
+// Left/Right (collapse/expand groups) are omitted from the status bar
+// since the generic arrow labels are misleading; the help overlay shows them.
 func (k KeyMap) SourcesShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Left, k.Right, k.Open, k.ToggleApproach, k.SetOwnership, k.Back, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Open, k.ToggleApproach, k.SetOwnership, k.Back, k.Help}
 }
 
 // PipelineShortHelp returns help bindings for the pipeline monitor view.
