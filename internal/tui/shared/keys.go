@@ -61,7 +61,7 @@ type KeyMap struct {
 	ExpandAll    key.Binding
 	CollapseAll  key.Binding
 
-	// Future views
+	// View navigation
 	Sources  key.Binding
 	Pipeline key.Binding
 }
@@ -116,7 +116,7 @@ func NewKeyMap(nav string) KeyMap {
 		ExpandAll:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "expand all")),
 		CollapseAll:  key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "collapse all")),
 
-		// Future views.
+		// View navigation.
 		Sources:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sources")),
 		Pipeline: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pipeline")),
 	}
@@ -167,12 +167,12 @@ func (k KeyMap) FitnessShortHelp() []key.Binding {
 // Left/Right (collapse/expand groups) are omitted from the status bar
 // since the generic arrow labels are misleading; the help overlay shows them.
 func (k KeyMap) SourcesShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Open, k.ToggleApproach, k.SetOwnership, k.Back, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Open, k.ToggleApproach, k.SetOwnership, k.Pipeline, k.Back, k.Help}
 }
 
 // PipelineShortHelp returns help bindings for the pipeline monitor view.
 func (k KeyMap) PipelineShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Open, k.Retry, k.Refresh, k.LogView, k.Back, k.Help}
+	return []key.Binding{k.Up, k.Down, k.Open, k.Retry, k.Refresh, k.Sources, k.LogView, k.Back, k.Help}
 }
 
 // LogViewShortHelp returns help bindings for the log viewer.

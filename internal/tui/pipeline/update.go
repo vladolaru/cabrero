@@ -85,6 +85,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Refresh):
 		m.statusMsg = "Refreshing…"
 		return m, func() tea.Msg { return message.PipelineTickMsg{} }
+
+	case key.Matches(msg, m.keys.Sources):
+		return m, func() tea.Msg {
+			return message.SwitchView{View: message.ViewSourceManager}
+		}
 	}
 
 	return m, nil

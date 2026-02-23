@@ -121,6 +121,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.PopView:
 		return m.popView()
 
+	case message.SwitchView:
+		return m.switchView(msg.View)
+
 	case message.StatusMessage:
 		m.statusMsg = msg.Text
 		if msg.Duration > 0 {
@@ -655,6 +658,26 @@ func (m appModel) popView() (tea.Model, tea.Cmd) {
 
 	m.state = m.viewStack[len(m.viewStack)-1]
 	m.viewStack = m.viewStack[:len(m.viewStack)-1]
+	return m, nil
+}
+
+// switchView replaces the current top-level view without touching the navigation stack.
+// This keeps esc always returning to Proposals regardless of cross-navigation jumps.
+func (m appModel) switchView(view message.ViewState) (tea.Model, tea.Cmd) {
+	m.state = view
+	switch view {
+	case message.ViewSourceManager:
+		m.sources = sources.New(m.sourceGroups, &m.keys, m.config)
+		m.sources.SetSize(m.width, m.childHeight())
+		return m, nil
+	case message.ViewPipelineMonitor:
+		m.pipelineMonitor.SetSize(m.width, m.childHeight())
+		return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
+			return message.PipelineTickMsg{}
+		})
+	case message.ViewDashboard:
+		return m, nil
+	}
 	return m, nil
 }
 

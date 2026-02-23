@@ -33,6 +33,12 @@ type PushView struct {
 // PopView pops the current view, returning to the previous one.
 type PopView struct{}
 
+// SwitchView replaces the current top-level view without modifying the navigation stack.
+// Used for peer-to-peer navigation between top-level sections (Proposals, Sources, Pipeline).
+type SwitchView struct {
+	View ViewState
+}
+
 // DashboardStats holds counts and status for the dashboard header.
 type DashboardStats struct {
 	Version string // build version, e.g. "v0.13.0"

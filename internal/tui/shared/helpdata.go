@@ -227,6 +227,12 @@ func sourcesHelp(km KeyMap) []HelpSection {
 			},
 		},
 		{
+			Title: "Views",
+			Entries: []HelpEntry{
+				{km.Pipeline.Help().Key, "Open pipeline monitor"},
+			},
+		},
+		{
 			Title: "Global",
 			Entries: []HelpEntry{
 				{km.Back.Help().Key, "Return to previous view"},
@@ -276,6 +282,12 @@ func pipelineHelp(km KeyMap) []HelpSection {
 				{km.Retry.Help().Key, "Retry failed run"},
 				{km.Refresh.Help().Key, "Refresh data"},
 				{km.LogView.Help().Key, "View daemon logs"},
+			},
+		},
+		{
+			Title: "Views",
+			Entries: []HelpEntry{
+				{km.Sources.Help().Key, "Open source manager"},
 			},
 		},
 		{
