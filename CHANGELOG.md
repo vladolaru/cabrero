@@ -5,6 +5,14 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-02-23
+
+### Fixed
+- **Source detail origin showed group label** — the Origin field in the source
+  detail Info section displayed the group label (e.g. "Unclassified") instead of
+  the source's actual origin (e.g. "User-level", "Plugin: foo"). Now derives the
+  display label from the source's own Origin field.
+
 ## [0.16.0] - 2026-02-23
 
 ### Added
@@ -605,6 +613,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.16.1]: https://github.com/vladolaru/cabrero/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vladolaru/cabrero/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/vladolaru/cabrero/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/vladolaru/cabrero/compare/v0.13.0...v0.14.0
