@@ -27,6 +27,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 
+	case statusClearMsg:
+		m.statusMsg = ""
+		return m, nil
+
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}

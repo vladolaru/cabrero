@@ -4,11 +4,18 @@
 package pipeline
 
 import (
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+
 	pl "github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
+
+// statusClearMsg is sent after a delay to clear the status bar message.
+type statusClearMsg struct{}
 
 // Model is the pipeline monitor view model.
 type Model struct {
@@ -47,12 +54,12 @@ func (m *Model) SetSize(width, height int) {
 }
 
 // Refresh updates the pipeline data while preserving cursor and expansion state.
-func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats) {
+// Returns a tea.Cmd when a timed status clear is needed (manual refresh).
+func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats) tea.Cmd {
 	m.runs = runs
 	m.stats = stats
 	m.prompts = prompts
 	m.dashStats = dashStats
-	m.statusMsg = ""
 	// Clamp cursor to the new data bounds.
 	if m.cursor >= len(m.runs) {
 		m.cursor = max(0, len(m.runs)-1)
@@ -60,6 +67,14 @@ func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts [
 	if m.expandedIdx >= len(m.runs) {
 		m.expandedIdx = -1
 	}
+	// Show confirmation only after a manual refresh.
+	if m.statusMsg != "" {
+		m.statusMsg = "Data refreshed."
+		return tea.Tick(1500*time.Millisecond, func(time.Time) tea.Msg {
+			return statusClearMsg{}
+		})
+	}
+	return nil
 }
 
 // HasActivePrompt returns true when a confirmation prompt is active

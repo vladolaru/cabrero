@@ -302,10 +302,11 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case message.PipelineDataRefreshed:
 		m.pipelineRefreshing = false
-		m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats)
-		return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
+		statusCmd := m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats)
+		nextTick := tea.Tick(5*time.Second, func(time.Time) tea.Msg {
 			return message.PipelineTickMsg{}
 		})
+		return m, tea.Batch(statusCmd, nextTick)
 
 	case message.LogTickMsg:
 		if m.state == message.ViewLogViewer {
