@@ -79,7 +79,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, m.keys.Refresh):
-		return m, nil
+		return m, func() tea.Msg {
+			return message.PipelineTickMsg{}
+		}
 	}
 
 	return m, nil
