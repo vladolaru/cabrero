@@ -5,6 +5,17 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Renamed `review` CLI command to `dashboard`
+- Simplified persistent header from "Cabrero Review" to "Cabrero"
+- All views now have a consistent sub-header with title and contextual stats
+- Help overlay preserves the sub-header, only replacing the content area
+
+### Removed
+- Proposal stats from the persistent header (moved to dashboard sub-header)
+
 ## [0.15.0] - 2026-02-23
 
 ### Added
@@ -386,7 +397,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **`cabrero review`** — interactive Bubble Tea TUI for reviewing proposals.
+- **`cabrero dashboard`** (originally `cabrero review`) — interactive Bubble Tea TUI for reviewing proposals.
   Dashboard shows proposal list with type indicators, confidence, and sort/filter.
   Detail view renders colored unified diffs, rationale, and citation chains.
   Stack-based navigation with configurable arrow or vim keybinding modes.

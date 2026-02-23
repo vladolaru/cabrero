@@ -60,7 +60,7 @@ ASSESSMENT: Low fitness for your workflow.
 Consider replacing or supplementing with a user-level skill.
 ```
 
-Fitness reports appear in the Cabrero Review App as a distinct item type alongside proposals.
+Fitness reports appear in the Cabrero TUI as a distinct item type alongside proposals.
 
 ### New Source Discovery
 
@@ -408,7 +408,7 @@ tool access. Apply and chat stages remain non-agentic.
   Evaluator invocations.
 - **Evaluator** — apply: blends approved changes into SKILL.md using the writing skill.
   Runs on approval only — infrequent, quality-critical. Non-agentic (`--print`).
-- **Evaluator** — chat: interactive proposal interrogation in the Review App. Latency-
+- **Evaluator** — chat: interactive proposal interrogation in the TUI. Latency-
   sensitive; fast enough to feel conversational. Non-agentic (`--print`).
 
 ### Cross-Session Pattern Aggregation
@@ -692,7 +692,7 @@ is a UI layer over a system that already works — not a dependency of it.
 
 **Go binary with Bubble Tea.** A self-contained compiled binary with no runtime
 dependencies — install it and it works, same distribution story as any well-built CLI
-tool. Bubble Tea is the right TUI library for the review interface: mature, composable,
+tool. Bubble Tea is the right TUI library for the interactive TUI: mature, composable,
 and purpose-built for exactly this kind of interactive terminal UI.
 
 Claude Code itself is TypeScript/JavaScript — a single heavily obfuscated 20MB bundle
@@ -716,6 +716,7 @@ cabrero run <session_id>        Run the full pipeline on a session
 cabrero sessions                List captured sessions with status (processed/pending/error)
 cabrero status                  Show pipeline health: sessions, daemon, hooks
 cabrero proposals               List pending proposals
+cabrero dashboard               Interactive TUI for reviewing proposals
 cabrero inspect <proposal_id>   Show full proposal with citation chain
 cabrero approve <proposal_id>   Approve and apply a proposal (same flow as app)
 cabrero reject <proposal_id>    Reject with optional reason
@@ -784,7 +785,7 @@ comparison. The CLI handles operating and debugging the system itself — pipeli
 execution, prompt iteration, batch operations, inspection. Both read and write the same
 `~/.cabrero/` store; there is no duplication of state.
 
-## macOS UI — Cabrero Review App
+## macOS UI — Cabrero App
 
 ### Form Factor
 
@@ -1057,9 +1058,9 @@ plugin: another-third-party   not mine     ◎ Evaluate  [unclassified ⚠]
 - Hook scripts embedded in binary via `//go:embed`
 - `--yes` flag for scripted installs, `--dry-run` for preview
 
-**Phase 4a — Review TUI (core review loop)** ✓
+**Phase 4a — TUI (core review loop)** ✓
 
-12. **Bubble Tea review interface** — dashboard with proposal list, proposal detail
+12. **Bubble Tea dashboard** — dashboard with proposal list, proposal detail
     view with colored diffs, keyboard navigation, approve/reject/defer ✓
 13. **AI chat panel** — streaming Evaluator via `claude` CLI, citation chain as context,
     question chips, revised proposal detection via ` ```revision ` marker ✓
@@ -1074,7 +1075,7 @@ shows a view title, brief description, and only the key bindings relevant to the
 current view, grouped into sections with full descriptions. See `docs/plans/2026-02-20-review-tui-design.md`
 for the full design specification.
 
-**Phase 4b — Review TUI (assessment & management)** ✅
+**Phase 4b — TUI (assessment & management)** ✅
 
 15. **Fitness report detail view** — visual assessment bars (three-bucket health
     breakdown), expandable session evidence by category, dismiss and jump-to-sources
@@ -1084,7 +1085,7 @@ for the full design specification.
     change history detail with rollback support. Adaptive column layout for wide/standard/narrow
     terminals. See `docs/plans/2026-02-20-review-tui-phase4b-plan.md` for the implementation plan.
 
-**Phase 4c — Review TUI (operational monitoring)** ✓
+**Phase 4c — TUI (operational monitoring)** ✓
 
 17. **Pipeline monitor** — daemon health, recent runs with per-stage timing,
     token usage and cost stats, sparkline activity chart, prompt versions, retry
