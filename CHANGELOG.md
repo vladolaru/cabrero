@@ -40,6 +40,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Pipeline monitor Recent Runs column alignment** — timing columns (parse,
+  cls, eval) now use fixed-width formatting so values align vertically regardless
+  of which stages completed. Error indicators ("✗ cls failed", "✗ eval failed")
+  stay in their column. Project name column widened from 20 to 25 chars in wide
+  mode to prevent truncation of longer names.
 - **Queued sessions without transcript** — `ScanQueued` now skips sessions
   missing a `transcript.jsonl` file, preventing repeated pipeline failures
   from incomplete captures.

@@ -250,7 +250,7 @@ func formatCost(cost float64) string {
 func (m Model) runLayout() (idLen int, projectMax int) {
 	switch m.layoutMode() {
 	case layoutWide:
-		return 8, 20
+		return 8, 25
 	case layoutStandard:
 		return 8, 15
 	default: // narrow
@@ -362,15 +362,14 @@ func checkmark(ok bool) string {
 }
 
 // formatTimingForMode formats per-stage timing based on layout mode.
-//   - Wide: all 3 stages (parse, cls, eval)
-//   - Standard: 2 stages (parse, eval) — classifier omitted
+//   - Wide: all 3 stages (parse, cls, eval) — fixed-width columns
+//   - Standard: 2 stages (parse, eval) — fixed-width columns
 //   - Narrow: total duration only
 func formatTimingForMode(run pl.PipelineRun, mode layout) string {
-	if run.Status == "queued" {
-		return mutedStyle.Render("(queued)")
-	}
-
 	if mode == layoutNarrow {
+		if run.Status == "queued" {
+			return mutedStyle.Render("(queued)")
+		}
 		total := run.ParseDuration + run.ClassifierDuration + run.EvaluatorDuration
 		if total == 0 {
 			return ""
@@ -378,23 +377,53 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 		return fmt.Sprintf("%.0fs", total.Seconds())
 	}
 
-	var parts []string
+	// Fixed-width columns keep rows aligned regardless of which stages completed.
+	// Column widths (chars): parse 14 ("  0.5s parse  "), cls 12 (" 65.8s cls  "), eval 14 ("   71s eval").
+	const (
+		parseW = 14
+		clsW   = 12
+		evalW  = 14
+	)
+
+	if run.Status == "queued" {
+		return mutedStyle.Render("(queued)")
+	}
+
+	// Parse column — always reserves its width.
+	parseCol := strings.Repeat(" ", parseW)
 	if run.HasDigest && run.ParseDuration > 0 {
-		parts = append(parts, fmt.Sprintf("%5.1fs parse", run.ParseDuration.Seconds()))
+		parseCol = fmt.Sprintf("%5.1fs parse  ", run.ParseDuration.Seconds())
 	}
+
 	if mode == layoutWide {
+		// Cls column — always reserves its width.
+		clsCol := strings.Repeat(" ", clsW)
 		if run.HasClassifier {
-			parts = append(parts, fmt.Sprintf("%5.1fs cls", run.ClassifierDuration.Seconds()))
+			clsCol = fmt.Sprintf("%5.1fs cls  ", run.ClassifierDuration.Seconds())
 		} else if run.Status == "error" && run.HasDigest {
-			parts = append(parts, errorStyle.Render("  ✗ cls failed"))
+			// Pad before styling so ANSI codes don't affect width.
+			clsCol = errorStyle.Render(fmt.Sprintf("%-*s", clsW, "✗ cls failed"))
 		}
+
+		evalCol := ""
+		if run.HasEvaluator {
+			evalCol = fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds())
+		} else if run.Status == "error" && run.HasClassifier {
+			evalCol = errorStyle.Render(fmt.Sprintf("%-*s", evalW, "✗ eval failed"))
+		}
+
+		return parseCol + clsCol + evalCol
 	}
+
+	// Standard: parse + eval (cls omitted).
+	evalCol := ""
 	if run.HasEvaluator {
-		parts = append(parts, fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds()))
+		evalCol = fmt.Sprintf("%5.0fs eval", run.EvaluatorDuration.Seconds())
 	} else if run.Status == "error" && run.HasClassifier {
-		parts = append(parts, errorStyle.Render(" ✗ eval failed"))
+		evalCol = errorStyle.Render(fmt.Sprintf("%-*s", evalW, "✗ eval failed"))
 	}
-	return strings.Join(parts, "  ")
+
+	return parseCol + evalCol
 }
 
 func relativeTime(t time.Time) string {
