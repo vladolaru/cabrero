@@ -217,6 +217,26 @@ func (m Model) HasActiveSearch() bool {
 	return m.searchTerm != "" && len(m.matches) > 0
 }
 
+// scrollToCursor adjusts the viewport offset to make the cursor's entry visible.
+// It counts rendered lines to find the entry's position in the viewport content.
+func (m *Model) scrollToCursor() {
+	if len(m.entries) == 0 {
+		return
+	}
+
+	// Calculate the line number where the cursor entry starts.
+	lineNum := 0
+	for i := 0; i < m.cursor && i < len(m.entries); i++ {
+		lineNum++ // entry's main line
+		if m.entries[i].Expanded {
+			lineNum += len(m.entries[i].Extra)
+		}
+		lineNum++ // blank separator line
+	}
+
+	m.viewport.SetYOffset(lineNum)
+}
+
 // Color helper functions that read the adaptive colors.
 func mutedColor() string {
 	if lipgloss.HasDarkBackground() {

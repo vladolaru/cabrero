@@ -45,6 +45,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.FollowToggle):
 		m.followMode = !m.followMode
 		if m.followMode {
+			m.cursor = max(0, len(m.entries)-1)
+			m.refreshViewportContent()
 			m.viewport.GotoBottom()
 		}
 		return m, nil
@@ -65,15 +67,42 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.gotoMatch(prev)
 		}
 		return m, nil
-	}
+	// Entry-level cursor navigation (Up/Down).
+	case key.Matches(msg, m.keys.Up):
+		if m.cursor > 0 {
+			m.cursor--
+			m.followMode = false
+			m.refreshViewportContent()
+			m.scrollToCursor()
+		}
+		return m, nil
 
-	// Any manual scroll disables follow mode.
-	if msg.Type == tea.KeyUp || msg.Type == tea.KeyDown ||
-		msg.Type == tea.KeyPgUp || msg.Type == tea.KeyPgDown {
+	case key.Matches(msg, m.keys.Down):
+		if m.cursor < len(m.entries)-1 {
+			m.cursor++
+			m.followMode = false
+			m.refreshViewportContent()
+			m.scrollToCursor()
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.GotoTop):
+		m.cursor = 0
 		m.followMode = false
+		m.refreshViewportContent()
+		m.viewport.GotoTop()
+		return m, nil
+
+	case key.Matches(msg, m.keys.GotoBottom):
+		m.cursor = max(0, len(m.entries)-1)
+		m.followMode = false
+		m.refreshViewportContent()
+		m.viewport.GotoBottom()
+		return m, nil
 	}
 
-	// Forward to viewport.
+	// HalfPageUp/Down and other keys go directly to viewport (raw line scrolling).
+	// These don't move the cursor.
 	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
 	return m, cmd

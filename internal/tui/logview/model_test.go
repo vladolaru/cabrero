@@ -466,3 +466,58 @@ func TestViewExpandedMultiLineEntry(t *testing.T) {
 		t.Error("expanded entry should show [-] indicator")
 	}
 }
+
+func TestCursorNavigation(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	if m.cursor != 0 {
+		t.Fatalf("cursor should start at 0, got %d", m.cursor)
+	}
+
+	// Move down.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.cursor != 1 {
+		t.Errorf("cursor should be 1 after Down, got %d", m.cursor)
+	}
+
+	// Move up.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.cursor != 0 {
+		t.Errorf("cursor should be 0 after Up, got %d", m.cursor)
+	}
+
+	// Can't go above 0.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.cursor != 0 {
+		t.Errorf("cursor should stay at 0, got %d", m.cursor)
+	}
+}
+
+func TestCursorNavigationDisablesFollow(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	if !m.followMode {
+		t.Fatal("follow should start on")
+	}
+
+	// Moving cursor should disable follow mode.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.followMode {
+		t.Error("cursor navigation should disable follow mode")
+	}
+}
+
+func TestCursorStaysInBounds(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// Move to last entry.
+	for i := 0; i < len(m.entries)+5; i++ {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if m.cursor != len(m.entries)-1 {
+		t.Errorf("cursor should clamp to last entry (%d), got %d", len(m.entries)-1, m.cursor)
+	}
+}
