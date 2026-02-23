@@ -42,8 +42,9 @@ type PipelineConfig struct {
 	EvaluatorMaxTurns  int
 	ClassifierTimeout  time.Duration
 	EvaluatorTimeout   time.Duration
-	Logger             Logger // nil defaults to stdLogger (stdout/stderr)
-	Debug              bool   // persist CC sessions for classifier/evaluator
+	MaxConcurrentInvocations int    // 0 means unlimited; daemon default is 3
+	Logger                  Logger // nil defaults to stdLogger (stdout/stderr)
+	Debug                   bool   // persist CC sessions for classifier/evaluator
 }
 
 // logger returns the configured Logger, falling back to stdLogger.
@@ -67,12 +68,13 @@ func DefaultPipelineConfig() PipelineConfig {
 		evaluatorModel = models.EvaluatorModel
 	}
 	return PipelineConfig{
-		ClassifierModel:    classifierModel,
-		EvaluatorModel:     evaluatorModel,
-		ClassifierMaxTurns: 15,
-		EvaluatorMaxTurns:  20,
-		ClassifierTimeout:  2 * time.Minute,
-		EvaluatorTimeout:   5 * time.Minute,
+		ClassifierModel:         classifierModel,
+		EvaluatorModel:          evaluatorModel,
+		ClassifierMaxTurns:      15,
+		EvaluatorMaxTurns:       20,
+		ClassifierTimeout:       2 * time.Minute,
+		EvaluatorTimeout:        5 * time.Minute,
+		MaxConcurrentInvocations: 3,
 	}
 }
 

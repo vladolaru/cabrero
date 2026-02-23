@@ -54,6 +54,7 @@ func New(cfg Config) (*Daemon, error) {
 	cfg.Pipeline.Logger = &daemonPipelineLogger{log: log}
 	runner := pipeline.NewRunner(cfg.Pipeline)
 	runner.Source = "daemon"
+	pipeline.InitInvokeSemaphore(cfg.Pipeline.MaxConcurrentInvocations)
 	return &Daemon{config: cfg, log: log, runner: runner}, nil
 }
 

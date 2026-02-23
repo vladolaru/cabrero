@@ -10,10 +10,45 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vladolaru/cabrero/internal/store"
 )
+
+var (
+	invokeSem     chan struct{}
+	invokeSemOnce sync.Once
+)
+
+// InitInvokeSemaphore sets the maximum number of concurrent claude CLI
+// invocations. Call once at startup (e.g. from daemon or CLI main).
+// A limit of 0 means unlimited (no semaphore).
+func InitInvokeSemaphore(limit int) {
+	invokeSemOnce.Do(func() {
+		if limit > 0 {
+			invokeSem = make(chan struct{}, limit)
+		}
+	})
+}
+
+func acquireInvokeSemaphore() {
+	if invokeSem != nil {
+		invokeSem <- struct{}{}
+	}
+}
+
+func releaseInvokeSemaphore() {
+	if invokeSem != nil {
+		<-invokeSem
+	}
+}
+
+// resetInvokeSemaphore resets the semaphore for testing. Not thread-safe.
+func resetInvokeSemaphore() {
+	invokeSem = nil
+	invokeSemOnce = sync.Once{}
+}
 
 // ClaudeResult holds the parsed output from a claude CLI JSON response.
 type ClaudeResult struct {
@@ -137,7 +172,9 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 		cmd.Stdin = cfg.Stdin
 	}
 
+	acquireInvokeSemaphore()
 	out, err := cmd.Output()
+	releaseInvokeSemaphore()
 	if err != nil {
 		if cfg.Timeout > 0 && ctx.Err() == context.DeadlineExceeded {
 			return nil, fmt.Errorf("claude timed out after %s", cfg.Timeout)

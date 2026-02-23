@@ -3,7 +3,9 @@ package pipeline
 import (
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // --- buildClaudeArgs tests ---
@@ -855,6 +857,61 @@ func TestSplitUsageForBatch_SingleSession(t *testing.T) {
 	if result[0].OutputTokens != 1500 {
 		t.Errorf("OutputTokens = %d, want 1500", result[0].OutputTokens)
 	}
+}
+
+// --- invokeSemaphore tests ---
+
+func TestInvokeSemaphore_LimitsConcurrency(t *testing.T) {
+	resetInvokeSemaphore()
+
+	limit := 2
+	InitInvokeSemaphore(limit)
+
+	var mu sync.Mutex
+	maxConcurrent := 0
+	current := 0
+	done := make(chan struct{})
+
+	for i := 0; i < 5; i++ {
+		go func() {
+			acquireInvokeSemaphore()
+			mu.Lock()
+			current++
+			if current > maxConcurrent {
+				maxConcurrent = current
+			}
+			mu.Unlock()
+
+			time.Sleep(50 * time.Millisecond)
+
+			mu.Lock()
+			current--
+			mu.Unlock()
+			releaseInvokeSemaphore()
+
+			done <- struct{}{}
+		}()
+	}
+
+	for i := 0; i < 5; i++ {
+		<-done
+	}
+
+	if maxConcurrent > limit {
+		t.Errorf("maxConcurrent = %d, want <= %d", maxConcurrent, limit)
+	}
+	if maxConcurrent < limit {
+		t.Errorf("maxConcurrent = %d, want exactly %d (semaphore not fully utilized)", maxConcurrent, limit)
+	}
+}
+
+func TestInvokeSemaphore_ZeroMeansUnlimited(t *testing.T) {
+	resetInvokeSemaphore()
+	InitInvokeSemaphore(0)
+
+	// Should not block — acquire/release are no-ops.
+	acquireInvokeSemaphore()
+	releaseInvokeSemaphore()
 }
 
 // --- Test helpers ---
