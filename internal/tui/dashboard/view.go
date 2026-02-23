@@ -91,34 +91,39 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 
 	var lastCapture string
 	if stats.LastCaptureTime != nil {
-		lastCapture = "Last capture: " + timeAgo(*stats.LastCaptureTime)
+		lastCapture = mutedStyle.Render("Last capture:") + " " + timeAgo(*stats.LastCaptureTime)
 	}
 
 	hookPre := checkMark(stats.HookPreCompact)
 	hookEnd := checkMark(stats.HookSessionEnd)
-	hooks := fmt.Sprintf("Hooks: pre-compact %s  session-end %s", hookPre, hookEnd)
+	hooks := mutedStyle.Render("Hooks:") + fmt.Sprintf(" pre-compact %s  session-end %s", hookPre, hookEnd)
 
 	debugIndicator := ""
 	if stats.DebugMode {
-		debugIndicator = "  │  Debug: " + warningStyle.Render("enabled")
+		debugIndicator = "  " + mutedStyle.Render("│  Debug:") + " " + warningStyle.Render("enabled")
 	}
 
 	if width >= 120 {
 		// Wide: stats on left, daemon/hooks on right.
+		// Style labels individually — wrapping the whole block in mutedStyle
+		// overrides ANSI colors on the first styled element (checkmarks, dots).
 		left := title + "\n" + statsLine
-		right := fmt.Sprintf("Daemon: %s\n%s\n%s%s", daemonStatus, lastCapture, hooks, debugIndicator)
-		rightRendered := mutedStyle.Render(right)
-		return lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", rightRendered)
+		rightLines := []string{
+			mutedStyle.Render("Daemon:") + " " + daemonStatus,
+			lastCapture,
+			hooks + debugIndicator,
+		}
+		return lipgloss.JoinHorizontal(lipgloss.Top, left, "    ", strings.Join(rightLines, "\n"))
 	}
 
 	// Standard/narrow: stacked header.
-	daemonLine := fmt.Sprintf("  Daemon: %s", daemonStatus)
+	daemonLine := "  " + mutedStyle.Render("Daemon:") + " " + daemonStatus
 	if lastCapture != "" {
-		daemonLine += "  │  " + lastCapture
+		daemonLine += "  " + mutedStyle.Render("│") + "  " + lastCapture
 	}
 	return title + "\n" + mutedStyle.Render(statsLine) + "\n" +
-		mutedStyle.Render(daemonLine) + "\n" +
-		mutedStyle.Render("  "+hooks+debugIndicator)
+		daemonLine + "\n" +
+		"  " + hooks + debugIndicator
 }
 
 func (m Model) renderItemList() string {
