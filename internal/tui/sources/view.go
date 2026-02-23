@@ -48,9 +48,7 @@ func (m Model) detailSubHeader() string {
 	if m.detailSource == nil {
 		return title
 	}
-	src := m.detailSource
-	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s", src.Name, src.Ownership, src.Approach)
-	return title + "\n" + mutedStyle.Render(statsLine)
+	return title + "\n" + mutedStyle.Render("  "+m.detailSource.Name)
 }
 
 // View renders the source manager.
@@ -229,7 +227,7 @@ func renderOwnership(ownership string) string {
 	case "not_mine":
 		return "not mine"
 	default:
-		return "\u26a0"
+		return "unknown"
 	}
 }
 
@@ -243,7 +241,7 @@ func renderApproach(approach string) string {
 	case "paused":
 		return "paused"
 	default:
-		return "-"
+		return "not set"
 	}
 }
 
@@ -259,6 +257,17 @@ func renderHealth(s fitness.Source) string {
 	}
 
 	return renderBar(s.HealthScore, s.Approach)
+}
+
+// renderHealthText returns a plain-text health summary for the detail info section.
+func renderHealthText(s *fitness.Source) string {
+	if s.Ownership == "" {
+		return "n/a (unclassified)"
+	}
+	if s.HealthScore < 0 {
+		return "n/a"
+	}
+	return fmt.Sprintf("%.0f%%", s.HealthScore)
 }
 
 // renderBar renders a text-based progress bar.
@@ -300,8 +309,21 @@ func (m Model) renderDetail() string {
 	if m.detailSource == nil {
 		return ""
 	}
+	src := m.detailSource
 
 	var b strings.Builder
+
+	// Source info.
+	b.WriteString(headerStyle.Render("  Info") + "\n\n")
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Origin:"), m.detailOrigin))
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Ownership:"), renderOwnership(src.Ownership)))
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Approach:"), renderApproach(src.Approach)))
+	b.WriteString(fmt.Sprintf("  %-12s %d\n", mutedStyle.Render("Sessions:"), src.SessionCount))
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Health:"), renderHealthText(src)))
+	if src.ClassifiedAt != nil {
+		b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Classified:"), src.ClassifiedAt.Format("2006-01-02 15:04")))
+	}
+	b.WriteString("\n")
 
 	// Recent changes.
 	b.WriteString(headerStyle.Render("  Recent Changes") + "\n\n")
