@@ -27,8 +27,8 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/sources"
 )
 
-// reviewModel is the root Bubble Tea model for the review TUI.
-type reviewModel struct {
+// appModel is the root Bubble Tea model for the TUI.
+type appModel struct {
 	state     message.ViewState
 	viewStack []message.ViewState
 	config    *shared.Config
@@ -70,11 +70,11 @@ type reviewModel struct {
 	height int
 }
 
-// newReviewModel creates the root model with loaded data.
-func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, runs []pipeline.PipelineRun, pipelineStats pipeline.PipelineStats, prompts []pipeline.PromptVersion, cfg *shared.Config) reviewModel {
+// newAppModel creates the root model with loaded data.
+func newAppModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, runs []pipeline.PipelineRun, pipelineStats pipeline.PipelineStats, prompts []pipeline.PromptVersion, cfg *shared.Config) appModel {
 	keys := shared.NewKeyMap(cfg.Navigation)
 
-	m := reviewModel{
+	m := appModel{
 		state:           message.ViewDashboard,
 		config:          cfg,
 		stats:           stats,
@@ -89,12 +89,12 @@ func newReviewModel(proposals []pipeline.ProposalWithSession, reports []fitness.
 }
 
 // Init implements tea.Model.
-func (m reviewModel) Init() tea.Cmd {
+func (m appModel) Init() tea.Cmd {
 	return nil
 }
 
 // Update implements tea.Model.
-func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	childMsg := msg // message forwarded to child views (may be height-adjusted)
 
@@ -187,7 +187,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
-			m = m2.(reviewModel)
+			m = m2.(appModel)
 		}
 		cmds = append(cmds, func() tea.Msg {
 			if err := apply.Archive(proposalID, "rejected"); err != nil {
@@ -208,7 +208,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
-			m = m2.(reviewModel)
+			m = m2.(appModel)
 		}
 		cmds = append(cmds, func() tea.Msg {
 			if err := apply.Archive(proposalID, "deferred"); err != nil {
@@ -231,7 +231,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
-			m = m2.(reviewModel)
+			m = m2.(appModel)
 		}
 		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
 			return message.StatusMessageExpired{}
@@ -248,7 +248,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
-			m = m2.(reviewModel)
+			m = m2.(appModel)
 		}
 		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
 			return message.StatusMessageExpired{}
@@ -417,7 +417,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model.
-func (m reviewModel) View() string {
+func (m appModel) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
@@ -466,7 +466,7 @@ func (m reviewModel) View() string {
 	return header + "\n" + separator + "\n" + content
 }
 
-func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool) {
+func (m appModel) handleGlobalKey(msg tea.KeyMsg) (appModel, tea.Cmd, bool) {
 	switch {
 	case key.Matches(msg, m.keys.ForceQuit):
 		return m, tea.Quit, true
@@ -509,7 +509,7 @@ func (m reviewModel) handleGlobalKey(msg tea.KeyMsg) (reviewModel, tea.Cmd, bool
 	return m, nil, false
 }
 
-func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model, tea.Cmd) {
+func (m appModel) pushView(view message.ViewState, action string) (tea.Model, tea.Cmd) {
 	m.viewStack = append(m.viewStack, m.state)
 	m.state = view
 
@@ -587,14 +587,14 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 }
 
 // childHeight returns the height available for child views (total minus persistent header).
-func (m reviewModel) childHeight() int {
+func (m appModel) childHeight() int {
 	return m.height - m.headerHeight
 }
 
 // resizeDetailChat sets layout-aware dimensions on detail and chat models.
 // Wide (>= 120): horizontal split using ChatPanelWidth percentage for chat width.
 // Narrow (< 120): vertical split using ChatPanelWidth percentage for chat height.
-func (m *reviewModel) resizeDetailChat() {
+func (m *appModel) resizeDetailChat() {
 	ch := m.childHeight()
 	if !m.config.Detail.ChatPanelOpen {
 		m.detail.SetSize(m.width, ch)
@@ -623,7 +623,7 @@ func (m *reviewModel) resizeDetailChat() {
 	}
 }
 
-func (m reviewModel) popView() (tea.Model, tea.Cmd) {
+func (m appModel) popView() (tea.Model, tea.Cmd) {
 	if len(m.viewStack) == 0 {
 		return m, nil
 	}

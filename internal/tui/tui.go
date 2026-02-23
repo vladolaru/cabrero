@@ -18,7 +18,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/message"
 )
 
-// Run launches the interactive review TUI.
+// Run launches the interactive TUI dashboard.
 // The version parameter is displayed in the dashboard header.
 func Run(version string) error {
 	cfg, err := LoadConfig()
@@ -60,7 +60,7 @@ func Run(version string) error {
 		prompts = nil
 	}
 
-	m := newReviewModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
+	m := newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

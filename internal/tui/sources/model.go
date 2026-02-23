@@ -1,4 +1,4 @@
-// Package sources implements the source manager view for the review TUI.
+// Package sources implements the source manager view for the TUI.
 // It displays tracked sources grouped by origin, with controls for ownership,
 // approach toggling, and change rollback.
 package sources

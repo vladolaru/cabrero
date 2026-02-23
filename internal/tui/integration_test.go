@@ -12,7 +12,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
 )
 
-func newTestRoot() reviewModel {
+func newTestRoot() appModel {
 	proposals := testdata.TestProposals()
 	reports := testdata.TestFitnessReports()
 	stats := testdata.TestDashboardStats()
@@ -21,13 +21,13 @@ func newTestRoot() reviewModel {
 	pipelineStats := testdata.TestPipelineStats()
 	prompts := testdata.TestPromptVersions()
 	cfg := testdata.TestConfig()
-	return newReviewModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
+	return newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
 }
 
-// update is a helper that calls Update and returns the concrete reviewModel.
-func update(m reviewModel, msg tea.Msg) (reviewModel, tea.Cmd) {
+// update is a helper that calls Update and returns the concrete appModel.
+func update(m appModel, msg tea.Msg) (appModel, tea.Cmd) {
 	model, cmd := m.Update(msg)
-	return model.(reviewModel), cmd
+	return model.(appModel), cmd
 }
 
 func TestFullNavigationFlow(t *testing.T) {

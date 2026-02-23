@@ -1,4 +1,4 @@
-// Package message defines all Bubble Tea message types for the review TUI.
+// Package message defines all Bubble Tea message types for the TUI.
 package message
 
 import (

@@ -1,4 +1,4 @@
-// Package pipeline implements the pipeline monitor view for the review TUI.
+// Package pipeline implements the pipeline monitor view for the TUI.
 // It displays daemon status, pipeline activity statistics, recent pipeline runs
 // with inline expansion, and prompt version tracking.
 package pipeline

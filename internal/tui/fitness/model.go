@@ -1,4 +1,4 @@
-// Package fitness implements the fitness report detail view for the review TUI.
+// Package fitness implements the fitness report detail view for the TUI.
 // It displays a fitness assessment of a third-party artifact, showing health
 // metrics (assessment bars), a verdict, and session evidence grouped by category.
 package fitness

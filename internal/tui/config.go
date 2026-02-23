@@ -1,4 +1,4 @@
-// Package tui implements the interactive review TUI for Cabrero.
+// Package tui implements the interactive TUI for Cabrero.
 package tui
 
 import (
