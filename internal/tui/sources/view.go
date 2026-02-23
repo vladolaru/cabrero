@@ -219,6 +219,22 @@ func (m Model) renderSourceRow(gi, si int, isCursor bool, cols columnSpec) strin
 	return strings.Join(parts, "  ")
 }
 
+// renderOrigin converts a raw origin string to a display label.
+func renderOrigin(origin string) string {
+	switch {
+	case origin == "user":
+		return "User-level"
+	case strings.HasPrefix(origin, "project:"):
+		return "Project: " + origin[len("project:"):]
+	case strings.HasPrefix(origin, "plugin:"):
+		return "Plugin: " + origin[len("plugin:"):]
+	case origin == "":
+		return "unknown"
+	default:
+		return origin
+	}
+}
+
 // renderOwnership returns a display string for the ownership field.
 func renderOwnership(ownership string) string {
 	switch ownership {
@@ -315,7 +331,7 @@ func (m Model) renderDetail() string {
 
 	// Source info.
 	b.WriteString(headerStyle.Render("  Info") + "\n\n")
-	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Origin:"), m.detailOrigin))
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Origin:"), renderOrigin(src.Origin)))
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Ownership:"), renderOwnership(src.Ownership)))
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Approach:"), renderApproach(src.Approach)))
 	b.WriteString(fmt.Sprintf("  %-12s %d\n", mutedStyle.Render("Sessions:"), src.SessionCount))

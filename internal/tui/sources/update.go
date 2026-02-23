@@ -138,7 +138,6 @@ func (m Model) handleOpen() (Model, tea.Cmd) {
 	m.detailOpen = true
 	src := *s
 	m.detailSource = &src
-	m.detailOrigin = m.groups[item.groupIdx].Label
 	return m, nil
 }
 
@@ -259,7 +258,6 @@ func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Back):
 			m.detailOpen = false
 			m.detailSource = nil
-			m.detailOrigin = ""
 			m.changes = nil
 			return m, nil
 

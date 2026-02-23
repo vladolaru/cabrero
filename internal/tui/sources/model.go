@@ -16,7 +16,6 @@ type Model struct {
 	cursor          int
 	detailOpen      bool
 	detailSource    *fitness.Source
-	detailOrigin    string // group label for the source in detail view
 	changes         []fitness.ChangeEntry
 	confirm         components.ConfirmModel
 	confirmState    ConfirmState
