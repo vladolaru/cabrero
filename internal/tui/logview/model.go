@@ -65,9 +65,10 @@ func parseEntries(content string) []LogEntry {
 	return entries
 }
 
-// lineMatch records the line number of a search match.
+// lineMatch records the location of a search match.
 type lineMatch struct {
-	lineNum int
+	lineNum  int // raw line number (for fallback line-based search)
+	entryIdx int // which entry this match belongs to
 }
 
 // Model is the log viewer model.
@@ -182,7 +183,9 @@ func (m *Model) clampCursor() {
 	}
 }
 
-// performSearch finds all lines matching the search term.
+// performSearch finds all entries (or lines) matching the search term.
+// When entries are available, searches within structured entries and
+// auto-expands collapsed entries whose continuation lines contain matches.
 func (m *Model) performSearch() {
 	m.matches = nil
 	m.matchIdx = -1
@@ -190,11 +193,31 @@ func (m *Model) performSearch() {
 		return
 	}
 	term := strings.ToLower(m.searchTerm)
-	for i, line := range m.lines {
-		if strings.Contains(strings.ToLower(line), term) {
-			m.matches = append(m.matches, lineMatch{lineNum: i})
+
+	if len(m.entries) > 0 {
+		for i, entry := range m.entries {
+			entryText := strings.ToLower(entry.Message)
+			for _, extra := range entry.Extra {
+				entryText += "\n" + strings.ToLower(extra)
+			}
+			if strings.Contains(entryText, term) {
+				m.matches = append(m.matches, lineMatch{entryIdx: i})
+				// Auto-expand entries with matches in continuation lines.
+				if entry.IsMultiLine() {
+					if !strings.Contains(strings.ToLower(entry.Message), term) {
+						m.entries[i].Expanded = true
+					}
+				}
+			}
+		}
+	} else {
+		for i, line := range m.lines {
+			if strings.Contains(strings.ToLower(line), term) {
+				m.matches = append(m.matches, lineMatch{lineNum: i})
+			}
 		}
 	}
+
 	if len(m.matches) > 0 {
 		m.matchIdx = 0
 		m.gotoMatch(0)
@@ -208,8 +231,15 @@ func (m *Model) gotoMatch(idx int) {
 		return
 	}
 	m.matchIdx = idx
-	lineNum := m.matches[idx].lineNum
-	m.viewport.SetYOffset(lineNum)
+
+	if len(m.entries) > 0 {
+		m.cursor = m.matches[idx].entryIdx
+		m.refreshViewportContent()
+		m.scrollToCursor()
+	} else {
+		lineNum := m.matches[idx].lineNum
+		m.viewport.SetYOffset(lineNum)
+	}
 }
 
 // HasActiveSearch reports whether the log viewer has active search matches.

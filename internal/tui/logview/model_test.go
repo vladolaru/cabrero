@@ -595,3 +595,48 @@ func TestCollapseAll(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchExpandsMatchingEntries(t *testing.T) {
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	m := New(testLogMultiLine, &keys, cfg)
+	m.SetSize(120, 40)
+
+	// Search for text that's in a continuation line.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	for _, r := range "config.Load" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if len(m.matches) == 0 {
+		t.Fatal("expected matches for 'config.Load'")
+	}
+
+	// The entry containing "config.Load" should be auto-expanded.
+	if !m.entries[1].Expanded {
+		t.Error("entry with matching continuation line should be auto-expanded")
+	}
+}
+
+func TestSearchNextMovesCursor(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// Search for "session" which appears in entry index 2.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	for _, r := range "session" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if len(m.matches) == 0 {
+		t.Fatal("expected matches for 'session'")
+	}
+
+	// Cursor should be at the first matching entry.
+	firstMatchEntry := m.matches[0].entryIdx
+	if m.cursor != firstMatchEntry {
+		t.Errorf("cursor = %d, want %d (first match entry)", m.cursor, firstMatchEntry)
+	}
+}
