@@ -135,11 +135,23 @@ func defaults(w, h int) (int, int) {
 
 // renderWithHeader prepends the persistent header + separator to child content
 // and returns the remaining height available for the child view.
+// Does NOT include sub-header — use renderWithSubHeader for the full frame.
 func renderWithHeader(stats message.DashboardStats, w int) (prefix string, headerHeight int) {
 	header := dashboard.RenderHeader(stats, w)
 	separator := strings.Repeat("─", w)
 	prefix = header + "\n" + separator + "\n"
 	headerHeight = strings.Count(header, "\n") + 2 // +1 trailing newline, +1 separator line
+	return
+}
+
+// renderWithSubHeader prepends header + separator + sub-header + separator to child content.
+// Returns the prefix string and the total height consumed (for calculating child view height).
+func renderWithSubHeader(stats message.DashboardStats, subHeader string, w int) (prefix string, totalHeight int) {
+	headerPrefix, hh := renderWithHeader(stats, w)
+	separator := strings.Repeat("─", w)
+	subHeaderHeight := 3 // title + stats + separator
+	prefix = headerPrefix + subHeader + "\n" + separator + "\n"
+	totalHeight = hh + subHeaderHeight
 	return
 }
 
@@ -160,16 +172,15 @@ func renderDashboard(w, h int, empty bool) (string, error) {
 		stats = testdata.TestDashboardStats()
 	}
 
-	prefix, hh := renderWithHeader(stats, w)
 	m := dashboard.New(proposals, reports, stats, &keys, cfg)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h - hh})
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h - th})
 	return prefix + m.View(), nil
 }
 
 func renderProposalDetail(w, h int) (string, error) {
 	w, h = defaults(w, h)
 	stats := testdata.TestDashboardStats()
-	prefix, hh := renderWithHeader(stats, w)
 
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
@@ -177,7 +188,8 @@ func renderProposalDetail(w, h int) (string, error) {
 	citations := testdata.TestCitations()
 
 	m := detail.New(&p, citations, &keys, cfg)
-	m.SetSize(w, h-hh)
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	m.SetSize(w, h-th)
 	return prefix + m.View(), nil
 }
 
@@ -189,8 +201,6 @@ func renderProposalDetailChat(w, h int) (string, error) {
 		h = 40
 	}
 	stats := testdata.TestDashboardStats()
-	prefix, hh := renderWithHeader(stats, w)
-	ch := h - hh
 
 	cfg := testdata.TestConfig()
 	cfg.Detail.ChatPanelOpen = true
@@ -199,6 +209,8 @@ func renderProposalDetailChat(w, h int) (string, error) {
 	citations := testdata.TestCitations()
 
 	m := detail.New(&p, citations, &keys, cfg)
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	ch := h - th
 	m.SetSize(w, ch)
 
 	chatPct := cfg.Detail.ChatPanelWidth
@@ -219,35 +231,34 @@ func renderProposalDetailChat(w, h int) (string, error) {
 func renderFitnessReport(w, h int) (string, error) {
 	w, h = defaults(w, h)
 	stats := testdata.TestDashboardStats()
-	prefix, hh := renderWithHeader(stats, w)
 
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
 	report := testdata.TestFitnessReport()
 
 	m := fitness_tui.New(report, &keys, cfg)
-	m.SetSize(w, h-hh)
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	m.SetSize(w, h-th)
 	return prefix + m.View(), nil
 }
 
 func renderSourceManager(w, h int) (string, error) {
 	w, h = defaults(w, h)
 	stats := testdata.TestDashboardStats()
-	prefix, hh := renderWithHeader(stats, w)
 
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
 	groups := testdata.TestSourceGroups()
 
 	m := sources.New(groups, &keys, cfg)
-	m.SetSize(w, h-hh)
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	m.SetSize(w, h-th)
 	return prefix + m.View(), nil
 }
 
 func renderPipelineMonitor(w, h int) (string, error) {
 	w, h = defaults(w, h)
 	dashStats := testdata.TestDashboardStats()
-	prefix, hh := renderWithHeader(dashStats, w)
 
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
@@ -256,32 +267,40 @@ func renderPipelineMonitor(w, h int) (string, error) {
 	prompts := testdata.TestPromptVersions()
 
 	m := pipeline_tui.New(runs, stats, prompts, dashStats, &keys, cfg)
-	m.SetSize(w, h-hh)
+	prefix, th := renderWithSubHeader(dashStats, m.SubHeader(), w)
+	m.SetSize(w, h-th)
 	return prefix + m.View(), nil
 }
 
 func renderLogViewer(w, h int) (string, error) {
 	w, h = defaults(w, h)
 	stats := testdata.TestDashboardStats()
-	prefix, hh := renderWithHeader(stats, w)
 
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
 	content := testdata.TestLogContent()
 
 	m := logview.New(content, &keys, cfg)
-	m.SetSize(w, h-hh)
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	m.SetSize(w, h-th)
 	return prefix + m.View(), nil
 }
 
 func renderHelpOverlay(w, h int, nav string) (string, error) {
 	w, h = defaults(w, h)
 	stats := testdata.TestDashboardStats()
-	prefix, prefixLines := renderWithHeader(stats, w)
 
+	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(nav)
+
+	// Use dashboard's sub-header for the help overlay snapshot.
+	proposals := testdata.TestProposals()
+	reports := testdata.TestFitnessReports()
+	m := dashboard.New(proposals, reports, stats, &keys, cfg)
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+
 	hc := shared.HelpForView(message.ViewDashboard, keys)
-	helpContent := components.RenderHelpOverlay(hc, w, h-prefixLines)
+	helpContent := components.RenderHelpOverlay(hc, w, h-th)
 
 	return prefix + helpContent, nil
 }
