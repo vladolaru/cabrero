@@ -459,8 +459,8 @@ func (m reviewModel) View() string {
 		if m.state == message.ViewSourceManager && m.sources.DetailOpen() {
 			viewState = message.ViewSourceDetail
 		}
-		sections := shared.HelpForView(viewState, m.keys)
-		content = components.RenderHelpOverlay(sections, m.width, m.height)
+		hc := shared.HelpForView(viewState, m.keys)
+		content = components.RenderHelpOverlay(hc, m.width, m.height)
 	}
 
 	return header + "\n" + separator + "\n" + content

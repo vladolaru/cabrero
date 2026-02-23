@@ -1066,8 +1066,8 @@ Phase 4a delivers the core value proposition: interactive proposal review with
 AI chat. Implemented with Bubble Tea v1.x, Bubbles v1.x, Lip Gloss v1.x.
 Configurable via `~/.cabrero/config.json` (arrow/vim navigation, theme,
 chat panel width, confirmation toggles). Context-aware help overlay (`?` key)
-shows only the key bindings relevant to the current view, grouped into sections
-with full descriptions. See `docs/plans/2026-02-20-review-tui-design.md`
+shows a view title, brief description, and only the key bindings relevant to the
+current view, grouped into sections with full descriptions. See `docs/plans/2026-02-20-review-tui-design.md`
 for the full design specification.
 
 **Phase 4b — Review TUI (assessment & management)** ✅

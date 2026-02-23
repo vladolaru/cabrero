@@ -280,8 +280,8 @@ func renderHelpOverlay(w, h int, nav string) (string, error) {
 	prefix, prefixLines := renderWithHeader(stats, w)
 
 	keys := shared.NewKeyMap(nav)
-	sections := shared.HelpForView(message.ViewDashboard, keys)
-	helpContent := components.RenderHelpOverlay(sections, w, h-prefixLines)
+	hc := shared.HelpForView(message.ViewDashboard, keys)
+	helpContent := components.RenderHelpOverlay(hc, w, h-prefixLines)
 
 	return prefix + helpContent, nil
 }

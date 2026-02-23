@@ -27,6 +27,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Search auto-expands all entries and jumps to latest match** — searching in
   the log viewer now expands all multi-line entries and moves the cursor to the
   last match for immediate context.
+- **Help overlay view title and description** — the help overlay (`?` key) now
+  shows a "[View Name] Help" title and a brief description of the view's purpose
+  above the key binding sections, providing context for each view.
 
 ### Changed
 

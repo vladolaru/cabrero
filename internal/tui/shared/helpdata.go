@@ -14,25 +14,64 @@ type HelpSection struct {
 	Entries []HelpEntry
 }
 
-// HelpForView returns help sections relevant to the given view.
-func HelpForView(view message.ViewState, km KeyMap) []HelpSection {
+// HelpContent bundles a view title, description, and key binding sections.
+type HelpContent struct {
+	Title       string
+	Description string
+	Sections    []HelpSection
+}
+
+// HelpForView returns help content (title, description, and key binding sections) for the given view.
+func HelpForView(view message.ViewState, km KeyMap) HelpContent {
 	switch view {
 	case message.ViewDashboard:
-		return dashboardHelp(km)
+		return HelpContent{
+			Title:       "Dashboard Help",
+			Description: "Lists all pending proposals and fitness reports. Review, approve, reject, or defer items.",
+			Sections:    dashboardHelp(km),
+		}
 	case message.ViewProposalDetail:
-		return detailHelp(km)
+		return HelpContent{
+			Title:       "Proposal Detail Help",
+			Description: "Inspect a proposal's diff, rationale, and citation chain. Use AI chat to ask questions or request revisions.",
+			Sections:    detailHelp(km),
+		}
 	case message.ViewFitnessDetail:
-		return fitnessHelp(km)
+		return HelpContent{
+			Title:       "Fitness Report Help",
+			Description: "Review a fitness assessment for a source. See health breakdown, session evidence, and navigate to the source manager.",
+			Sections:    fitnessHelp(km),
+		}
 	case message.ViewSourceManager:
-		return sourcesHelp(km)
+		return HelpContent{
+			Title:       "Source Manager Help",
+			Description: "Browse tracked sources grouped by origin. Set ownership, toggle approach, and open source details.",
+			Sections:    sourcesHelp(km),
+		}
 	case message.ViewSourceDetail:
-		return sourceDetailHelp(km)
+		return HelpContent{
+			Title:       "Source Detail Help",
+			Description: "View a source's configuration, recent changes, and history. Toggle approach, set ownership, or rollback.",
+			Sections:    sourceDetailHelp(km),
+		}
 	case message.ViewPipelineMonitor:
-		return pipelineHelp(km)
+		return HelpContent{
+			Title:       "Pipeline Monitor Help",
+			Description: "Monitor daemon health, pipeline runs with per-stage timing, token usage, and prompt versions. Retry failed runs or view logs.",
+			Sections:    pipelineHelp(km),
+		}
 	case message.ViewLogViewer:
-		return logViewerHelp(km)
+		return HelpContent{
+			Title:       "Log Viewer Help",
+			Description: "Browse structured daemon log entries. Expand/collapse multi-line entries, search with auto-expand of matches.",
+			Sections:    logViewerHelp(km),
+		}
 	default:
-		return dashboardHelp(km)
+		return HelpContent{
+			Title:       "Dashboard Help",
+			Description: "Lists all pending proposals and fitness reports. Review, approve, reject, or defer items.",
+			Sections:    dashboardHelp(km),
+		}
 	}
 }
 
