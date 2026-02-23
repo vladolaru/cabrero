@@ -216,7 +216,16 @@ func TestSources_ToggleApproach(t *testing.T) {
 		t.Fatal("confirm should be active")
 	}
 
-	// Confirm with 'y' — produces a cmd with ConfirmResult.
+	// The rendered view should show the confirm prompt with [y/N].
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "evaluate") {
+		t.Error("toggle confirm View() should mention the target approach")
+	}
+	if !strings.Contains(view, "[y/N]") {
+		t.Error("toggle confirm View() should show [y/N] prompt")
+	}
+
+	// Confirm with 'y' — the key the prompt advertises.
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 
 	if cmd == nil {
@@ -407,11 +416,26 @@ func TestSources_DetailAndRollback(t *testing.T) {
 		t.Errorf("detailSource.Name = %q, want docx-helper", m.detailSource.Name)
 	}
 
+	// The detail view should render source information.
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "docx-helper") {
+		t.Error("detail View() should show the source name")
+	}
+	if !strings.Contains(view, "Recent Changes") {
+		t.Error("detail View() should show the changes section")
+	}
+
 	// Close detail with Esc.
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEscape})
 
 	if m.detailOpen {
 		t.Error("detail should be closed after Esc")
+	}
+
+	// After closing, the main list should be visible.
+	view = ansi.Strip(m.View())
+	if !strings.Contains(view, "Source Manager") {
+		t.Error("list view should be visible after closing detail")
 	}
 
 	// Reopen detail with changes, test rollback with confirmation.
@@ -428,7 +452,16 @@ func TestSources_DetailAndRollback(t *testing.T) {
 		t.Fatalf("confirmState = %d, want ConfirmRollback", m.confirmState)
 	}
 
-	// Confirm with 'y' — produces ConfirmResult.
+	// The confirm prompt should show [y/N] and mention the change ID.
+	view = ansi.Strip(m.View())
+	if !strings.Contains(view, "[y/N]") {
+		t.Error("rollback confirm View() should show [y/N] prompt")
+	}
+	if !strings.Contains(view, "change-1") {
+		t.Error("rollback confirm View() should mention the change ID")
+	}
+
+	// Confirm with 'y' — the key the prompt advertises.
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 
 	if cmd == nil {
@@ -542,7 +575,16 @@ func TestSources_OwnershipMine(t *testing.T) {
 		t.Fatalf("confirmState = %d, want ConfirmSetOwnership", m.confirmState)
 	}
 
-	// Press 'm' for mine.
+	// The rendered view should show the prompt with [m]ine option.
+	view := m.View()
+	if !strings.Contains(view, "[m]ine") {
+		t.Error("ownership prompt View() should contain [m]ine")
+	}
+	if !strings.Contains(view, "[n]ot mine") {
+		t.Error("ownership prompt View() should contain [n]ot mine")
+	}
+
+	// Press 'm' — the key the prompt advertises for "mine".
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
 
 	if cmd == nil {
@@ -559,6 +601,12 @@ func TestSources_OwnershipMine(t *testing.T) {
 	if own.NewOwnership != "mine" {
 		t.Errorf("NewOwnership = %q, want mine", own.NewOwnership)
 	}
+
+	// After choosing, the prompt should be gone and the list should be visible.
+	view = m.View()
+	if strings.Contains(view, "[m]ine") {
+		t.Error("ownership prompt should be dismissed after choosing")
+	}
 }
 
 func TestSources_OwnershipNotMine(t *testing.T) {
@@ -571,7 +619,13 @@ func TestSources_OwnershipNotMine(t *testing.T) {
 	// Press 'o' for ownership change.
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
 
-	// Press 'n' for not mine.
+	// Verify prompt is shown.
+	view := m.View()
+	if !strings.Contains(view, "[n]ot mine") {
+		t.Error("ownership prompt View() should contain [n]ot mine")
+	}
+
+	// Press 'n' — the key the prompt advertises for "not mine".
 	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 
 	if cmd == nil {
@@ -606,6 +660,35 @@ func TestSources_OwnershipCancel(t *testing.T) {
 	if cmd != nil {
 		t.Error("no cmd expected after cancelling ownership prompt")
 	}
+
+	// After cancel, the list should be visible again.
+	view := m.View()
+	if strings.Contains(view, "[m]ine") {
+		t.Error("ownership prompt should be gone after cancel")
+	}
+	if !strings.Contains(view, "Source Manager") {
+		t.Error("list view should be visible after cancel")
+	}
+}
+
+func TestSources_OwnershipUnrecognizedKeyIgnored(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	// Navigate to "docx-helper" and open ownership prompt.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+
+	// Keys not in m/n/esc should be silently ignored.
+	for _, r := range []rune{'a', 'y', 'x', 'o', '1'} {
+		m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		if m2.confirmState != ConfirmSetOwnership {
+			t.Errorf("pressing %q should not change confirmState", string(r))
+		}
+		if cmd != nil {
+			t.Errorf("pressing %q should not produce a command", string(r))
+		}
+	}
 }
 
 func TestSources_ConfirmModel_Inactive(t *testing.T) {
@@ -614,6 +697,20 @@ func TestSources_ConfirmModel_Inactive(t *testing.T) {
 	view := cm.View()
 	if view != "" {
 		t.Errorf("inactive confirm View should be empty, got %q", view)
+	}
+}
+
+func TestSources_StatusBarShowsKeyHints(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	view := ansi.Strip(m.View())
+
+	// The status bar should advertise the keys available in the source manager.
+	for _, hint := range []string{"enter", "open", "esc", "back"} {
+		if !strings.Contains(view, hint) {
+			t.Errorf("status bar should contain %q", hint)
+		}
 	}
 }
 
