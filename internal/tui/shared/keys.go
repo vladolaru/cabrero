@@ -103,7 +103,7 @@ func NewKeyMap(nav string) KeyMap {
 
 		// Pipeline Monitor.
 		Retry:   key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "retry")),
-		LogView: key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "log")),
+		LogView: key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "log")),
 		Refresh: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 
 		// Log Viewer.
@@ -150,7 +150,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 // DetailShortHelp returns bindings for the detail view status bar.
 func (k KeyMap) DetailShortHelp() []key.Binding {
 	return []key.Binding{
-		k.Up, k.Down, k.Back, k.Approve, k.Reject, k.Defer, k.TabForward, k.Help,
+		k.Up, k.Down, k.Back, k.Approve, k.Reject, k.Defer, k.Chat, k.TabForward, k.Help,
 	}
 }
 

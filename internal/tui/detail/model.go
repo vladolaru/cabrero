@@ -76,7 +76,7 @@ func (m *Model) SetSize(width, height int) {
 }
 
 func (m Model) isWideMode() bool {
-	return m.width >= 120
+	return m.width >= 120 && m.config.Detail.ChatPanelOpen
 }
 
 // renderBodyContent builds the scrollable content for the body viewport:

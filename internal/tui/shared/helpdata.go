@@ -102,7 +102,7 @@ func detailHelp(km KeyMap) []HelpSection {
 		{
 			Title: "Detail",
 			Entries: []HelpEntry{
-				{km.Chat.Help().Key, "Open AI chat about this proposal"},
+				{km.Chat.Help().Key, "Toggle AI chat panel (wide mode only)"},
 				{km.UseRevision.Help().Key, "Use a specific revision"},
 				{km.Chip1.Help().Key, "Quick prompt: why was this flagged?"},
 				{km.Chip2.Help().Key, "Quick prompt: show the raw turns"},

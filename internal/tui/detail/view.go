@@ -52,9 +52,9 @@ func (m Model) View() string {
 		content += strings.Repeat("\n", remaining)
 	}
 
-	// Status bar — hide "tab" hint when chat panel isn't visible.
+	// Status bar — hide tab hint when chat panel isn't open (nothing to tab to).
 	bindings := m.keys.DetailShortHelp()
-	if !m.isWideMode() || !m.config.Detail.ChatPanelOpen {
+	if !m.config.Detail.ChatPanelOpen {
 		var filtered []key.Binding
 		for _, kb := range bindings {
 			if key.Matches(tea.KeyMsg{Type: tea.KeyTab}, kb) {

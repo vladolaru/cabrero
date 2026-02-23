@@ -136,6 +136,10 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case message.ChatPanelToggled:
+		m.resizeDetailChat()
+		return m, nil
+
 	case message.ApproveStarted:
 		// Start blending in a background goroutine.
 		p := m.detail.Proposal()
@@ -363,17 +367,23 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 	case message.ViewProposalDetail:
-		var cmd tea.Cmd
-		m.detail, cmd = m.detail.Update(childMsg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-		// Forward to chat only when the panel is visible (wide mode + enabled).
-		if m.width >= 120 && m.config.Detail.ChatPanelOpen {
-			var chatCmd tea.Cmd
-			m.chat, chatCmd = m.chat.Update(childMsg)
-			if chatCmd != nil {
-				cmds = append(cmds, chatCmd)
+		// Handle resize with layout-aware dimensions (don't forward raw WindowSizeMsg).
+		if _, isResize := childMsg.(tea.WindowSizeMsg); isResize {
+			m.resizeDetailChat()
+		} else if _, isToggle := childMsg.(message.ChatPanelToggled); isToggle {
+			m.resizeDetailChat()
+		} else {
+			var cmd tea.Cmd
+			m.detail, cmd = m.detail.Update(childMsg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			if m.config.Detail.ChatPanelOpen {
+				var chatCmd tea.Cmd
+				m.chat, chatCmd = m.chat.Update(childMsg)
+				if chatCmd != nil {
+					cmds = append(cmds, chatCmd)
+				}
 			}
 		}
 	case message.ViewFitnessDetail:
@@ -421,11 +431,14 @@ func (m reviewModel) View() string {
 	case message.ViewDashboard:
 		content = m.dashboard.View()
 	case message.ViewProposalDetail:
-		if m.width >= 120 && m.config.Detail.ChatPanelOpen {
-			// Wide mode: detail and chat side by side.
+		if m.config.Detail.ChatPanelOpen {
 			detailView := m.detail.View()
 			chatView := m.chat.View()
-			content = lipgloss.JoinHorizontal(lipgloss.Top, detailView, chatView)
+			if m.width >= 120 {
+				content = lipgloss.JoinHorizontal(lipgloss.Top, detailView, chatView)
+			} else {
+				content = lipgloss.JoinVertical(lipgloss.Left, detailView, chatView)
+			}
 		} else {
 			content = m.detail.View()
 		}
@@ -507,13 +520,12 @@ func (m reviewModel) pushView(view message.ViewState, action string) (tea.Model,
 		p := m.dashboard.SelectedProposal()
 		if p != nil {
 			citations := buildCitations(p)
-			ch := m.childHeight()
 			m.detail = detail.New(p, citations, &m.keys, m.config)
-			m.detail.SetSize(m.width, ch)
 
-			// Initialize chat for this proposal.
+			// Initialize chat for this proposal (dimensions set by resizeDetailChat).
 			chips := defaultChips()
-			m.chat = chat.New(chips, "", chatWidth(m.width, m.config), ch)
+			m.chat = chat.New(chips, "", m.width, m.childHeight())
+			m.resizeDetailChat()
 
 			// Trigger follow-up action if specified.
 			switch action {
@@ -579,6 +591,38 @@ func (m reviewModel) childHeight() int {
 	return m.height - m.headerHeight
 }
 
+// resizeDetailChat sets layout-aware dimensions on detail and chat models.
+// Wide (>= 120): horizontal split using ChatPanelWidth percentage for chat width.
+// Narrow (< 120): vertical split using ChatPanelWidth percentage for chat height.
+func (m *reviewModel) resizeDetailChat() {
+	ch := m.childHeight()
+	if !m.config.Detail.ChatPanelOpen {
+		m.detail.SetSize(m.width, ch)
+		return
+	}
+
+	chatPct := m.config.Detail.ChatPanelWidth
+	if chatPct <= 0 {
+		chatPct = 35
+	}
+
+	if m.width >= 120 {
+		// Horizontal split: detail gets full height, chat gets percentage of width.
+		cw := m.width * chatPct / 100
+		m.detail.SetSize(m.width, ch)
+		m.chat.SetSize(cw, ch)
+	} else {
+		// Vertical split: both get full width, height is split.
+		chatH := ch * chatPct / 100
+		if chatH < 6 {
+			chatH = 6
+		}
+		detailH := ch - chatH
+		m.detail.SetSize(m.width, detailH)
+		m.chat.SetSize(m.width-2, chatH)
+	}
+}
+
 func (m reviewModel) popView() (tea.Model, tea.Cmd) {
 	if len(m.viewStack) == 0 {
 		return m, nil
@@ -607,17 +651,6 @@ func defaultChips() []string {
 		"Conservative version",
 		"Risk of approving?",
 	}
-}
-
-func chatWidth(totalWidth int, cfg *shared.Config) int {
-	if totalWidth < 120 {
-		return totalWidth - 2
-	}
-	pct := cfg.Detail.ChatPanelWidth
-	if pct <= 0 {
-		pct = 35
-	}
-	return totalWidth * pct / 100
 }
 
 func actionStatusText(msg tea.Msg) string {

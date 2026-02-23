@@ -96,6 +96,10 @@ type DeferFinished struct {
 	Err        error
 }
 
+// ChatPanelToggled signals that the chat panel was toggled via the 'c' key.
+// The root model handles this by resizing detail and chat models.
+type ChatPanelToggled struct{}
+
 // AI chat messages.
 
 // ChatStreamDone signals that streaming is complete.

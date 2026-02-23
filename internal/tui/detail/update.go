@@ -80,8 +80,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, m.keys.TabForward):
-		// Only toggle focus when chat panel is actually visible (wide mode + enabled).
-		if m.isWideMode() && m.config.Detail.ChatPanelOpen {
+		if m.config.Detail.ChatPanelOpen {
 			if m.focus == FocusProposal {
 				m.focus = FocusChat
 			} else {
@@ -98,6 +97,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Defer):
 		return m.startDefer()
+
+	case key.Matches(msg, m.keys.Chat):
+		m.config.Detail.ChatPanelOpen = !m.config.Detail.ChatPanelOpen
+		return m, func() tea.Msg { return message.ChatPanelToggled{} }
 
 	case key.Matches(msg, m.keys.UseRevision):
 		// Only meaningful if revision exists — handled by chat model.
