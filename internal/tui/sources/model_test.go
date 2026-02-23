@@ -353,11 +353,13 @@ func TestSources_EmptyState(t *testing.T) {
 	if !strings.Contains(view, "No sources tracked") {
 		t.Error("empty state should show 'No sources tracked'")
 	}
-	if !strings.Contains(view, "Source Manager") {
-		t.Error("empty state should still show the header")
+	// Source Manager header and counts are now in SubHeader(), rendered by root model.
+	subHeader := ansi.Strip(m.SubHeader())
+	if !strings.Contains(subHeader, "Source Manager") {
+		t.Error("empty state should still show the header in sub-header")
 	}
-	if !strings.Contains(view, "0 sources") {
-		t.Error("empty state should show '0 sources' count")
+	if !strings.Contains(subHeader, "0 sources") {
+		t.Error("empty state should show '0 sources' count in sub-header")
 	}
 }
 
@@ -416,11 +418,12 @@ func TestSources_DetailAndRollback(t *testing.T) {
 		t.Errorf("detailSource.Name = %q, want docx-helper", m.detailSource.Name)
 	}
 
-	// The detail view should render source information.
-	view := ansi.Strip(m.View())
-	if !strings.Contains(view, "docx-helper") {
-		t.Error("detail View() should show the source name")
+	// Source name is now in SubHeader(), rendered by root model.
+	subHeader := ansi.Strip(m.SubHeader())
+	if !strings.Contains(subHeader, "docx-helper") {
+		t.Error("detail SubHeader() should show the source name")
 	}
+	view := ansi.Strip(m.View())
 	if !strings.Contains(view, "Recent Changes") {
 		t.Error("detail View() should show the changes section")
 	}
@@ -433,8 +436,8 @@ func TestSources_DetailAndRollback(t *testing.T) {
 	}
 
 	// After closing, the main list should be visible.
-	view = ansi.Strip(m.View())
-	if !strings.Contains(view, "Source Manager") {
+	subHeader = ansi.Strip(m.SubHeader())
+	if !strings.Contains(subHeader, "Source Manager") {
 		t.Error("list view should be visible after closing detail")
 	}
 
@@ -666,7 +669,8 @@ func TestSources_OwnershipCancel(t *testing.T) {
 	if strings.Contains(view, "[m]ine") {
 		t.Error("ownership prompt should be gone after cancel")
 	}
-	if !strings.Contains(view, "Source Manager") {
+	subHeader := ansi.Strip(m.SubHeader())
+	if !strings.Contains(subHeader, "Source Manager") {
 		t.Error("list view should be visible after cancel")
 	}
 }

@@ -76,14 +76,6 @@ func (m Model) View() string {
 
 	var b strings.Builder
 
-	// Header with source counts.
-	b.WriteString(m.renderHeader())
-	b.WriteString("\n")
-
-	// Separator.
-	b.WriteString(strings.Repeat("\u2500", m.width))
-	b.WriteString("\n")
-
 	// Column headers.
 	b.WriteString(m.renderColumnHeaders())
 	b.WriteString("\n")
@@ -310,16 +302,6 @@ func (m Model) renderDetail() string {
 	}
 
 	var b strings.Builder
-
-	s := m.detailSource
-
-	b.WriteString(headerStyle.Render("  Source: "+s.Name) + "\n")
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  Origin: %s  |  Ownership: %s  |  Approach: %s",
-		s.Origin, renderOwnership(s.Ownership), renderApproach(s.Approach))) + "\n")
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  Sessions: %d  |  Health: %.0f%%",
-		s.SessionCount, s.HealthScore)) + "\n")
-	b.WriteString("\n")
-	b.WriteString(strings.Repeat("\u2500", m.width) + "\n")
 
 	// Recent changes.
 	b.WriteString(headerStyle.Render("  Recent Changes") + "\n\n")

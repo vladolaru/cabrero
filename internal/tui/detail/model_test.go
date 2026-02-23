@@ -175,8 +175,10 @@ func TestDetail_View(t *testing.T) {
 	m := newTestDetail()
 	view := ansi.Strip(m.View())
 
-	if !strings.Contains(view, "Proposal: skill_improvement") {
-		t.Error("missing proposal type header")
+	// Proposal header is now in SubHeader(), rendered by root model.
+	subHeader := ansi.Strip(m.SubHeader())
+	if !strings.Contains(subHeader, "Proposal Detail") {
+		t.Error("missing proposal type in sub-header")
 	}
 	if !strings.Contains(view, "PROPOSED CHANGE") {
 		t.Error("missing change section")

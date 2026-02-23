@@ -50,8 +50,10 @@ func TestLogModelView(t *testing.T) {
 	if !strings.Contains(view, "daemon started") {
 		t.Error("view missing log content")
 	}
-	if !strings.Contains(view, "Log Viewer") {
-		t.Error("view missing title")
+	// Title is now in SubHeader(), rendered by root model.
+	subHeader := ansi.Strip(m.SubHeader())
+	if !strings.Contains(subHeader, "Log Viewer") {
+		t.Error("sub-header missing title")
 	}
 }
 

@@ -71,10 +71,10 @@ func TestFullNavigationFlow(t *testing.T) {
 		t.Errorf("viewStack len = %d, want 1", len(m.viewStack))
 	}
 
-	// Detail should render proposal content.
+	// Detail should render proposal content (sub-header rendered by root model).
 	view = ansi.Strip(m.View())
-	if !strings.Contains(view, "Proposal:") {
-		t.Error("detail missing proposal header")
+	if !strings.Contains(view, "Proposal Detail") {
+		t.Error("detail missing proposal sub-header")
 	}
 
 	// Press Esc to go back.

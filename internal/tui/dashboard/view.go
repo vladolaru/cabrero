@@ -43,8 +43,6 @@ func (m Model) View() string {
 		b.WriteString("\n")
 	} else {
 		b.WriteString("\n")
-		b.WriteString(headerStyle.Render("  PENDING REVIEW"))
-		b.WriteString("\n\n")
 		b.WriteString(m.renderItemList())
 	}
 

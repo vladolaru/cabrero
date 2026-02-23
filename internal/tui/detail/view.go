@@ -44,15 +44,7 @@ func (m Model) View() string {
 
 	var b strings.Builder
 
-	// Header (5 visual lines).
-	p := &m.proposal.Proposal
-	b.WriteString(detailHeader.Render(fmt.Sprintf("  Proposal: %s", p.Type)))
-	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("  Target: %s\n", shared.ShortenHome(p.Target)))
-	b.WriteString(fmt.Sprintf("  Confidence: %s  │  Session: %s\n",
-		detailAccent.Render(p.Confidence),
-		detailMuted.Render(m.proposal.SessionID)))
-	b.WriteString("\n")
+	b.WriteString("\n") // spacing before viewport
 
 	// Scrollable body viewport.
 	b.WriteString(m.bodyViewport.View())

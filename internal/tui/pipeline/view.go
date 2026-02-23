@@ -57,10 +57,6 @@ func (m Model) View() string {
 
 	var sections []string
 
-	// Title.
-	title := "  " + titleStyle.Render("Pipeline Monitor")
-	sections = append(sections, title)
-
 	// Daemon header.
 	sections = append(sections, m.renderDaemonHeader())
 

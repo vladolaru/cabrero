@@ -231,11 +231,13 @@ func TestFitness_View(t *testing.T) {
 	m := newTestFitness()
 	view := ansi.Strip(m.View())
 
-	if !strings.Contains(view, "Fitness Report: docx-helper") {
-		t.Error("missing report header")
+	// Report header is now in SubHeader(), rendered by root model.
+	subHeader := ansi.Strip(m.SubHeader())
+	if !strings.Contains(subHeader, "Fitness Report") {
+		t.Error("missing report title in sub-header")
 	}
-	if !strings.Contains(view, "Ownership: mine") {
-		t.Error("missing ownership in header")
+	if !strings.Contains(subHeader, "docx-helper") {
+		t.Error("missing source name in sub-header")
 	}
 	if !strings.Contains(view, "ASSESSMENT") {
 		t.Error("missing assessment section")

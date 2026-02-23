@@ -106,7 +106,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Compute persistent header height.
 		header := dashboard.RenderHeader(m.stats, m.width)
 		m.headerHeight = strings.Count(header, "\n") + 2 // +1 trailing newline, +1 separator line
-		childMsg = tea.WindowSizeMsg{Width: msg.Width, Height: msg.Height - m.headerHeight}
+		subHeaderHeight := 3                              // title + stats + separator
+		childMsg = tea.WindowSizeMsg{Width: msg.Width, Height: msg.Height - m.headerHeight - subHeaderHeight}
 
 	case tea.KeyMsg:
 		// Global keys handled first.
@@ -426,6 +427,9 @@ func (m appModel) View() string {
 	header := dashboard.RenderHeader(m.stats, m.width)
 	separator := strings.Repeat("─", m.width)
 
+	// Sub-header (view title + stats).
+	subHeader := m.subHeader()
+
 	var content string
 
 	switch m.state {
@@ -463,7 +467,7 @@ func (m appModel) View() string {
 		content = components.RenderHelpOverlay(hc, m.width, m.height)
 	}
 
-	return header + "\n" + separator + "\n" + content
+	return header + "\n" + separator + "\n" + subHeader + "\n" + separator + "\n" + content
 }
 
 func (m appModel) handleGlobalKey(msg tea.KeyMsg) (appModel, tea.Cmd, bool) {
@@ -586,9 +590,30 @@ func (m appModel) pushView(view message.ViewState, action string) (tea.Model, te
 	return m, tea.Batch(cmds...)
 }
 
-// childHeight returns the height available for child views (total minus persistent header).
+// subHeader returns the sub-header for the currently active view.
+func (m appModel) subHeader() string {
+	switch m.state {
+	case message.ViewDashboard:
+		return m.dashboard.SubHeader()
+	case message.ViewProposalDetail:
+		return m.detail.SubHeader()
+	case message.ViewFitnessDetail:
+		return m.fitness.SubHeader()
+	case message.ViewSourceManager, message.ViewSourceDetail:
+		return m.sources.SubHeader()
+	case message.ViewPipelineMonitor:
+		return m.pipelineMonitor.SubHeader()
+	case message.ViewLogViewer:
+		return m.logViewer.SubHeader()
+	default:
+		return ""
+	}
+}
+
+// childHeight returns the height available for child views (total minus persistent header and sub-header).
 func (m appModel) childHeight() int {
-	return m.height - m.headerHeight
+	subHeaderHeight := 3 // title + stats + separator
+	return m.height - m.headerHeight - subHeaderHeight
 }
 
 // resizeDetailChat sets layout-aware dimensions on detail and chat models.

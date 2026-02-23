@@ -40,25 +40,7 @@ func (m Model) View() string {
 
 	var b strings.Builder
 
-	// Header: source name, ownership, mode, observed count.
-	r := m.report
-	b.WriteString(fitnessHeader.Render(fmt.Sprintf("  Fitness Report: %s", r.SourceName)))
-	b.WriteString("\n")
-	ownershipLine := fmt.Sprintf("  Ownership: %s  |  Origin: %s  |  Observed: %d sessions (%d days)",
-		fitnessAccent.Render(r.Ownership),
-		fitnessMuted.Render(r.SourceOrigin),
-		r.ObservedCount,
-		r.WindowDays)
-	// Split ownership/origin onto separate lines when the combined line would overflow.
-	if m.width < 100 {
-		ownershipLine = fmt.Sprintf("  Ownership: %s  |  Origin: %s\n  Observed: %d sessions (%d days)",
-			fitnessAccent.Render(r.Ownership),
-			fitnessMuted.Render(r.SourceOrigin),
-			r.ObservedCount,
-			r.WindowDays)
-	}
-	b.WriteString(ownershipLine + "\n")
-	b.WriteString("\n")
+	b.WriteString("\n") // spacing before viewport
 
 	// Viewport with assessment, verdict, and evidence.
 	b.WriteString(m.viewport.View())

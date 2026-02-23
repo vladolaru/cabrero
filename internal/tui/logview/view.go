@@ -34,15 +34,6 @@ func (m Model) View() string {
 		return ""
 	}
 
-	// Title with follow indicator.
-	var followIndicator string
-	if m.followMode {
-		followIndicator = followOnStyle.Render("●")
-	} else {
-		followIndicator = followOffStyle.Render("○")
-	}
-	title := titleStyle.Render("Log Viewer") + "  follow " + followIndicator
-
 	// Viewport content.
 	content := m.viewport.View()
 
@@ -58,5 +49,5 @@ func (m Model) View() string {
 		}
 	}
 
-	return title + "\n" + content + "\n" + bottom
+	return content + "\n" + bottom
 }
