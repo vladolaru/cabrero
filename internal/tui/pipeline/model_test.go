@@ -305,7 +305,7 @@ func TestModelPipelineKeyEmitsPushLogView(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Press L.
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
 	if cmd == nil {
 		t.Fatal("L should produce cmd")
 	}

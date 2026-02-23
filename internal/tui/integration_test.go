@@ -415,10 +415,10 @@ func TestPipelineToLogViewerAndBack(t *testing.T) {
 		t.Fatal("should be in pipeline monitor")
 	}
 
-	// Press 'L' to open log viewer.
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
+	// Press 'l' to open log viewer.
+	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
 	if cmd == nil {
-		t.Fatal("L should produce cmd")
+		t.Fatal("l should produce cmd")
 	}
 	pushMsg := cmd()
 	push, ok := pushMsg.(message.PushView)
