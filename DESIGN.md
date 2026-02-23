@@ -322,6 +322,20 @@ diagnosing TCC prompts from network volumes, iCloud, or Google Drive. The config
 toggle (`store.ReadDebugFlag()`) is re-read at the top of each daemon poll cycle, so
 debug mode can be switched on and off without restarting the daemon.
 
+**Reliability.** Two mechanisms protect against transient LLM failures and resource
+contention:
+
+- **Concurrent invocation limiter** — a channel-based semaphore in `invokeClaude()` caps
+  the number of simultaneous `claude` CLI processes. Default limit: 3 (configurable via
+  `PipelineConfig.MaxConcurrentInvocations`; 0 = unlimited). The timeout timer starts
+  *after* the semaphore is acquired, so queuing time doesn't eat into execution budget.
+  The CLI blocks when all slots are busy (with a log message); the daemon uses non-blocking
+  try-acquire and skips the session instead, leaving it queued for the next poll cycle.
+- **JSON parse retry** — Classifier and Evaluator output occasionally contains malformed
+  JSON (markdown fences, prose preamble). When parsing fails with a retriable JSON error,
+  the stage is re-invoked up to `MaxLLMRetries` times (default 1). Non-JSON errors are
+  not retried.
+
 **Trigger:** The daemon only processes sessions with status `"queued"`. Hook-captured
 sessions (session-end, pre-compact) are written with `"queued"` status and processed
 automatically. Bulk-imported sessions get `"imported"` status and must be explicitly
@@ -513,6 +527,12 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (5 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
+- **Concurrency limiting** — caps simultaneous `claude` CLI invocations via a shared
+  semaphore (default 3, configurable via `MaxConcurrentInvocations`). Daemon uses
+  non-blocking try-acquire: if all slots are busy, sessions stay queued and are retried
+  on the next poll cycle. CLI commands block-wait for a slot with a progress message
+- **Transcript validation** — `ScanQueued` skips sessions without a `transcript.jsonl`
+  file, preventing repeated failures from incomplete captures
 - **Smart batching** — uses `pipeline.BatchProcessor` to group queued sessions by project,
   run Classifier individually (cheap triage), then batch "evaluate" sessions into a single
   Evaluator call per project

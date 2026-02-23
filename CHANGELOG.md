@@ -7,6 +7,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Concurrent invocation limiter** — caps the number of simultaneous `claude`
+  CLI processes via a channel-based semaphore in `invokeClaude()`. Default
+  limit: 3 (configurable via `PipelineConfig.MaxConcurrentInvocations`; 0 =
+  unlimited). CLI commands block-wait for a slot with a progress message;
+  the daemon uses non-blocking try-acquire and skips busy sessions (retried
+  next poll cycle). Timeout timer starts after semaphore acquire so queuing
+  time doesn't eat into execution budget.
+- **JSON parse retry** — Classifier and Evaluator re-invoke on malformed JSON
+  output (markdown fences, prose preamble) up to `MaxLLMRetries` times
+  (default 1). Non-JSON errors are not retried.
+
+### Fixed
+
+- **Queued sessions without transcript** — `ScanQueued` now skips sessions
+  missing a `transcript.jsonl` file, preventing repeated pipeline failures
+  from incomplete captures.
+
 ## [0.14.0] - 2026-02-23
 
 ### Added
