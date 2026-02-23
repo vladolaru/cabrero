@@ -118,6 +118,24 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 		"  " + hooks + debugIndicator
 }
 
+// SubHeader returns the view title and stats line for the dashboard.
+func (m Model) SubHeader() string {
+	title := headerStyle.Render("  Proposals")
+
+	statsLine := fmt.Sprintf("  %d awaiting review", m.stats.PendingCount)
+	if m.stats.ApprovedCount > 0 {
+		statsLine += fmt.Sprintf("  ·  %d approved", m.stats.ApprovedCount)
+	}
+	if m.stats.RejectedCount > 0 {
+		statsLine += fmt.Sprintf("  ·  %d rejected", m.stats.RejectedCount)
+	}
+	if m.stats.FitnessReportCount > 0 {
+		statsLine += fmt.Sprintf("  ·  %d fitness reports", m.stats.FitnessReportCount)
+	}
+
+	return title + "\n" + mutedStyle.Render(statsLine)
+}
+
 func (m Model) renderItemList() string {
 	var b strings.Builder
 
