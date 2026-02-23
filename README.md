@@ -92,7 +92,8 @@ cabrero sessions    Browse captured sessions
 cabrero run         Run the analysis pipeline on a specific session
 cabrero proposals   See what Cabrero is suggesting
 cabrero inspect     Drill into a proposal with full evidence chain
-cabrero review      Interactive TUI for reviewing proposals (the good stuff)
+cabrero             Interactive dashboard (the good stuff)
+cabrero dashboard   Same as above, explicit form
 cabrero approve     Approve and apply a proposal (non-interactive)
 cabrero reject      Reject a proposal with optional reason
 cabrero backfill    Process existing sessions through the full pipeline
@@ -142,7 +143,7 @@ All TUI settings live in `~/.cabrero/config.json`: navigation mode (arrows/vim),
 
 ## Project status
 
-Active development. The capture layer, analysis pipeline, background daemon, self-packaging, and the full interactive review TUI are functional. The iteration tooling (prompt replay against past sessions, calibration sets) is next.
+Active development. The capture layer, analysis pipeline, background daemon, self-packaging, and the full interactive TUI are functional. The iteration tooling (prompt replay against past sessions, calibration sets) is next.
 
 If you are in a hurry, the [design document](DESIGN.md) has the full architecture and roadmap — all the layers, the LLM stack, cross-session pattern detection, the planned macOS menu bar app, and the prompt iteration system.
 
