@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Source registry** — auto-discover skills and CLAUDE.md files from classifier
+  outputs at TUI startup, persist ownership/approach classifications across
+  sessions in `sources.json`, and group sources by origin (user, project, plugin)
+  in the Sources tab.
 - **Persistent header across all TUI views** — the dashboard header (title,
   version, proposal counts, daemon status, hooks) now renders above every view
   instead of only the dashboard. Navigating to proposal detail, source manager,
