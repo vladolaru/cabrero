@@ -5,6 +5,13 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-02-23
+
+### Changed
+- **Evaluator prompt v4** — the evaluator now instructs the LLM to use paragraph
+  breaks in `change` and `rationale` fields. Proposals will render as structured
+  paragraphs in the TUI instead of dense walls of text.
+
 ## [0.17.0] - 2026-02-23
 
 ### Added
@@ -628,6 +635,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.18.0]: https://github.com/vladolaru/cabrero/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/vladolaru/cabrero/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/vladolaru/cabrero/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vladolaru/cabrero/compare/v0.15.0...v0.16.0
