@@ -7,50 +7,87 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
+
+// waitingMessages are shown with the spinner while waiting for the AI response.
+var waitingMessages = []string{
+	"Consulting the goats...",
+	"Herding pirate goats...",
+	"Reading the tea leaves...",
+	"Asking the oracle...",
+	"Thinking goat thoughts...",
+	"Polishing the crystal ball...",
+	"Counting citations...",
+	"Interrogating the transcript...",
+	"Wrangling the LLM...",
+	"Pondering your question...",
+}
+
+// ChatConfig holds the configuration for a persistent chat session.
+type ChatConfig struct {
+	SessionID    string // persistent CC session ID (pre-blocklisted by caller)
+	SystemPrompt string // rich context: proposal details, cited UUIDs, guidelines
+	AllowedTools string // comma-separated path-scoped tool specs for --allowedTools
+	Debug        bool
+}
 
 // ChatMessage is a single message in the chat history.
 type ChatMessage struct {
-	Role    string // "user" or "assistant"
-	Content string
+	Role     string // "user" or "assistant"
+	Content  string
+	Rendered string // pre-rendered content (markdown for assistant, plain for user)
 }
 
 // Model is the AI chat panel model.
 type Model struct {
-	messages       []ChatMessage
-	viewport       viewport.Model
-	input          textarea.Model
-	chips          []string // question chips from Haiku evaluation
-	chipsVisible   bool
+	messages     []ChatMessage
+	viewport     viewport.Model
+	input        textarea.Model
+	chips        []string // question chips from Haiku evaluation
+	chipsVisible bool
 	streaming      bool
 	streamBuf      strings.Builder
+	activityLines  []string // recent activity descriptions shown during streaming
 	spinner        spinner.Model
-	contextPayload string // citation chain JSON for system context
-	revision       *string
-	width          int
-	height         int
+	waitingMsg     string // funny message shown while waiting for AI
+	config       ChatConfig
+	messagesSent int // 0 = first message creates session; >0 = resume
+	revision     *string
+	width        int
+	height       int
+	// Focused indicates whether the chat panel has focus.
+	// When false, the panel is rendered in muted colors.
+	Focused bool
 }
 
-// New creates a chat model with question chips and context payload.
-func New(chips []string, contextPayload string, width, height int) Model {
+// New creates a chat model with question chips and session config.
+func New(chips []string, cfg ChatConfig, width, height int) Model {
 	ta := textarea.New()
-	ta.Placeholder = "Type a question..."
+	ta.Placeholder = "Send a message..."
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 2000
 	ta.SetHeight(1)
 	ta.SetWidth(width - 4)
+	ta.FocusedStyle.Base = lipgloss.NewStyle()
+	ta.BlurredStyle.Base = lipgloss.NewStyle()
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.BlurredStyle.CursorLine = lipgloss.NewStyle()
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(shared.ColorChat)
 
 	m := Model{
-		input:          ta,
-		chips:          chips,
-		chipsVisible:   len(chips) > 0,
-		spinner:        s,
-		contextPayload: contextPayload,
-		width:          width,
-		height:         height,
+		input:        ta,
+		chips:        chips,
+		chipsVisible: len(chips) > 0,
+		spinner:      s,
+		config:       cfg,
+		width:        width,
+		height:       height,
 	}
 
 	vpH := m.viewportHeight()
@@ -58,27 +95,28 @@ func New(chips []string, contextPayload string, width, height int) Model {
 	return m
 }
 
-// SetSize updates the chat panel dimensions.
+// SetSize updates the chat panel dimensions and re-renders content.
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 	m.viewport.Width = width - 2
 	m.viewport.Height = m.viewportHeight()
 	m.input.SetWidth(width - 4)
+	m.rerenderMessages()
+	m.updateViewportContent()
 }
 
 // viewportHeight returns the viewport height after reserving space for chrome.
-// Chrome: header (2 lines) + optional chips + newline after viewport (1) + input (1).
-// Each visible chip is 3 visual lines (border top + content + border bottom) plus
-// a trailing newline, and a blank line follows the last chip.
+// Chrome: header (2) + optional chips + post-viewport newline (1) + blank (1) + input (1) + trailing newline (1).
+// Each visible chip is 1 line ("[N] text") plus a trailing blank line after all chips.
 func (m Model) viewportHeight() int {
-	chrome := 4 // header (2) + post-viewport newline (1) + input (1)
+	chrome := 6 // header (2) + post-viewport newline (1) + blank before input (1) + input (1) + trailing newline (1)
 	if m.chipsVisible && len(m.chips) > 0 {
 		n := len(m.chips)
 		if n > 4 {
 			n = 4
 		}
-		chrome += n*3 + 1 // 3 lines per chip (border) + 1 trailing blank
+		chrome += n + 1 // 1 line per chip + 1 trailing blank
 	}
 	h := m.height - chrome
 	if h < 1 {
@@ -87,37 +125,96 @@ func (m Model) viewportHeight() int {
 	return h
 }
 
+// IsInputFocused returns true when the chat text input has focus (user is typing).
+func (m Model) IsInputFocused() bool {
+	return m.input.Focused()
+}
+
 // HasRevision returns true if the last assistant response contained a revision.
 func (m Model) HasRevision() bool {
 	return m.revision != nil
 }
 
 // addMessage appends a message and updates the viewport.
+// User messages use simple word wrap; assistant messages are parsed as markdown.
+// Both use hanging indent so continuation lines align past the label.
 func (m *Model) addMessage(role, content string) {
-	m.messages = append(m.messages, ChatMessage{Role: role, Content: content})
+	w := m.width - 2
+	indent := 4 // "AI: "
+	if role == "user" {
+		indent = 5 // "You: "
+	}
+	msg := ChatMessage{Role: role, Content: content}
+	if role == "assistant" {
+		rendered := renderMarkdown(content, w-indent)
+		msg.Rendered = applyHangingIndent(rendered, indent)
+	} else {
+		msg.Rendered = shared.WrapHangingIndent(content, w, indent)
+	}
+	m.messages = append(m.messages, msg)
 	m.updateViewportContent()
 }
 
+// rerenderMessages rebuilds the pre-rendered content for all messages
+// at the current width. Called on resize.
+func (m *Model) rerenderMessages() {
+	w := m.width - 2
+	for i := range m.messages {
+		indent := 4 // "AI: "
+		if m.messages[i].Role == "user" {
+			indent = 5 // "You: "
+		}
+		if m.messages[i].Role == "assistant" {
+			rendered := renderMarkdown(m.messages[i].Content, w-indent)
+			m.messages[i].Rendered = applyHangingIndent(rendered, indent)
+		} else {
+			m.messages[i].Rendered = shared.WrapHangingIndent(m.messages[i].Content, w, indent)
+		}
+	}
+}
+
 func (m *Model) updateViewportContent() {
+	if m.width == 0 {
+		return
+	}
 	var b strings.Builder
 	for _, msg := range m.messages {
 		switch msg.Role {
 		case "user":
-			b.WriteString("You: ")
-			b.WriteString(msg.Content)
+			b.WriteString(chatLabelStyle.Render("You:") + " " + msg.Rendered)
+			b.WriteString("\n\n")
 		case "assistant":
-			b.WriteString("AI: ")
-			b.WriteString(msg.Content)
+			b.WriteString(chatLabelStyle.Render("AI:") + " " + msg.Rendered)
+			b.WriteString("\n\n")
 		}
-		b.WriteString("\n\n")
 	}
 
 	if m.streaming {
-		b.WriteString("AI: ")
-		b.WriteString(m.streamBuf.String())
-		b.WriteString("▊") // blinking cursor indicator
+		spinnerPrefix := m.spinner.View() + " "
+		b.WriteString(spinnerPrefix + chatAccent.Render(m.waitingMsg))
+		if len(m.activityLines) > 0 {
+			// Pad activity lines to align with text after spinner.
+			pad := strings.Repeat(" ", lipgloss.Width(spinnerPrefix))
+			b.WriteString("\n")
+			for _, line := range m.activityLines {
+				b.WriteString(pad + chatMuted.Render(line) + "\n")
+			}
+		}
 	}
 
+	wasAtBottom := m.viewport.AtBottom()
 	m.viewport.SetContent(b.String())
-	m.viewport.GotoBottom()
+	if wasAtBottom {
+		m.viewport.GotoBottom()
+	}
+}
+
+// applyHangingIndent adds indent spaces before all lines except the first.
+func applyHangingIndent(s string, indent int) string {
+	pad := strings.Repeat(" ", indent)
+	lines := strings.Split(s, "\n")
+	for i := 1; i < len(lines); i++ {
+		lines[i] = pad + lines[i]
+	}
+	return strings.Join(lines, "\n")
 }

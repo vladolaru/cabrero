@@ -1,6 +1,9 @@
 package chat
 
 import (
+	"math/rand"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -17,13 +20,26 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case chatTokenWithContinuation:
-		m.streamBuf.WriteString(msg.token)
+		if msg.newTurn {
+			// New assistant turn — discard intermediate text from earlier turns.
+			m.streamBuf.Reset()
+		}
+		if msg.token != "" {
+			m.streamBuf.WriteString(msg.token)
+		}
+		if msg.activity != "" {
+			m.activityLines = append(m.activityLines, msg.activity)
+			if len(m.activityLines) > 3 {
+				m.activityLines = m.activityLines[len(m.activityLines)-3:]
+			}
+		}
 		m.updateViewportContent()
 		return m, msg.NextCmd()
 
 	case message.ChatStreamDone:
 		m.streaming = false
-		response := m.streamBuf.String()
+		m.activityLines = nil
+		response := strings.TrimLeft(m.streamBuf.String(), " \t\n\r")
 		m.streamBuf.Reset()
 		m.addMessage("assistant", response)
 
@@ -35,6 +51,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case message.ChatStreamError:
 		m.streaming = false
+		m.activityLines = nil
 		m.streamBuf.Reset()
 		m.addMessage("assistant", "Error: "+msg.Err.Error())
 		return m, nil
@@ -49,6 +66,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
+			m.updateViewportContent()
 		}
 	}
 
@@ -100,7 +118,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	return m, nil
+	// Enter focuses the input when not already focused.
+	if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
+		m.input.Focus()
+		return m, nil
+	}
+
+	// Forward scroll keys to viewport.
+	var cmd tea.Cmd
+	m.viewport, cmd = m.viewport.Update(msg)
+	return m, cmd
 }
 
 func (m Model) sendChip(idx int) (Model, tea.Cmd) {
@@ -113,7 +140,10 @@ func (m Model) sendChip(idx int) (Model, tea.Cmd) {
 func (m Model) sendMessage(text string) (Model, tea.Cmd) {
 	m.addMessage("user", text)
 	m.streaming = true
+	m.waitingMsg = waitingMessages[rand.Intn(len(waitingMessages))]
 	m.streamBuf.Reset()
+	firstMessage := m.messagesSent == 0
+	m.messagesSent++
 	m.updateViewportContent()
-	return m, StartChat(text, m.contextPayload)
+	return m, tea.Batch(m.spinner.Tick, StartChat(text, m.config, firstMessage))
 }

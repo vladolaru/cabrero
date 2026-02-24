@@ -16,7 +16,11 @@ func newTestChat() Model {
 		"Conservative version",
 		"Risk of approving?",
 	}
-	return New(chips, `{"citations": []}`, 60, 30)
+	cfg := ChatConfig{
+		SessionID:    "00000000-0000-0000-0000-000000000001",
+		SystemPrompt: "Test proposal context.",
+	}
+	return New(chips, cfg, 60, 30)
 }
 
 func TestChat_ChipSend(t *testing.T) {
@@ -133,5 +137,88 @@ func TestChat_StreamError(t *testing.T) {
 	}
 	if m.messages[0].Role != "assistant" {
 		t.Errorf("role = %q, want assistant", m.messages[0].Role)
+	}
+}
+
+func TestBuildChatArgs_FirstMessage(t *testing.T) {
+	cfg := ChatConfig{
+		SessionID:    "test-uuid-123",
+		SystemPrompt: "You are reviewing a proposal.",
+		AllowedTools: "Read(//home/.cabrero/raw/abc/**),Grep(//home/.cabrero/raw/abc/**)",
+	}
+
+	args := buildChatArgs(cfg, true)
+
+	assertFlag := func(flag, value string) {
+		t.Helper()
+		for i, a := range args {
+			if a == flag && i+1 < len(args) && args[i+1] == value {
+				return
+			}
+		}
+		t.Errorf("args missing %s %q: %v", flag, value, args)
+	}
+
+	assertFlag("--session-id", "test-uuid-123")
+	assertFlag("--system-prompt", "You are reviewing a proposal.")
+	assertFlag("--allowedTools", cfg.AllowedTools)
+	assertFlag("--permission-mode", "dontAsk")
+
+	for _, a := range args {
+		if a == "--resume" {
+			t.Error("first message should not have --resume")
+		}
+	}
+}
+
+func TestBuildChatArgs_ResumeMessage(t *testing.T) {
+	cfg := ChatConfig{
+		SessionID:    "test-uuid-123",
+		SystemPrompt: "You are reviewing a proposal.",
+		AllowedTools: "Read(//home/.cabrero/raw/abc/**),Grep(//home/.cabrero/raw/abc/**)",
+	}
+
+	args := buildChatArgs(cfg, false)
+
+	assertFlag := func(flag, value string) {
+		t.Helper()
+		for i, a := range args {
+			if a == flag && i+1 < len(args) && args[i+1] == value {
+				return
+			}
+		}
+		t.Errorf("args missing %s %q: %v", flag, value, args)
+	}
+
+	assertFlag("--resume", "test-uuid-123")
+
+	for _, a := range args {
+		if a == "--session-id" {
+			t.Error("resume should not have --session-id")
+		}
+		if a == "--system-prompt" {
+			t.Error("resume should not have --system-prompt")
+		}
+		if a == "--allowedTools" {
+			t.Error("resume should not have --allowedTools")
+		}
+		if a == "--permission-mode" {
+			t.Error("resume should not have --permission-mode")
+		}
+	}
+}
+
+func TestBuildChatArgs_NoAllowedTools(t *testing.T) {
+	cfg := ChatConfig{
+		SessionID:    "test-uuid-456",
+		SystemPrompt: "Prompt.",
+	}
+
+	args := buildChatArgs(cfg, true)
+
+	for _, a := range args {
+		if a == "--allowedTools" {
+			t.Error("should not have --allowedTools when empty")
+		}
 	}
 }
