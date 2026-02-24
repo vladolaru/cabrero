@@ -464,7 +464,7 @@ from "digest too large for stdin" to "too many retrieval calls accumulating cont
 
 1. **Max turns** — cap agentic turns per invocation (default: Classifier 15, Evaluator 20).
    Configurable in daemon config. Prevents runaway exploration.
-2. **Session timeout** — hard wall-clock limit (default: Classifier 2 min, Evaluator 5 min).
+2. **Session timeout** — hard wall-clock limit (default: Classifier 3 min, Evaluator 7 min).
    Configurable in daemon config. The daemon needs predictable throughput.
 3. **Digest size cap** — still needed for the starting context. Truncate or summarize
    sections when total digest exceeds a configurable token budget (e.g. 50K tokens).
@@ -545,6 +545,8 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
   surfaced in `cabrero status`, `cabrero doctor`, TUI pipeline monitor, and run output
 - **Evaluator tuning** — turn budgets and timeouts configurable via CLI flags
   (`--classifier-max-turns`, `--evaluator-max-turns`, `--classifier-timeout`, `--evaluator-timeout`)
+  or `config.json` (`classifierTimeout`, `evaluatorTimeout`).
+  Resolution: CLI flag → config.json → compile-time default
 - **Debug mode** — `--debug` flag or `{"debug": true}` in `config.json` persists full CC
   session transcripts for Classifier/Evaluator invocations. Config-based toggle is re-read
   each poll cycle (no restart needed)
@@ -711,8 +713,8 @@ cabrero run <session_id>        Run the full pipeline on a session
   --debug                         Persist CC sessions for classifier/evaluator inspection
   --classifier-max-turns <int>    Max agentic turns for Classifier (default 15)
   --evaluator-max-turns <int>     Max agentic turns for Evaluator (default 20)
-  --classifier-timeout <duration> Timeout for Classifier (default 2m)
-  --evaluator-timeout <duration>  Timeout for Evaluator (default 5m)
+  --classifier-timeout <duration> Timeout for Classifier (default 3m)
+  --evaluator-timeout <duration>  Timeout for Evaluator (default 7m)
 cabrero sessions                List captured sessions with status (processed/pending/error)
 cabrero status                  Show pipeline health: sessions, daemon, hooks
 cabrero proposals               List pending proposals
@@ -743,8 +745,8 @@ cabrero daemon                  Run background session processor (for launchd)
   --debug                         Persist CC sessions for classifier/evaluator inspection
   --classifier-max-turns <int>    Max agentic turns for Classifier (default 15)
   --evaluator-max-turns <int>     Max agentic turns for Evaluator (default 20)
-  --classifier-timeout <duration> Timeout for Classifier (default 2m)
-  --evaluator-timeout <duration>  Timeout for Evaluator (default 5m)
+  --classifier-timeout <duration> Timeout for Classifier (default 3m)
+  --evaluator-timeout <duration>  Timeout for Evaluator (default 7m)
 cabrero replay                  Re-run pipeline with a different prompt against a past session
   --session <id>                  Session to replay (required unless --calibration)
   --prompt <path>                 Path to alternate prompt file (required)
@@ -868,11 +870,10 @@ The detail view includes an AI chat panel for interrogating proposals you want t
 understand before deciding. This is not a general-purpose chatbot — it is scoped
 entirely to the current proposal.
 
-**Layout** — the chat panel is togglable via the `c` key. In wide terminals (≥ 120
-columns), the chat panel appears beside the proposal detail in a horizontal split.
-In narrow terminals, the chat panel appears below the proposal in a vertical split.
-Both layouts use the `ChatPanelWidth` config percentage (default 35%) for the chat's
-share of the available space (width in horizontal mode, height in vertical mode).
+**Layout** — the chat panel is togglable via the `c` key. In wide terminals (≥ 160
+columns), the chat panel appears beside the proposal detail in a horizontal split
+at 50% width. In narrow terminals (< 160), the chat panel appears below the proposal
+in a vertical split with a bounded viewport height.
 `Tab` switches focus between the proposal and chat panes when the chat panel is open.
 
 **Cold start** — the panel never opens blank. The Classifier generates 3–4 proposal-specific
@@ -901,6 +902,14 @@ record shows: evaluator diff → chat modification → approved revision.
 extra auth. CC's existing authentication is reused. The citation chain for the current
 proposal is injected as the system context. Responses stream via stdout capture from the
 spawned process. No server, no network dependency beyond what CC already has.
+
+**Markdown rendering** — assistant responses are parsed as markdown using goldmark
+(pure Go, zero unsafe dependencies) and styled with lipgloss. Supported elements:
+headings (bold), bold text, bullet/numbered lists with nested indentation, fenced
+code blocks (indented + muted), blockquotes (`│` prefix), horizontal rules, and
+inline code (muted). The renderer word-wraps content to fit the available viewport
+width. This replaced glamour, which caused GC heap corruption from unsafe pointer
+usage in its regexp2 and termenv dependencies.
 
 **Approve / Reject / Defer buttons remain visible at all times during chat.** The
 conversation sharpens judgment; it does not replace the decision.
@@ -1074,7 +1083,8 @@ with rollback support. Unset values display as "unknown" (ownership) or "not set
     before/after diff confirmation, rollback entry written ✓
 
 Phase 4a delivers the core value proposition: interactive proposal review with
-AI chat. Implemented with Bubble Tea v1.x, Bubbles v1.x, Lip Gloss v1.x.
+AI chat. Implemented with Bubble Tea v1.x, Bubbles v1.x, Lip Gloss v1.x,
+goldmark (markdown parsing).
 Configurable via `~/.cabrero/config.json` (arrow/vim navigation, theme,
 chat panel width, confirmation toggles). Context-aware help overlay (`?` key)
 shows a view title, brief description, and only the key bindings relevant to the
@@ -1087,6 +1097,9 @@ sub-header (title + contextual stats). Bare `cabrero` launches the dashboard
 Pipeline) are cross-navigable — `s`/`p` shortcuts jump directly between them
 via a `SwitchView` message that replaces the current view without growing the
 navigation stack. Esc from any top-level section always returns to Proposals.
+`q` quits the app from any view (suppressed when a text input is focused).
+Section headings within detail views use a consistent style: bold + accent color,
+uppercase (e.g. "PROPOSED CHANGE", "RATIONALE", "INFO", "RECENT CHANGES").
 
 **Phase 4b — TUI (assessment & management)** ✅
 
