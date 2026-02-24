@@ -58,10 +58,11 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 		"--no-session-persistence",
 		"--disable-slash-commands",
 		"--tools", "",
+		"--settings", `{"disableAllHooks": true}`, // prevent user hooks from firing
 	)
 	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from network volumes
 	cmd.Stdin = strings.NewReader(prompt)
-	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
+	cmd.Env = cleanClaudeEnv()
 
 	out, err := cmd.Output()
 	if err != nil {
@@ -201,4 +202,16 @@ func expandPath(p string) string {
 		}
 	}
 	return p
+}
+
+// cleanClaudeEnv returns os.Environ() with CLAUDECODE stripped and CABRERO_SESSION=1 added.
+func cleanClaudeEnv() []string {
+	var env []string
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "CLAUDECODE=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	return append(env, "CABRERO_SESSION=1")
 }
