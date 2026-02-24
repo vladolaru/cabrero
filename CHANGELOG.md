@@ -5,6 +5,57 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-02-24
+
+### Added
+- **Markdown rendering in AI chat** — assistant responses are now parsed as
+  markdown via goldmark (pure Go) and styled with lipgloss. Headers render bold,
+  bold text is bold, bullet and numbered lists use `•`/`1.` prefixes with proper
+  indentation, fenced code blocks are indented and dimmed, and blockquotes use
+  `│` prefix. Replaces the previous plain word-wrap rendering.
+- **View sub-headers** — all TUI views now have a consistent sub-header area
+  rendered between the persistent header and the content area. Proposal stats
+  moved from the persistent header to the dashboard sub-header. Help overlay
+  preserves sub-headers and renders multi-paragraph descriptions above key
+  binding sections.
+- **Configurable pipeline timeouts** — classifier and evaluator timeouts can
+  now be set via `config.json` (`classifierTimeout`, `evaluatorTimeout`) using
+  Go duration strings (e.g. `"3m"`, `"90s"`). Defaults raised from 2m/5m to
+  3m/7m.
+
+### Changed
+- **Chat layout breakpoint raised to 160 columns** — the AI chat panel now uses
+  a horizontal split (side-by-side) at ≥160 columns and a vertical split (chat
+  underneath) below 160. Wide mode gives the chat 50% of the terminal width.
+- **AI label inline with response** — assistant messages now start on the same
+  line as the "AI:" label with hanging indent for continuation lines, matching
+  the "You:" user message style.
+
+### Fixed
+- **Chat viewport scrolling during streaming** — the viewport no longer
+  force-scrolls to the bottom on every spinner tick or stream token. Auto-scroll
+  only triggers when the user was already at the bottom.
+- **Narrow mode chat input visibility** — the chat input area is now always
+  visible in narrow mode (vertical split) by using a bounded viewport height and
+  auto-scrolling the detail body viewport.
+- **Glamour removed** — the glamour markdown library caused repeated GC heap
+  corruption crashes (`found bad pointer in Go heap`) due to unsafe pointer usage
+  in its regexp2 and termenv dependencies. Replaced entirely with goldmark (pure
+  Go parser) + lipgloss (pure Go styling), eliminating all unsafe dependencies
+  from the rendering path.
+- **User hooks firing in subprocess invocations** — all `claude` CLI subprocess
+  invocations (pipeline, chat panel, apply) now pass
+  `--settings '{"disableAllHooks": true}'` to prevent user-configured hooks from
+  firing. Fixes macOS notification prompts and self-observation loops where
+  cabrero's own capture hooks would fire during pipeline/chat/apply operations.
+- **Nested Claude Code session errors** — subprocess invocations now strip
+  `CLAUDECODE` from the environment, preventing "cannot be launched inside
+  another Claude Code session" errors when cabrero runs inside a CC terminal.
+
+### Removed
+- `glamour` dependency and all transitive unsafe dependencies (regexp2, chroma,
+  termenv style operations) from the chat rendering path.
+
 ## [0.18.0] - 2026-02-23
 
 ### Changed
@@ -635,6 +686,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.19.0]: https://github.com/vladolaru/cabrero/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vladolaru/cabrero/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/vladolaru/cabrero/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/vladolaru/cabrero/compare/v0.16.0...v0.16.1
