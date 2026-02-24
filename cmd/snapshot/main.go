@@ -220,7 +220,8 @@ func renderProposalDetailChat(w, h int) (string, error) {
 	chatW := w * chatPct / 100
 	c := chat.New(
 		[]string{"Why was this flagged?", "Show the raw turns", "Conservative version", "Risk of approving?"},
-		"", chatW, ch,
+		chat.ChatConfig{SessionID: "00000000-0000-0000-0000-000000000000"},
+		chatW, ch,
 	)
 
 	detailView := m.View()

@@ -105,6 +105,11 @@ func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.Pro
 	stats.StaleInterval = defaults.StaleInterval
 	stats.InterSessionDelay = defaults.InterSessionDelay
 
+	// Pipeline timeouts (resolved from config.json → compile-time defaults).
+	pipelineDefaults := pipeline.DefaultPipelineConfig()
+	stats.ClassifierTimeout = pipelineDefaults.ClassifierTimeout
+	stats.EvaluatorTimeout = pipelineDefaults.EvaluatorTimeout
+
 	// Store metrics.
 	stats.StorePath = store.Root()
 	stats.SessionCount = len(sessions)

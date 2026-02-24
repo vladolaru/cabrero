@@ -111,6 +111,9 @@ func TestDashboardStats() message.DashboardStats {
 		StaleInterval:     30 * time.Minute,
 		InterSessionDelay: 30 * time.Second,
 
+		ClassifierTimeout: 3 * time.Minute,
+		EvaluatorTimeout:  7 * time.Minute,
+
 		StorePath:    "/home/test/.cabrero",
 		SessionCount: 18,
 		DiskBytes:    297_795_584, // ~284 MB
@@ -385,7 +388,7 @@ func TestPipelineRuns() []pipeline.PipelineRun {
 			r.InputTokens = 2_100
 			r.OutputTokens = 450
 			r.CostUSD = 0.03
-			r.ErrorDetail = "classifier timeout after 2m"
+			r.ErrorDetail = "classifier timeout after 3m"
 		}),
 		TestPipelineRun(func(r *pipeline.PipelineRun) {
 			r.SessionID = "7e0b1234"

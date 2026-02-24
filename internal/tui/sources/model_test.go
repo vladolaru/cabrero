@@ -424,7 +424,7 @@ func TestSources_DetailAndRollback(t *testing.T) {
 		t.Error("detail SubHeader() should show the source name")
 	}
 	view := ansi.Strip(m.View())
-	if !strings.Contains(view, "Recent Changes") {
+	if !strings.Contains(view, "RECENT CHANGES") {
 		t.Error("detail View() should show the changes section")
 	}
 

@@ -15,7 +15,7 @@ import (
 var (
 	detailHeader  = lipgloss.NewStyle().Bold(true)
 	detailMuted   = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	detailSection = lipgloss.NewStyle().Bold(true)
+	detailSection = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
 	detailAccent  = lipgloss.NewStyle().Foreground(shared.ColorAccent)
 )
 
@@ -53,38 +53,45 @@ func (m Model) View() string {
 	// Fill remaining space.
 	content := b.String()
 	lines := strings.Count(content, "\n")
-	remaining := m.height - lines - 1
-	if remaining > 0 {
-		content += strings.Repeat("\n", remaining)
-	}
-
-	// Status bar — hide tab hint when chat panel isn't open (nothing to tab to).
-	bindings := m.keys.DetailShortHelp()
-	if !m.config.Detail.ChatPanelOpen {
-		var filtered []key.Binding
-		for _, kb := range bindings {
-			if key.Matches(tea.KeyMsg{Type: tea.KeyTab}, kb) {
-				continue
-			}
-			filtered = append(filtered, kb)
+	if m.HideStatusBar {
+		// No status bar — root renders it separately. Reserve 1 line for the root's "\n" + statusBar.
+		remaining := m.height - lines - 1
+		if remaining > 0 {
+			content += strings.Repeat("\n", remaining)
 		}
-		bindings = filtered
+	} else {
+		// Reserve 1 line for the status bar.
+		remaining := m.height - lines - 1
+		if remaining > 0 {
+			content += strings.Repeat("\n", remaining)
+		}
+		bindings := m.keys.DetailShortHelp()
+		if !m.config.Detail.ChatPanelOpen {
+			var filtered []key.Binding
+			for _, kb := range bindings {
+				if key.Matches(tea.KeyMsg{Type: tea.KeyTab}, kb) {
+					continue
+				}
+				filtered = append(filtered, kb)
+			}
+			bindings = filtered
+		}
+		content += components.RenderStatusBar(bindings, "", m.width)
 	}
-	content += components.RenderStatusBar(bindings, "", m.width)
 
 	return content
 }
 
-func renderCitations(citations []shared.CitationEntry, width int) string {
+func renderCitations(citations []shared.CitationEntry, cursor int, width int) string {
 	var b strings.Builder
 	for i, c := range citations {
-		prefix := "  "
-		if i == 0 {
-			prefix = "> "
+		prefix := "    "
+		if i == cursor {
+			prefix = "  > "
 		}
-		b.WriteString(fmt.Sprintf("  %s%s\n", prefix, detailMuted.Render(c.Summary)))
+		b.WriteString(fmt.Sprintf("%s%s\n", prefix, detailMuted.Render(c.Summary)))
 		if c.Expanded {
-			b.WriteString(shared.IndentBlock(c.RawJSON, 6))
+			b.WriteString(shared.WrapIndent(c.RawJSON, width, 6))
 			b.WriteString("\n")
 		}
 	}

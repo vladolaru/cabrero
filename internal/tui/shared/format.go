@@ -92,3 +92,19 @@ func WrapIndent(s string, width, indent int) string {
 	wrapped := lipgloss.NewStyle().Width(textWidth).Render(s)
 	return IndentBlock(wrapped, indent)
 }
+
+// WrapHangingIndent word-wraps s to fit within (width - indent) characters.
+// The first line is returned without indent; continuation lines are indented.
+func WrapHangingIndent(s string, width, indent int) string {
+	textWidth := width - indent
+	if textWidth < 10 {
+		textWidth = 10
+	}
+	wrapped := lipgloss.NewStyle().Width(textWidth).Render(s)
+	pad := strings.Repeat(" ", indent)
+	lines := strings.Split(wrapped, "\n")
+	for i := 1; i < len(lines); i++ {
+		lines[i] = pad + lines[i]
+	}
+	return strings.Join(lines, "\n")
+}

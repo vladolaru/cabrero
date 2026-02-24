@@ -33,12 +33,13 @@ type KeyMap struct {
 	Defer   key.Binding
 
 	// Detail
-	Chat        key.Binding
-	UseRevision key.Binding
-	Chip1       key.Binding
-	Chip2       key.Binding
-	Chip3       key.Binding
-	Chip4       key.Binding
+	Chat           key.Binding
+	UseRevision    key.Binding
+	CitationToggle key.Binding
+	Chip1          key.Binding
+	Chip2          key.Binding
+	Chip3          key.Binding
+	Chip4          key.Binding
 
 	// Fitness Report
 	Dismiss key.Binding
@@ -88,9 +89,10 @@ func NewKeyMap(nav string) KeyMap {
 		Defer:   key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "defer")),
 
 		// Detail keys.
-		Chat:        key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "chat")),
-		UseRevision: key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "use revision")),
-		Chip1:       key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "chip 1")),
+		Chat:           key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "chat")),
+		UseRevision:    key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "use revision")),
+		CitationToggle: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "expand/collapse")),
+		Chip1:          key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "chip 1")),
 		Chip2:       key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "chip 2")),
 		Chip3:       key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "chip 3")),
 		Chip4:       key.NewBinding(key.WithKeys("4"), key.WithHelp("4", "chip 4")),

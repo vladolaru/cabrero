@@ -256,6 +256,11 @@ func (m Model) HasActiveSearch() bool {
 	return m.searchTerm != "" && len(m.matches) > 0
 }
 
+// IsSearchInputActive returns true when the search input field is active (user is typing).
+func (m Model) IsSearchInputActive() bool {
+	return m.searchActive
+}
+
 // scrollToCursor adjusts the viewport offset to make the cursor's entry visible.
 // It counts rendered lines to find the entry's position in the viewport content.
 func (m *Model) scrollToCursor() {

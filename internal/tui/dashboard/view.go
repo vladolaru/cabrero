@@ -36,12 +36,13 @@ func (m Model) View() string {
 
 	var b strings.Builder
 
-	// Content.
+	// Column headers and content.
 	if len(m.filtered) == 0 {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("  " + components.EmptyProposals()))
 		b.WriteString("\n")
 	} else {
+		b.WriteString(m.renderColumnHeaders())
 		b.WriteString("\n")
 		b.WriteString(m.renderItemList())
 	}
@@ -72,7 +73,8 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 	if stats.Version != "" {
 		titleText += "  " + mutedStyle.Render(stats.Version)
 	}
-	title := headerStyle.Render(titleText)
+	tagline := mutedStyle.Render("  Shepherding AI pirate goats, one skill at a time")
+	title := headerStyle.Render(titleText) + "\n" + tagline
 
 	var daemonStatus string
 	if stats.DaemonRunning {
@@ -134,8 +136,21 @@ func (m Model) SubHeader() string {
 	return title + "\n" + mutedStyle.Render(statsLine)
 }
 
+func (m Model) renderColumnHeaders() string {
+	cols := m.columnLayout()
+
+	// Row: prefix(2) + " " + indicator(1) + " " + type(18) + "  " + target + "  " + confidence
+	// TYPE aligns with the bullet indicator at position 3 (prefix + space).
+	header := shared.PadRight("   TYPE", cols.typeWidth+3) +
+		"  " + shared.PadRight("TARGET", cols.targetWidth) +
+		"  " + "CONFIDENCE"
+
+	return mutedStyle.Render(header)
+}
+
 func (m Model) renderItemList() string {
 	var b strings.Builder
+	cols := m.columnLayout()
 
 	for i, item := range m.filtered {
 		prefix := "  "
@@ -151,8 +166,8 @@ func (m Model) renderItemList() string {
 			indicator = warningStyle.Render(indicatorFitness)
 		}
 
-		typeName := shared.PadRight(item.TypeName(), 18)
-		target := shared.TruncatePad(shared.ShortenHome(item.Target()), m.targetWidth())
+		typeName := shared.PadRight(item.TypeName(), cols.typeWidth)
+		target := shared.TruncatePad(shared.ShortenHome(item.Target()), cols.targetWidth)
 		confidence := mutedStyle.Render(item.Confidence())
 
 		line := fmt.Sprintf("%s %s %s  %s  %s", prefix, indicator, typeName, target, confidence)
@@ -194,14 +209,27 @@ func (m Model) renderStatusBar() string {
 	return components.RenderStatusBar(keys.ShortHelp(), "", m.width)
 }
 
-func (m Model) targetWidth() int {
-	if m.width >= 120 {
-		return 40
+// Column layout.
+
+const (
+	colType       = 18 // longest type: "skill_improvement" = 17 + 1
+	colConfidence = 12 // longest: "100% health" = 11 + 1
+)
+
+type columnSpec struct {
+	typeWidth   int
+	targetWidth int
+}
+
+func (m Model) columnLayout() columnSpec {
+	// Row: prefix(2) + " " + indicator(1) + " " + type + "  " + target + "  " + confidence
+	// Fixed overhead = 5 + typeWidth + 2 + 2 + confidenceWidth
+	overhead := 5 + colType + 2 + 2 + colConfidence
+	targetWidth := m.width - overhead
+	if targetWidth < 15 {
+		targetWidth = 15
 	}
-	if m.width >= 80 {
-		return 30
-	}
-	return 20
+	return columnSpec{typeWidth: colType, targetWidth: targetWidth}
 }
 
 func checkMark(ok bool) string {

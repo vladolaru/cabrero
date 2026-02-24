@@ -171,6 +171,47 @@ func TestDetail_DeferSendsMessage(t *testing.T) {
 	}
 }
 
+func TestDetail_CitationNavigation(t *testing.T) {
+	m := newTestDetail()
+
+	if m.citationCursor != 0 {
+		t.Fatalf("initial citationCursor = %d, want 0", m.citationCursor)
+	}
+
+	// Press Down to move to next citation.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.citationCursor != 1 {
+		t.Errorf("citationCursor after Down = %d, want 1", m.citationCursor)
+	}
+
+	// Press Up to move back.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.citationCursor != 0 {
+		t.Errorf("citationCursor after Up = %d, want 0", m.citationCursor)
+	}
+
+	// Press Enter to expand.
+	if m.citations[0].Expanded {
+		t.Fatal("citation should start collapsed")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.citations[0].Expanded {
+		t.Error("citation should be expanded after Enter")
+	}
+
+	// Verify the expanded content appears in the view.
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, m.citations[0].RawJSON[:20]) {
+		t.Error("expanded citation JSON not visible in view")
+	}
+
+	// Press Enter again to collapse.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.citations[0].Expanded {
+		t.Error("citation should be collapsed after second Enter")
+	}
+}
+
 func TestDetail_View(t *testing.T) {
 	m := newTestDetail()
 	view := ansi.Strip(m.View())

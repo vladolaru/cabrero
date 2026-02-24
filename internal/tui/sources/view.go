@@ -25,13 +25,14 @@ const (
 )
 
 var (
-	headerStyle   = shared.HeaderStyle
-	mutedStyle    = shared.MutedStyle
-	selectedStyle = shared.SelectedStyle
-	successStyle  = shared.SuccessStyle
-	warningStyle  = shared.WarningStyle
-	accentStyle   = shared.AccentStyle
-	errorStyle    = shared.ErrorStyle
+	headerStyle        = shared.HeaderStyle
+	sectionHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
+	mutedStyle         = shared.MutedStyle
+	selectedStyle      = shared.SelectedStyle
+	successStyle       = shared.SuccessStyle
+	warningStyle       = shared.WarningStyle
+	accentStyle        = shared.AccentStyle
+	errorStyle         = shared.ErrorStyle
 )
 
 // SubHeader returns the sub-header for the current source view (list or detail).
@@ -330,7 +331,7 @@ func (m Model) renderDetail() string {
 	var b strings.Builder
 
 	// Source info.
-	b.WriteString(headerStyle.Render("  Info") + "\n\n")
+	b.WriteString("  " + sectionHeaderStyle.Render("INFO") + "\n\n")
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Origin:"), renderOrigin(src.Origin)))
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Ownership:"), renderOwnership(src.Ownership)))
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Approach:"), renderApproach(src.Approach)))
@@ -342,7 +343,7 @@ func (m Model) renderDetail() string {
 	b.WriteString("\n")
 
 	// Recent changes.
-	b.WriteString(headerStyle.Render("  Recent Changes") + "\n\n")
+	b.WriteString("  " + sectionHeaderStyle.Render("RECENT CHANGES") + "\n\n")
 
 	if len(m.changes) == 0 {
 		b.WriteString(mutedStyle.Render("  No changes recorded.") + "\n")

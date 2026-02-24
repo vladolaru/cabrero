@@ -152,6 +152,11 @@ func (m Model) SelectedFitnessReport() *fitness.Report {
 	return item.FitnessReport
 }
 
+// HasActiveInput returns true when the filter input is active (user is typing).
+func (m Model) HasActiveInput() bool {
+	return m.filterActive
+}
+
 // CycleSortOrder advances to the next sort order.
 func (m *Model) CycleSortOrder() {
 	for i, s := range sortOrders {

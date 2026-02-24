@@ -13,7 +13,7 @@ import (
 var (
 	fitnessHeader  = lipgloss.NewStyle().Bold(true)
 	fitnessMuted   = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	fitnessSection = lipgloss.NewStyle().Bold(true)
+	fitnessSection = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
 	fitnessAccent  = lipgloss.NewStyle().Foreground(shared.ColorAccent)
 )
 

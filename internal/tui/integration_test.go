@@ -107,7 +107,7 @@ func TestQuitFromDashboard(t *testing.T) {
 	}
 }
 
-func TestQuitBlockedFromDetail(t *testing.T) {
+func TestQuitFromDetail(t *testing.T) {
 	m := newTestRoot()
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
@@ -117,13 +117,14 @@ func TestQuitBlockedFromDetail(t *testing.T) {
 		t.Fatal("should be in detail view")
 	}
 
-	// Press 'q' should NOT quit from detail.
+	// Press 'q' should quit from detail (no active text input).
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
-	if cmd != nil {
-		msg := cmd()
-		if msg == tea.Quit() {
-			t.Error("q should not quit from detail view")
-		}
+	if cmd == nil {
+		t.Fatal("q should produce quit cmd from detail view")
+	}
+	msg := cmd()
+	if msg != tea.Quit() {
+		t.Error("q should quit from detail view")
 	}
 }
 

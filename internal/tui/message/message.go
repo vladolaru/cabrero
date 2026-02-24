@@ -63,6 +63,10 @@ type DashboardStats struct {
 	StaleInterval     time.Duration
 	InterSessionDelay time.Duration
 
+	// Pipeline timeouts (from config/defaults)
+	ClassifierTimeout time.Duration
+	EvaluatorTimeout  time.Duration
+
 	// Store metrics
 	StorePath    string
 	SessionCount int

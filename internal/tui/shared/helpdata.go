@@ -208,6 +208,13 @@ func detailHelp(km KeyMap) []HelpSection {
 			},
 		},
 		{
+			Title: "Citations",
+			Entries: []HelpEntry{
+				{km.Up.Help().Key + "/" + km.Down.Help().Key, "Navigate citations (scroll at boundary)"},
+				{km.CitationToggle.Help().Key, "Expand/collapse citation"},
+			},
+		},
+		{
 			Title: "Detail",
 			Entries: []HelpEntry{
 				{km.Chat.Help().Key, "Toggle AI chat panel"},

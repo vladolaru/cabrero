@@ -106,8 +106,44 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Only meaningful if revision exists — handled by chat model.
 		return m, nil
 
-	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down),
-		key.Matches(msg, m.keys.HalfPageUp), key.Matches(msg, m.keys.HalfPageDown):
+	// Citation navigation (Up/Down) and expand/collapse (Enter).
+	case key.Matches(msg, m.keys.CitationToggle):
+		if m.focus == FocusProposal && m.citationCursor >= 0 && m.citationCursor < len(m.citations) {
+			m.citations[m.citationCursor].Expanded = !m.citations[m.citationCursor].Expanded
+			m.bodyViewport.SetContent(m.renderBodyContent())
+			return m, nil
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.focus == FocusProposal {
+			if len(m.citations) > 0 && m.citationCursor > 0 {
+				m.citationCursor--
+				m.bodyViewport.SetContent(m.renderBodyContent())
+			} else {
+				var cmd tea.Cmd
+				m.bodyViewport, cmd = m.bodyViewport.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		if m.focus == FocusProposal {
+			if len(m.citations) > 0 && m.citationCursor < len(m.citations)-1 {
+				m.citationCursor++
+				m.bodyViewport.SetContent(m.renderBodyContent())
+			} else {
+				var cmd tea.Cmd
+				m.bodyViewport, cmd = m.bodyViewport.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.HalfPageUp), key.Matches(msg, m.keys.HalfPageDown):
 		if m.focus == FocusProposal {
 			var cmd tea.Cmd
 			m.bodyViewport, cmd = m.bodyViewport.Update(msg)

@@ -112,11 +112,14 @@ func (m Model) renderDaemonHeader() string {
 	} else {
 		left.WriteString(fmt.Sprintf("  Status:  %s\n", errorStyle.Render("● stopped")))
 	}
-	// Intervals: shown in standard and wide, omitted in narrow.
+	// Intervals and timeouts: shown in standard and wide, omitted in narrow.
 	if mode != layoutNarrow && m.dashStats.PollInterval > 0 {
 		left.WriteString(fmt.Sprintf("  Poll:    every %s\n", formatInterval(m.dashStats.PollInterval)))
 		left.WriteString(fmt.Sprintf("  Stale:   every %s\n", formatInterval(m.dashStats.StaleInterval)))
-		left.WriteString(fmt.Sprintf("  Delay:   %s", formatInterval(m.dashStats.InterSessionDelay)))
+		left.WriteString(fmt.Sprintf("  Delay:   %s\n", formatInterval(m.dashStats.InterSessionDelay)))
+		left.WriteString(fmt.Sprintf("  Timeouts: classifier %s, evaluator %s",
+			formatInterval(m.dashStats.ClassifierTimeout),
+			formatInterval(m.dashStats.EvaluatorTimeout)))
 	}
 	if m.dashStats.DebugMode {
 		left.WriteString(fmt.Sprintf("\n  Debug:   %s", warningStyle.Render("enabled")))
