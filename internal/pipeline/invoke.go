@@ -165,7 +165,7 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 	// In debug mode, generate a session ID and blocklist it before invocation.
 	var debugSessionID string
 	if cfg.Debug {
-		id, err := generateUUID()
+		id, err := GenerateUUID()
 		if err != nil {
 			return nil, fmt.Errorf("generating debug session ID: %w", err)
 		}
@@ -203,7 +203,7 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from `/`
-	cmd.Env = append(os.Environ(), "CABRERO_SESSION=1")
+	cmd.Env = cleanClaudeEnv()
 
 	if !cfg.Agentic {
 		cmd.Stdin = cfg.Stdin
@@ -267,6 +267,8 @@ func buildClaudeArgs(cfg claudeConfig, debugSessionID string) []string {
 			"--system-prompt", cfg.SystemPrompt,
 			"--output-format", "json",
 			"--disable-slash-commands",
+			"--mcp-config", "{}",                          // prevent loading user's MCP servers/plugins
+			"--settings", `{"disableAllHooks": true}`, // prevent user hooks from firing
 		}
 		if !cfg.Debug {
 			args = append(args, "--no-session-persistence")
@@ -296,6 +298,8 @@ func buildClaudeArgs(cfg claudeConfig, debugSessionID string) []string {
 			"--system-prompt", cfg.SystemPrompt,
 			"--disable-slash-commands",
 			"--tools", "",
+			"--mcp-config", "{}",                          // prevent loading user's MCP servers/plugins
+			"--settings", `{"disableAllHooks": true}`, // prevent user hooks from firing
 		}
 		if !cfg.Debug {
 			args = append(args, "--no-session-persistence")
@@ -316,8 +320,8 @@ func buildClaudeArgs(cfg claudeConfig, debugSessionID string) []string {
 	return args
 }
 
-// generateUUID returns a random UUID v4 string using crypto/rand.
-func generateUUID() (string, error) {
+// GenerateUUID returns a random UUID v4 string using crypto/rand.
+func GenerateUUID() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
@@ -441,4 +445,16 @@ func truncateForLog(s string, max int) string {
 		return s
 	}
 	return string(r[:max]) + "..."
+}
+
+// cleanClaudeEnv returns os.Environ() with CLAUDECODE stripped and CABRERO_SESSION=1 added.
+func cleanClaudeEnv() []string {
+	var env []string
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "CLAUDECODE=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	return append(env, "CABRERO_SESSION=1")
 }

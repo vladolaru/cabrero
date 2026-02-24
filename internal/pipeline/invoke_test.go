@@ -383,12 +383,12 @@ func TestEvaluatorAllowedTools_PathFormat(t *testing.T) {
 	}
 }
 
-// --- generateUUID tests ---
+// --- GenerateUUID tests ---
 
 func TestGenerateUUID_Format(t *testing.T) {
-	uuid, err := generateUUID()
+	uuid, err := GenerateUUID()
 	if err != nil {
-		t.Fatalf("generateUUID: %v", err)
+		t.Fatalf("GenerateUUID: %v", err)
 	}
 
 	// UUID v4 format: 8-4-4-4-12 hex chars.
@@ -403,9 +403,9 @@ func TestGenerateUUID_Format(t *testing.T) {
 }
 
 func TestGenerateUUID_Version4(t *testing.T) {
-	uuid, err := generateUUID()
+	uuid, err := GenerateUUID()
 	if err != nil {
-		t.Fatalf("generateUUID: %v", err)
+		t.Fatalf("GenerateUUID: %v", err)
 	}
 
 	// The 13th character (index 14, after 2 dashes) is the version nibble.
@@ -421,9 +421,9 @@ func TestGenerateUUID_Version4(t *testing.T) {
 }
 
 func TestGenerateUUID_VariantRFC4122(t *testing.T) {
-	uuid, err := generateUUID()
+	uuid, err := GenerateUUID()
 	if err != nil {
-		t.Fatalf("generateUUID: %v", err)
+		t.Fatalf("GenerateUUID: %v", err)
 	}
 
 	parts := strings.Split(uuid, "-")
@@ -440,9 +440,9 @@ func TestGenerateUUID_VariantRFC4122(t *testing.T) {
 func TestGenerateUUID_Uniqueness(t *testing.T) {
 	seen := make(map[string]bool)
 	for i := 0; i < 100; i++ {
-		uuid, err := generateUUID()
+		uuid, err := GenerateUUID()
 		if err != nil {
-			t.Fatalf("generateUUID iteration %d: %v", i, err)
+			t.Fatalf("GenerateUUID iteration %d: %v", i, err)
 		}
 		if seen[uuid] {
 			t.Fatalf("duplicate UUID at iteration %d: %s", i, uuid)

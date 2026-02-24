@@ -24,8 +24,8 @@ func testHistoryRecord(sessionID string, ts time.Time) HistoryRecord {
 		EvaluatorModel:       DefaultEvaluatorModel,
 		ClassifierMaxTurns:   15,
 		EvaluatorMaxTurns:    20,
-		ClassifierTimeoutNs:  int64(2 * time.Minute),
-		EvaluatorTimeoutNs:   int64(5 * time.Minute),
+		ClassifierTimeoutNs:  int64(3 * time.Minute),
+		EvaluatorTimeoutNs:   int64(7 * time.Minute),
 	}
 }
 
@@ -171,8 +171,8 @@ func TestReadHistory_RoundTrip(t *testing.T) {
 			EvaluatorPromptVersion:  "evaluator-v3",
 			ClassifierMaxTurns:      15,
 			EvaluatorMaxTurns:       20,
-			ClassifierTimeoutNs:     int64(2 * time.Minute),
-			EvaluatorTimeoutNs:      int64(5 * time.Minute),
+			ClassifierTimeoutNs:     int64(3 * time.Minute),
+			EvaluatorTimeoutNs:      int64(7 * time.Minute),
 			Debug:                   true,
 		},
 		{
@@ -188,8 +188,8 @@ func TestReadHistory_RoundTrip(t *testing.T) {
 			ClassifierPromptVersion: "classifier-v3",
 			ClassifierMaxTurns:      15,
 			EvaluatorMaxTurns:       20,
-			ClassifierTimeoutNs:     int64(2 * time.Minute),
-			EvaluatorTimeoutNs:      int64(5 * time.Minute),
+			ClassifierTimeoutNs:     int64(3 * time.Minute),
+			EvaluatorTimeoutNs:      int64(7 * time.Minute),
 		},
 	}
 

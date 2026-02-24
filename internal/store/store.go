@@ -188,22 +188,24 @@ func ReadDebugFlag() bool {
 	return cfg.Debug
 }
 
-// ModelConfig holds optional model overrides from config.json.
-type ModelConfig struct {
-	ClassifierModel string `json:"classifierModel"`
-	EvaluatorModel  string `json:"evaluatorModel"`
+// PipelineOverrides holds optional pipeline overrides from config.json.
+type PipelineOverrides struct {
+	ClassifierModel   string `json:"classifierModel"`
+	EvaluatorModel    string `json:"evaluatorModel"`
+	ClassifierTimeout string `json:"classifierTimeout"` // e.g. "3m", "90s"
+	EvaluatorTimeout  string `json:"evaluatorTimeout"`  // e.g. "7m", "5m30s"
 }
 
-// ReadModelConfig reads model overrides from ~/.cabrero/config.json.
+// ReadPipelineOverrides reads pipeline overrides from ~/.cabrero/config.json.
 // Returns zero-value fields for missing file, malformed JSON, or absent keys.
-func ReadModelConfig() ModelConfig {
+func ReadPipelineOverrides() PipelineOverrides {
 	data, err := os.ReadFile(filepath.Join(Root(), "config.json"))
 	if err != nil {
-		return ModelConfig{}
+		return PipelineOverrides{}
 	}
-	var cfg ModelConfig
+	var cfg PipelineOverrides
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return ModelConfig{}
+		return PipelineOverrides{}
 	}
 	return cfg
 }

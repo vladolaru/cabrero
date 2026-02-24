@@ -57,24 +57,32 @@ func (c PipelineConfig) logger() Logger {
 }
 
 // DefaultPipelineConfig returns production defaults.
-// Model names are resolved: config.json override → compile-time default.
+// Fields are resolved: config.json override → compile-time default.
 func DefaultPipelineConfig() PipelineConfig {
-	models := store.ReadModelConfig()
+	overrides := store.ReadPipelineOverrides()
 	classifierModel := DefaultClassifierModel
-	if models.ClassifierModel != "" {
-		classifierModel = models.ClassifierModel
+	if overrides.ClassifierModel != "" {
+		classifierModel = overrides.ClassifierModel
 	}
 	evaluatorModel := DefaultEvaluatorModel
-	if models.EvaluatorModel != "" {
-		evaluatorModel = models.EvaluatorModel
+	if overrides.EvaluatorModel != "" {
+		evaluatorModel = overrides.EvaluatorModel
+	}
+	classifierTimeout := 3 * time.Minute
+	if d, err := time.ParseDuration(overrides.ClassifierTimeout); err == nil && d > 0 {
+		classifierTimeout = d
+	}
+	evaluatorTimeout := 7 * time.Minute
+	if d, err := time.ParseDuration(overrides.EvaluatorTimeout); err == nil && d > 0 {
+		evaluatorTimeout = d
 	}
 	return PipelineConfig{
 		ClassifierModel:         classifierModel,
 		EvaluatorModel:          evaluatorModel,
 		ClassifierMaxTurns:      15,
 		EvaluatorMaxTurns:       20,
-		ClassifierTimeout:       2 * time.Minute,
-		EvaluatorTimeout:        5 * time.Minute,
+		ClassifierTimeout:       classifierTimeout,
+		EvaluatorTimeout:        evaluatorTimeout,
 		MaxConcurrentInvocations: 3,
 		MaxLLMRetries:           1,
 	}
