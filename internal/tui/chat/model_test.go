@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -220,5 +221,82 @@ func TestBuildChatArgs_NoAllowedTools(t *testing.T) {
 		if a == "--allowedTools" {
 			t.Error("should not have --allowedTools when empty")
 		}
+	}
+}
+
+func TestChat_ViewportMutedWhenUnfocused(t *testing.T) {
+	m := newTestChat()
+	m.Focused = true
+	m.addMessage("user", "Hello")
+	m.addMessage("assistant", "World")
+
+	focusedContent := m.viewport.View()
+
+	// Focused content should contain the message text.
+	if !strings.Contains(focusedContent, "You:") || !strings.Contains(focusedContent, "Hello") {
+		t.Error("focused viewport should contain user message")
+	}
+	if !strings.Contains(focusedContent, "AI:") || !strings.Contains(focusedContent, "World") {
+		t.Error("focused viewport should contain assistant message")
+	}
+
+	// Unfocused: content should still contain the text (muting preserves it).
+	m.SetFocused(false)
+	unfocusedContent := m.viewport.View()
+	if !strings.Contains(unfocusedContent, "You:") || !strings.Contains(unfocusedContent, "Hello") {
+		t.Error("unfocused viewport should still contain user message text")
+	}
+	if !strings.Contains(unfocusedContent, "AI:") || !strings.Contains(unfocusedContent, "World") {
+		t.Error("unfocused viewport should still contain assistant message text")
+	}
+
+	// Re-focus: content should restore to original.
+	m.SetFocused(true)
+	refocusedContent := m.viewport.View()
+	if refocusedContent != focusedContent {
+		t.Error("re-focused viewport should match original focused content")
+	}
+}
+
+func TestChat_SetFocused_NoopOnSameValue(t *testing.T) {
+	m := newTestChat()
+	m.Focused = true
+	m.addMessage("user", "test")
+
+	contentBefore := m.viewport.View()
+	m.SetFocused(true) // same value — should be a no-op
+	contentAfter := m.viewport.View()
+
+	if contentBefore != contentAfter {
+		t.Error("SetFocused with same value should not change viewport content")
+	}
+}
+
+func TestChat_MuteANSI_EmptyString(t *testing.T) {
+	result := muteANSI("")
+	if result != "" {
+		t.Errorf("muteANSI(\"\") = %q, want empty", result)
+	}
+}
+
+func TestChat_MuteANSI_PreservesText(t *testing.T) {
+	// muteANSI should strip ANSI codes and still contain the original text.
+	input := "\x1b[1;34mYou:\x1b[0m Hello world"
+	result := muteANSI(input)
+	if !strings.Contains(result, "You:") || !strings.Contains(result, "Hello world") {
+		t.Errorf("muteANSI should preserve text, got %q", result)
+	}
+}
+
+func TestChat_MuteANSI_BlankLines(t *testing.T) {
+	// Blank lines should remain blank (not wrapped in a style).
+	input := "line1\n\nline3"
+	result := muteANSI(input)
+	lines := strings.Split(result, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d", len(lines))
+	}
+	if lines[1] != "" {
+		t.Errorf("blank line should remain empty, got %q", lines[1])
 	}
 }

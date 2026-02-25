@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
@@ -55,9 +56,10 @@ type Model struct {
 	waitingMsg     string // funny message shown while waiting for AI
 	config       ChatConfig
 	messagesSent int // 0 = first message creates session; >0 = resume
-	revision     *string
-	width        int
-	height       int
+	revision       *string
+	rawContent     string // unpadded messages content for inline rendering
+	width          int
+	height         int
 	// Focused indicates whether the chat panel has focus.
 	// When false, the panel is rendered in muted colors.
 	Focused bool
@@ -107,10 +109,10 @@ func (m *Model) SetSize(width, height int) {
 }
 
 // viewportHeight returns the viewport height after reserving space for chrome.
-// Chrome: header (2) + optional chips + post-viewport newline (1) + blank (1) + input (1) + trailing newline (1).
+// Chrome: header (2) + optional chips + post-viewport newline (1) + input (1) + trailing newline (1).
 // Each visible chip is 1 line ("[N] text") plus a trailing blank line after all chips.
 func (m Model) viewportHeight() int {
-	chrome := 6 // header (2) + post-viewport newline (1) + blank before input (1) + input (1) + trailing newline (1)
+	chrome := 5 // header (2) + post-viewport newline (1) + input (1) + trailing newline (1)
 	if m.chipsVisible && len(m.chips) > 0 {
 		n := len(m.chips)
 		if n > 4 {
@@ -123,6 +125,16 @@ func (m Model) viewportHeight() int {
 		h = 1
 	}
 	return h
+}
+
+// SetFocused updates the focus state and re-renders viewport content
+// so that muting is applied or removed.
+func (m *Model) SetFocused(focused bool) {
+	if m.Focused == focused {
+		return
+	}
+	m.Focused = focused
+	m.updateViewportContent()
 }
 
 // IsInputFocused returns true when the chat text input has focus (user is typing).
@@ -202,11 +214,29 @@ func (m *Model) updateViewportContent() {
 		}
 	}
 
+	content := b.String()
+	if !m.Focused {
+		content = muteANSI(content)
+	}
+	m.rawContent = content
 	wasAtBottom := m.viewport.AtBottom()
-	m.viewport.SetContent(b.String())
+	m.viewport.SetContent(content)
 	if wasAtBottom {
 		m.viewport.GotoBottom()
 	}
+}
+
+// muteANSI strips all ANSI escape codes and re-applies chatMuted foreground,
+// producing uniformly muted text for the unfocused viewport.
+func muteANSI(s string) string {
+	stripped := ansi.Strip(s)
+	lines := strings.Split(stripped, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = chatMuted.Render(line)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // applyHangingIndent adds indent spaces before all lines except the first.

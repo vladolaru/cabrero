@@ -37,6 +37,8 @@ type Model struct {
 
 	// inlineChat holds rendered chat content for narrow mode (appended to body viewport).
 	inlineChat string
+	// inlineChatInput holds the chat input line for fixed rendering below the viewport.
+	inlineChatInput string
 }
 
 // New creates a detail model for the given proposal.
@@ -68,10 +70,11 @@ func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 
-	// Chrome: newline before viewport + newline after + fill padding + status bar.
-	chrome := 7
-	if m.HideStatusBar {
-		chrome = 6 // no status bar line
+	// Chrome: newline before viewport (1) + newline after (1).
+	// When rendering our own status bar, add fill padding + status bar.
+	chrome := 2
+	if !m.HideStatusBar {
+		chrome = 7 // + fill padding + status bar
 	}
 	bodyHeight := height - chrome
 	if bodyHeight < 4 {
@@ -178,10 +181,11 @@ func (m Model) HasRevision() bool {
 }
 
 // SetInlineChat sets rendered chat content to be appended inside the body viewport.
-// Used in narrow mode where the chat is part of the scrollable content.
-func (m *Model) SetInlineChat(content string) {
+// The input line is rendered as fixed chrome below the viewport (not scrollable).
+func (m *Model) SetInlineChat(content, input string) {
 	wasAtBottom := m.bodyViewport.AtBottom()
 	m.inlineChat = content
+	m.inlineChatInput = input
 	m.bodyViewport.SetContent(m.renderBodyContent())
 	if wasAtBottom {
 		m.bodyViewport.GotoBottom()
@@ -190,8 +194,9 @@ func (m *Model) SetInlineChat(content string) {
 
 // ClearInlineChat removes any inline chat content from the viewport.
 func (m *Model) ClearInlineChat() {
-	if m.inlineChat != "" {
+	if m.inlineChat != "" || m.inlineChatInput != "" {
 		m.inlineChat = ""
+		m.inlineChatInput = ""
 		m.bodyViewport.SetContent(m.renderBodyContent())
 	}
 }

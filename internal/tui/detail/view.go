@@ -50,16 +50,12 @@ func (m Model) View() string {
 	b.WriteString(m.bodyViewport.View())
 	b.WriteString("\n")
 
-	// Fill remaining space.
 	content := b.String()
-	lines := strings.Count(content, "\n")
 	if m.HideStatusBar {
-		// No status bar — root renders it separately. Reserve 1 line for the root's "\n" + statusBar.
-		remaining := m.height - lines - 1
-		if remaining > 0 {
-			content += strings.Repeat("\n", remaining)
-		}
+		// No fill — root handles layout (horizontal or vertical split).
 	} else {
+		// Fill remaining space.
+		lines := strings.Count(content, "\n")
 		// Reserve 1 line for the status bar.
 		remaining := m.height - lines - 1
 		if remaining > 0 {

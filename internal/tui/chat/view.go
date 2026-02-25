@@ -51,33 +51,30 @@ func (m Model) RenderInline() string {
 			if i >= 4 {
 				break
 			}
-			b.WriteString(renderChip(i, chip, m.Focused))
+			b.WriteString("  " + renderChip(i, chip, m.Focused))
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
 	}
 
-	// Chat messages viewport (bounded height, indented to match chrome).
-	b.WriteString(shared.IndentBlock(m.viewport.View(), 2))
-	b.WriteString("\n")
-
-	// Fill remaining space to push input to the bottom of the chat area.
-	content := b.String()
-	lines := strings.Count(content, "\n")
-	remaining := m.height - lines - 1 // -1 for input line
-	if remaining > 0 {
-		content += strings.Repeat("\n", remaining)
+	// Chat messages viewport (trimmed of trailing empty padding lines so it
+	// doesn't create empty space, while still providing scroll capability).
+	vpView := trimTrailingEmptyLines(m.viewport.View())
+	if vpView != "" {
+		b.WriteString(shared.IndentBlock(vpView, 2))
+		b.WriteString("\n")
 	}
 
-	// Input area.
+	return b.String()
+}
+
+// RenderInlineInput returns the chat input line for rendering as fixed chrome
+// outside the detail's scrollable viewport in narrow mode.
+func (m Model) RenderInlineInput() string {
 	if m.input.Focused() {
-		content += "  " + m.input.View()
-	} else {
-		content += chatMuted.Render("  Press enter to type...")
+		return "  " + m.input.View()
 	}
-	content += "\n"
-
-	return content
+	return chatMuted.Render("  Press enter to type...")
 }
 
 // View renders the chat panel (wide mode, horizontal split).
@@ -130,4 +127,15 @@ func (m Model) View() string {
 	content += "\n"
 
 	return content
+}
+
+// trimTrailingEmptyLines removes empty lines from the end of a string,
+// preserving all content lines. Used to strip viewport height-padding.
+func trimTrailingEmptyLines(s string) string {
+	lines := strings.Split(s, "\n")
+	i := len(lines) - 1
+	for i >= 0 && strings.TrimSpace(lines[i]) == "" {
+		i--
+	}
+	return strings.Join(lines[:i+1], "\n")
 }
