@@ -178,17 +178,24 @@ func buildBlendPrompt(currentContent, changeText, proposalType, rationale string
 
 // validateTarget checks that a resolved target path is safe to read and write.
 // Cabrero only modifies markdown files (CLAUDE.md, SKILL.md, etc.), so we
-// reject any path that doesn't end in .md or contains traversal components.
+// reject any path that doesn't end in .md or falls outside the user's home directory.
 func validateTarget(resolved string) error {
-	// Reject path traversal.
 	cleaned := filepath.Clean(resolved)
-	if strings.Contains(cleaned, "..") {
-		return fmt.Errorf("path contains traversal: %s", resolved)
-	}
 
 	// Must be a markdown file.
 	if !strings.HasSuffix(strings.ToLower(cleaned), ".md") {
 		return fmt.Errorf("target must be a .md file, got: %s", resolved)
+	}
+
+	// Reject path traversal: require the target to be inside the user's home directory.
+	// Note: strings.Contains(cleaned, "..") is a no-op after filepath.Clean resolves
+	// all traversal components. Use a prefix check instead.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	if !strings.HasPrefix(cleaned, home+string(filepath.Separator)) {
+		return fmt.Errorf("target outside home directory: %s", resolved)
 	}
 
 	return nil
