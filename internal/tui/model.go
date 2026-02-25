@@ -428,7 +428,17 @@ func (m appModel) View() tea.View {
 			content = m.detail.View() + sep + "\n" + chatView
 			content += "\n" + components.RenderStatusBar(m.keys.DetailShortHelp(), "", m.width)
 		} else {
+			// No chat panel: detail view + root-rendered status bar.
+			// Filter out Tab binding (opens chat panel) since the panel is closed.
+			var filtered []key.Binding
+			for _, kb := range m.keys.DetailShortHelp() {
+				if key.Matches(tea.KeyPressMsg{Code: tea.KeyTab}, kb) {
+					continue
+				}
+				filtered = append(filtered, kb)
+			}
 			content = m.detail.View()
+			content += "\n" + components.RenderStatusBar(filtered, "", m.width)
 		}
 	case message.ViewFitnessDetail:
 		content = m.fitness.View()
@@ -646,8 +656,7 @@ func (m appModel) childHeight() int {
 func (m *appModel) resizeDetailChat() {
 	ch := m.childHeight()
 	if !m.config.Detail.ChatPanelOpen {
-		m.detail.HideStatusBar = false
-		m.detail.SetSize(m.width, ch)
+		m.detail.SetSize(m.width, ch-1) // -1 for root-rendered status bar
 		return
 	}
 
@@ -661,7 +670,6 @@ func (m *appModel) resizeDetailChat() {
 		cw := m.width * 50 / 100
 		dw := m.width - cw - 3 // -3 for padded vertical separator ( │ )
 		panelH := ch - 1        // -1 for root-rendered status bar
-		m.detail.HideStatusBar = true
 		m.detail.SetSize(dw, panelH)
 		m.chat.SetSize(cw, panelH)
 	} else {
@@ -672,7 +680,6 @@ func (m *appModel) resizeDetailChat() {
 			chatH = 8
 		}
 		detailH := panelH - chatH - 1 // -1 for horizontal separator
-		m.detail.HideStatusBar = true
 		m.detail.SetSize(m.width, detailH)
 		m.chat.SetSize(m.width-2, chatH) // -2 for left indent
 		m.detail.ClearInlineChat()

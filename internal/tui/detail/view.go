@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/bubbles/v2/key"
-	tea "charm.land/bubbletea/v2"
-
-	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
@@ -39,27 +35,7 @@ func (m Model) View() string {
 	b.WriteString(m.bodyViewport.View())
 	b.WriteString("\n")
 
-	content := b.String()
-	if m.HideStatusBar {
-		// No fill — root handles layout (horizontal or vertical split).
-	} else {
-		// Fill remaining space and render the status bar.
-		content = shared.FillToBottom(content, m.height, 1)
-		bindings := m.keys.DetailShortHelp()
-		if !m.config.Detail.ChatPanelOpen {
-			var filtered []key.Binding
-			for _, kb := range bindings {
-				if key.Matches(tea.KeyPressMsg{Code: tea.KeyTab}, kb) {
-					continue
-				}
-				filtered = append(filtered, kb)
-			}
-			bindings = filtered
-		}
-		content += components.RenderStatusBar(bindings, "", m.width)
-	}
-
-	return content
+	return b.String()
 }
 
 func renderCitations(citations []shared.CitationEntry, cursor int, width int) string {

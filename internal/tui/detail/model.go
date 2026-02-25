@@ -31,10 +31,6 @@ type Model struct {
 	keys         *shared.KeyMap
 	config       *shared.Config
 
-	// HideStatusBar is set by the root model when the status bar is rendered
-	// externally (e.g., horizontal split with chat panel).
-	HideStatusBar bool
-
 	// inlineChat holds rendered chat content for narrow mode (appended to body viewport).
 	inlineChat string
 	// inlineChatInput holds the chat input line for fixed rendering below the viewport.
@@ -71,11 +67,9 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height
 
 	// Chrome: newline before viewport (1) + newline after (1).
-	// When rendering our own status bar, add fill padding + status bar.
+	// The root always renders the status bar externally and accounts for it
+	// by passing (childHeight - 1) as height. We reserve only viewport spacing.
 	chrome := 2
-	if !m.HideStatusBar {
-		chrome = 7 // + fill padding + status bar
-	}
 	bodyHeight := height - chrome
 	if bodyHeight < 4 {
 		bodyHeight = 4

@@ -212,6 +212,24 @@ func TestDetail_CitationNavigation(t *testing.T) {
 	}
 }
 
+func TestDetail_NeverRendersOwnStatusBar(t *testing.T) {
+	// detail.View() should never include status bar bindings in its output.
+	// The root is responsible for rendering the status bar.
+	keys := shared.NewKeyMap("arrows")
+	cfg := testdata.TestConfig()
+	p := testdata.TestProposalSkillImprovement()
+	m := New(&p, nil, &keys, cfg)
+	m.SetSize(80, 24)
+
+	view := ansi.Strip(m.View())
+
+	// The status bar renders key hints like "approve" — these should not appear
+	// in the detail view's own output.
+	if strings.Contains(view, "approve") {
+		t.Error("detail.View() should not render its own status bar")
+	}
+}
+
 func TestDetail_View(t *testing.T) {
 	m := newTestDetail()
 	view := ansi.Strip(m.View())

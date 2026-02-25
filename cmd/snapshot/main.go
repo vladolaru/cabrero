@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
@@ -189,8 +190,16 @@ func renderProposalDetail(w, h int) (string, error) {
 
 	m := detail.New(&p, citations, &keys, cfg)
 	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
-	m.SetSize(w, h-th)
-	return prefix + m.View(), nil
+	m.SetSize(w, h-th-1) // -1 for root-rendered status bar
+	// Root renders the status bar; filter Tab (opens chat, which is closed here).
+	var bindings []key.Binding
+	for _, kb := range keys.DetailShortHelp() {
+		if key.Matches(tea.KeyPressMsg{Code: tea.KeyTab}, kb) {
+			continue
+		}
+		bindings = append(bindings, kb)
+	}
+	return prefix + m.View() + "\n" + components.RenderStatusBar(bindings, "", w), nil
 }
 
 func renderProposalDetailChat(w, h int) (string, error) {
@@ -211,22 +220,26 @@ func renderProposalDetailChat(w, h int) (string, error) {
 	m := detail.New(&p, citations, &keys, cfg)
 	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
 	ch := h - th
-	m.SetSize(w, ch)
+	panelH := ch - 1 // -1 for root-rendered status bar
 
 	chatPct := cfg.Detail.ChatPanelWidth
 	if chatPct <= 0 {
 		chatPct = 35
 	}
 	chatW := w * chatPct / 100
+	dw := w - chatW - 3 // -3 for padded vertical separator
+	m.SetSize(dw, panelH)
 	c := chat.New(
 		[]string{"Why was this flagged?", "Show the raw turns", "Conservative version", "Risk of approving?"},
 		chat.ChatConfig{SessionID: "00000000-0000-0000-0000-000000000000"},
-		chatW, ch,
+		chatW, panelH,
 	)
 
 	detailView := m.View()
 	chatView := c.View()
-	return prefix + lipgloss.JoinHorizontal(lipgloss.Top, detailView, chatView), nil
+	content := lipgloss.JoinHorizontal(lipgloss.Top, detailView, chatView)
+	content += "\n" + components.RenderStatusBar(keys.DetailShortHelp(), "", w)
+	return prefix + content, nil
 }
 
 func renderFitnessReport(w, h int) (string, error) {
