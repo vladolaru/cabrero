@@ -41,10 +41,6 @@ type appModel struct {
 	stats        message.DashboardStats
 	headerHeight int
 
-	// Status bar
-	statusMsg    string
-	statusExpiry time.Time
-
 	// Child models
 	dashboard       dashboard.Model
 	detail          detail.Model
@@ -128,22 +124,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.SwitchView:
 		return m.switchView(msg.View)
 
-	case message.StatusMessage:
-		m.statusMsg = msg.Text
-		if msg.Duration > 0 {
-			m.statusExpiry = time.Now().Add(msg.Duration)
-			cmds = append(cmds, tea.Tick(msg.Duration, func(time.Time) tea.Msg {
-				return message.StatusMessageExpired{}
-			}))
-		}
-		return m, tea.Batch(cmds...)
-
-	case message.StatusMessageExpired:
-		if !m.statusExpiry.IsZero() && time.Now().After(m.statusExpiry) {
-			m.statusMsg = ""
-		}
-		return m, nil
-
 	case message.ChatPanelToggled:
 		m.resizeDetailChat()
 		return m, nil
@@ -190,77 +170,73 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.RejectFinished:
 		// Archive the proposal and return to dashboard.
 		proposalID := msg.ProposalID
-		m.statusMsg = actionStatusText(msg)
-		m.statusExpiry = time.Now().Add(3 * time.Second)
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
 			m = m2.(appModel)
 		}
+		cmds = append(cmds, func() tea.Msg {
+			return message.StatusMessage{Text: actionStatusText(msg), Duration: 3 * time.Second}
+		})
 		cmds = append(cmds, func() tea.Msg {
 			if err := apply.Archive(proposalID, "rejected"); err != nil {
 				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
 			}
 			return nil
 		})
-		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
-			return message.StatusMessageExpired{}
-		}))
 		return m, tea.Batch(cmds...)
 
 	case message.DeferFinished:
 		// Archive the proposal and return to dashboard.
 		proposalID := msg.ProposalID
-		m.statusMsg = actionStatusText(msg)
-		m.statusExpiry = time.Now().Add(3 * time.Second)
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
 			m = m2.(appModel)
 		}
 		cmds = append(cmds, func() tea.Msg {
+			return message.StatusMessage{Text: actionStatusText(msg), Duration: 3 * time.Second}
+		})
+		cmds = append(cmds, func() tea.Msg {
 			if err := apply.Archive(proposalID, "deferred"); err != nil {
 				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
 			}
 			return nil
 		})
-		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
-			return message.StatusMessageExpired{}
-		}))
 		return m, tea.Batch(cmds...)
 
 	case message.ApplyFinished:
+		var statusText string
 		if msg.Err != nil {
-			m.statusMsg = "Apply failed: " + msg.Err.Error()
+			statusText = "Apply failed: " + msg.Err.Error()
 		} else {
-			m.statusMsg = components.ConfirmApprove()
+			statusText = components.ConfirmApprove()
 		}
-		m.statusExpiry = time.Now().Add(3 * time.Second)
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
 			m = m2.(appModel)
 		}
-		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
-			return message.StatusMessageExpired{}
-		}))
+		cmds = append(cmds, func() tea.Msg {
+			return message.StatusMessage{Text: statusText, Duration: 3 * time.Second}
+		})
 		return m, tea.Batch(cmds...)
 
 	case message.DismissFinished:
+		var statusText string
 		if msg.Err != nil {
-			m.statusMsg = "Dismiss failed: " + msg.Err.Error()
+			statusText = "Dismiss failed: " + msg.Err.Error()
 		} else {
-			m.statusMsg = "Report dismissed."
+			statusText = "Report dismissed."
 		}
-		m.statusExpiry = time.Now().Add(3 * time.Second)
 		if m.state != message.ViewDashboard {
 			m2, cmd := m.popView()
 			cmds = append(cmds, cmd)
 			m = m2.(appModel)
 		}
-		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
-			return message.StatusMessageExpired{}
-		}))
+		cmds = append(cmds, func() tea.Msg {
+			return message.StatusMessage{Text: statusText, Duration: 3 * time.Second}
+		})
 		return m, tea.Batch(cmds...)
 
 	case message.JumpToSources:
@@ -273,18 +249,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sources = m.sources.PreSelectSource(msg.SourceName)
 		}
 		return m, nil
-
-	case message.RollbackFinished:
-		if msg.Err != nil {
-			m.statusMsg = "Rollback failed: " + msg.Err.Error()
-		} else {
-			m.statusMsg = "Rollback complete."
-		}
-		m.statusExpiry = time.Now().Add(3 * time.Second)
-		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
-			return message.StatusMessageExpired{}
-		}))
-		return m, tea.Batch(cmds...)
 
 	case message.PipelineTickMsg:
 		if m.state == message.ViewPipelineMonitor && !m.pipelineRefreshing {
@@ -355,15 +319,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case message.RetryRunFinished:
+		var statusText string
 		if msg.Err != nil {
-			m.statusMsg = "Retry failed: " + msg.Err.Error()
+			statusText = "Retry failed: " + msg.Err.Error()
 		} else {
-			m.statusMsg = "Retry complete."
+			statusText = "Retry complete."
 		}
-		m.statusExpiry = time.Now().Add(3 * time.Second)
-		cmds = append(cmds, tea.Tick(3*time.Second, func(time.Time) tea.Msg {
-			return message.StatusMessageExpired{}
-		}))
+		cmds = append(cmds, func() tea.Msg {
+			return message.StatusMessage{Text: statusText, Duration: 3 * time.Second}
+		})
 		return m, tea.Batch(cmds...)
 	}
 
@@ -456,8 +420,10 @@ func (m appModel) View() string {
 			content = lipgloss.JoinHorizontal(lipgloss.Top, detailView, sep, chatView)
 			content += "\n" + components.RenderStatusBar(m.keys.DetailShortHelp(), "", m.width)
 		} else if m.config.Detail.ChatPanelOpen {
-			// Narrow: chat is inline within the detail's scrollable viewport, status bar below.
-			content = m.detail.View()
+			// Narrow: vertical split — detail on top, separator, chat below, shared status bar.
+			sep := shared.MutedStyle.Render(strings.Repeat("─", m.width))
+			chatView := shared.IndentBlock(m.chat.View(), 2)
+			content = m.detail.View() + sep + "\n" + chatView
 			content += "\n" + components.RenderStatusBar(m.keys.DetailShortHelp(), "", m.width)
 		} else {
 			content = m.detail.View()
@@ -658,13 +624,10 @@ func (m appModel) renderVerticalSeparator(height int) string {
 	return strings.Join(lines, "\n")
 }
 
-// syncInlineChat updates the detail's inline chat content for narrow mode.
+// syncInlineChat clears any stale inline chat content from the detail viewport.
+// Narrow mode now uses a vertical split instead of inline embedding.
 func (m *appModel) syncInlineChat() {
-	if m.config.Detail.ChatPanelOpen && m.width < 160 {
-		m.detail.SetInlineChat(m.chat.RenderInline())
-	} else {
-		m.detail.ClearInlineChat()
-	}
+	m.detail.ClearInlineChat()
 }
 
 // childHeight returns the height available for child views (total minus persistent header and sub-header).
@@ -698,19 +661,18 @@ func (m *appModel) resizeDetailChat() {
 		m.detail.SetSize(dw, panelH)
 		m.chat.SetSize(cw, panelH)
 	} else {
-		// Narrow mode: chat content is inline within the detail's scrollable viewport.
-		// Give the chat a bounded height (percentage of panel) so its viewport
-		// constrains the messages area rather than growing unbounded.
+		// Narrow mode: vertical split — detail on top, chat panel below, shared status bar.
 		panelH := ch - 1 // -1 for root-rendered status bar
 		chatH := panelH * chatPct / 100
 		if chatH < 8 {
 			chatH = 8
 		}
+		detailH := panelH - chatH - 1 // -1 for horizontal separator
 		m.detail.HideStatusBar = true
-		m.detail.SetSize(m.width, panelH)
-		m.chat.SetSize(m.width-4, chatH)
+		m.detail.SetSize(m.width, detailH)
+		m.chat.SetSize(m.width-2, chatH) // -2 for left indent
+		m.detail.ClearInlineChat()
 	}
-	m.syncInlineChat()
 }
 
 // routeDetailKey routes a key event to the correct child model based on focus.
@@ -724,7 +686,7 @@ func (m *appModel) routeDetailKey(msg tea.KeyMsg) []tea.Cmd {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-		m.chat.Focused = m.detail.CurrentFocus() == detail.FocusChat
+		m.chat.SetFocused(m.detail.CurrentFocus() == detail.FocusChat)
 		return cmds
 	}
 
@@ -744,7 +706,7 @@ func (m *appModel) routeDetailKey(msg tea.KeyMsg) []tea.Cmd {
 			case key.Matches(msg, m.keys.Back):
 				// Esc switches focus back to proposal.
 				m.detail.SetFocus(detail.FocusProposal)
-				m.chat.Focused = false
+				m.chat.SetFocused(false)
 			case key.Matches(msg, m.keys.Approve),
 				key.Matches(msg, m.keys.Reject),
 				key.Matches(msg, m.keys.Defer),

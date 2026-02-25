@@ -43,7 +43,7 @@ func (m Model) View() string {
 		bottom = "/ " + m.searchInput.View()
 	} else {
 		// 3-arg call: bindings, timedMsg, width.
-		bottom = components.RenderStatusBar(m.keys.LogViewShortHelp(), "", m.width)
+		bottom = components.RenderStatusBar(m.keys.LogViewShortHelp(), m.statusMsg, m.width)
 		if m.searchTerm != "" && len(m.matches) > 0 {
 			bottom = fmt.Sprintf("[%d/%d matches] %s", m.matchIdx+1, len(m.matches), bottom)
 		}

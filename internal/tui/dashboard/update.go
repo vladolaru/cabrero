@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -15,9 +17,28 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case message.StatusMessage:
+		m.statusMsg = msg.Text
+		if msg.Duration > 0 {
+			m.statusExpiry = time.Now().Add(msg.Duration)
+			return m, tea.Tick(msg.Duration, func(time.Time) tea.Msg {
+				return message.StatusMessageExpired{}
+			})
+		}
+		return m, nil
+
+	case message.StatusMessageExpired:
+		if !m.statusExpiry.IsZero() && time.Now().After(m.statusExpiry) {
+			m.statusMsg = ""
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.viewport.Width = msg.Width
+		m.viewport.Height = m.viewportHeight()
+		m.updateContent()
 		return m, nil
 
 	case tea.KeyMsg:
@@ -33,22 +54,44 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if m.cursor < len(m.filtered)-1 {
 			m.cursor++
 		}
+		m.updateContent()
 		return m, nil
 
 	case key.Matches(msg, m.keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
 		}
+		m.updateContent()
+		return m, nil
+
+	case key.Matches(msg, m.keys.HalfPageDown):
+		jump := m.viewport.Height / 2
+		m.cursor += jump
+		if m.cursor >= len(m.filtered) {
+			m.cursor = max(0, len(m.filtered)-1)
+		}
+		m.updateContent()
+		return m, nil
+
+	case key.Matches(msg, m.keys.HalfPageUp):
+		jump := m.viewport.Height / 2
+		m.cursor -= jump
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+		m.updateContent()
 		return m, nil
 
 	case key.Matches(msg, m.keys.GotoTop):
 		m.cursor = 0
+		m.updateContent()
 		return m, nil
 
 	case key.Matches(msg, m.keys.GotoBottom):
 		if len(m.filtered) > 0 {
 			m.cursor = len(m.filtered) - 1
 		}
+		m.updateContent()
 		return m, nil
 
 	case key.Matches(msg, m.keys.Open):

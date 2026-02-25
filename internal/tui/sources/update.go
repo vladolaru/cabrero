@@ -17,6 +17,22 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Data messages are handled first regardless of sub-view state,
 	// since they are results of previous actions, not user input.
 	switch msg := msg.(type) {
+	case message.StatusMessage:
+		m.statusMsg = msg.Text
+		if msg.Duration > 0 {
+			m.statusExpiry = time.Now().Add(msg.Duration)
+			return m, tea.Tick(msg.Duration, func(time.Time) tea.Msg {
+				return message.StatusMessageExpired{}
+			})
+		}
+		return m, nil
+
+	case message.StatusMessageExpired:
+		if !m.statusExpiry.IsZero() && time.Now().After(m.statusExpiry) {
+			m.statusMsg = ""
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -345,7 +361,7 @@ func (m Model) handleOwnershipFinished(msg message.SetOwnershipFinished) (Model,
 func (m Model) handleRollbackFinished(msg message.RollbackFinished) (Model, tea.Cmd) {
 	if msg.Err != nil {
 		return m, func() tea.Msg {
-			return message.StatusMessage{Text: "Rollback failed: " + msg.Err.Error()}
+			return message.StatusMessage{Text: "Rollback failed: " + msg.Err.Error(), Duration: 3 * time.Second}
 		}
 	}
 	// Remove the rolled-back change from the list.
@@ -355,7 +371,9 @@ func (m Model) handleRollbackFinished(msg message.RollbackFinished) (Model, tea.
 			break
 		}
 	}
-	return m, nil
+	return m, func() tea.Msg {
+		return message.StatusMessage{Text: "Rollback complete.", Duration: 3 * time.Second}
+	}
 }
 
 // cursorGroupIdx returns the group index for the current cursor position.

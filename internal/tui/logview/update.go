@@ -1,12 +1,35 @@
 package logview
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/vladolaru/cabrero/internal/tui/message"
 )
 
 // Update handles messages for the log viewer.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case message.StatusMessage:
+		m.statusMsg = msg.Text
+		if msg.Duration > 0 {
+			m.statusExpiry = time.Now().Add(msg.Duration)
+			return m, tea.Tick(msg.Duration, func(time.Time) tea.Msg {
+				return message.StatusMessageExpired{}
+			})
+		}
+		return m, nil
+
+	case message.StatusMessageExpired:
+		if !m.statusExpiry.IsZero() && time.Now().After(m.statusExpiry) {
+			m.statusMsg = ""
+		}
+		return m, nil
+	default:
+	}
+
 	if m.searchActive {
 		return m.updateSearch(msg)
 	}

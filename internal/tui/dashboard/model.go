@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
+	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
@@ -78,9 +80,12 @@ type Model struct {
 	filtered     []DashboardItem // after filter applied
 	cursor       int
 	stats        message.DashboardStats
+	viewport     viewport.Model
 	filterInput  textinput.Model
 	filterActive bool
 	filterText   string
+	statusMsg    string
+	statusExpiry time.Time
 	sortOrder    string
 	width        int
 	height       int
@@ -176,6 +181,56 @@ func (m *Model) applyFilter() {
 	// For now, show all items.
 	if m.cursor >= len(m.filtered) {
 		m.cursor = max(0, len(m.filtered)-1)
+	}
+	m.updateContent()
+}
+
+// viewportHeight returns the height available for the scrollable item list.
+// Fixed chrome: status/filter bar (1). When items exist: column header (1) + sort line (1).
+func (m Model) viewportHeight() int {
+	chrome := 1 // status/filter bar
+	if len(m.filtered) > 0 {
+		chrome += 2 // column header + sort indicator
+	}
+	h := m.height - chrome
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// updateContent rebuilds the viewport content from the current items and cursor.
+// Only item rows go in the viewport; column headers and sort indicator are rendered
+// as fixed chrome in View().
+func (m *Model) updateContent() {
+	if m.width == 0 || m.height == 0 {
+		return
+	}
+
+	m.viewport.Height = m.viewportHeight()
+
+	if len(m.filtered) == 0 {
+		m.viewport.SetContent("\n" + mutedStyle.Render("  "+components.EmptyProposals()) + "\n")
+	} else {
+		m.viewport.SetContent(m.renderItemRows())
+	}
+
+	m.ensureCursorVisible()
+}
+
+// ensureCursorVisible adjusts the viewport scroll offset so the cursor row is visible.
+func (m *Model) ensureCursorVisible() {
+	if len(m.filtered) == 0 {
+		return
+	}
+	cursorLine := m.cursor
+	yOff := m.viewport.YOffset
+	h := m.viewport.Height
+
+	if cursorLine < yOff {
+		m.viewport.YOffset = cursorLine
+	} else if cursorLine >= yOff+h {
+		m.viewport.YOffset = cursorLine - h + 1
 	}
 }
 

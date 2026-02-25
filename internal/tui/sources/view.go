@@ -381,12 +381,12 @@ func (m Model) renderDetail() string {
 }
 
 func (m Model) renderStatusBar() string {
-	return components.RenderStatusBar(m.keys.SourcesShortHelp(), "", m.width)
+	return components.RenderStatusBar(m.keys.SourcesShortHelp(), m.statusMsg, m.width)
 }
 
 func (m Model) renderDetailStatusBar() string {
 	bindings := []key.Binding{m.keys.SetOwnership, m.keys.ToggleApproach, m.keys.Rollback, m.keys.Back, m.keys.Help}
-	return components.RenderStatusBar(bindings, "", m.width)
+	return components.RenderStatusBar(bindings, m.statusMsg, m.width)
 }
 
 // Column layout.

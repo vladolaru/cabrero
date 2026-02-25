@@ -4,6 +4,8 @@
 package fitness
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 
@@ -26,6 +28,8 @@ type Model struct {
 	evidence         []fitness.EvidenceGroup
 	selectedEvidence int // cursor for evidence groups
 	focus            Focus
+	statusMsg        string
+	statusExpiry     time.Time
 	spinner          spinner.Model
 	width            int
 	height           int

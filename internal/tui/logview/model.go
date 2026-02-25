@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -83,6 +84,8 @@ type Model struct {
 	followMode   bool
 	matches      []lineMatch
 	matchIdx     int // current match index, -1 if none
+	statusMsg    string
+	statusExpiry time.Time
 	width        int
 	height       int
 	keys         *shared.KeyMap

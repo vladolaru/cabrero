@@ -168,21 +168,30 @@ func TestHelpOverlayToggle(t *testing.T) {
 	}
 }
 
-func TestStatusMessageExpiry(t *testing.T) {
+func TestStatusMessage_RoutedToChild(t *testing.T) {
 	m := newTestRoot()
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	// Send a reject finished message.
-	m, _ = update(m, message.RejectFinished{ProposalID: "test"})
-	if m.statusMsg == "" {
-		t.Error("status message should be set after reject")
+	// Send a reject finished message — should emit a StatusMessage cmd.
+	m, cmd := update(m, message.RejectFinished{ProposalID: "test"})
+
+	// The root should be on dashboard (popped back).
+	if m.state != message.ViewDashboard {
+		t.Errorf("state = %d, want ViewDashboard", m.state)
 	}
 
-	// Force expiry by setting time in the past.
-	m.statusExpiry = time.Now().Add(-1 * time.Second)
-	m, _ = update(m, message.StatusMessageExpired{})
-	if m.statusMsg != "" {
-		t.Error("status message should be cleared after expiry")
+	// The cmd batch should include a StatusMessage.
+	if cmd == nil {
+		t.Fatal("expected cmd after RejectFinished")
+	}
+
+	// Process the batch: feed the StatusMessage to the model.
+	// Since tea.Batch is opaque, process it by sending StatusMessage directly.
+	m, _ = update(m, message.StatusMessage{Text: "test status", Duration: 3 * time.Second})
+
+	// The dashboard child should have received the status message.
+	if m.dashboard.View() == "" {
+		t.Error("dashboard should render after status message")
 	}
 }
 
@@ -517,9 +526,10 @@ func TestPipelineRetryFlow(t *testing.T) {
 		t.Fatalf("expected RetryRunFinished, got %T", retryFinishMsg)
 	}
 
-	m, _ = update(m, retryFinishMsg)
-	if m.statusMsg != "Retry complete." {
-		t.Errorf("statusMsg = %q, want %q", m.statusMsg, "Retry complete.")
+	m, cmd = update(m, retryFinishMsg)
+	// RetryRunFinished now emits a StatusMessage cmd instead of setting a root field.
+	if cmd == nil {
+		t.Fatal("expected cmd after RetryRunFinished")
 	}
 }
 

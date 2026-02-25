@@ -3,6 +3,7 @@ package sources
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -715,6 +716,24 @@ func TestSources_StatusBarShowsKeyHints(t *testing.T) {
 		if !strings.Contains(view, hint) {
 			t.Errorf("status bar should contain %q", hint)
 		}
+	}
+}
+
+func TestSources_StatusMessage_Shown(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	m, cmd := m.Update(message.StatusMessage{Text: "Rollback complete.", Duration: 3 * time.Second})
+	if m.statusMsg != "Rollback complete." {
+		t.Errorf("statusMsg = %q", m.statusMsg)
+	}
+	if cmd == nil {
+		t.Fatal("expected expiry tick cmd")
+	}
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "Rollback complete.") {
+		t.Error("View() should show status message in status bar")
 	}
 }
 

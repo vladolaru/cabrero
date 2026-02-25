@@ -1,6 +1,8 @@
 package fitness
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -10,6 +12,22 @@ import (
 // Update handles messages for the fitness detail view.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case message.StatusMessage:
+		m.statusMsg = msg.Text
+		if msg.Duration > 0 {
+			m.statusExpiry = time.Now().Add(msg.Duration)
+			return m, tea.Tick(msg.Duration, func(time.Time) tea.Msg {
+				return message.StatusMessageExpired{}
+			})
+		}
+		return m, nil
+
+	case message.StatusMessageExpired:
+		if !m.statusExpiry.IsZero() && time.Now().After(m.statusExpiry) {
+			m.statusMsg = ""
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.SetSize(msg.Width, msg.Height)
 		return m, nil

@@ -1,12 +1,15 @@
 package dashboard
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
@@ -184,6 +187,12 @@ func TestDashboard_View80x24(t *testing.T) {
 	if !strings.Contains(view, "fitness_report") {
 		t.Error("missing fitness report type")
 	}
+	if !strings.Contains(view, "Sort:") {
+		t.Error("missing sort indicator")
+	}
+	if !strings.Contains(view, "TYPE") {
+		t.Error("missing column headers")
+	}
 }
 
 func TestDashboard_OpenSendsMessage(t *testing.T) {
@@ -266,6 +275,100 @@ func TestDashboard_ActionKeysGatedOnProposal(t *testing.T) {
 	}
 }
 
+func TestDashboard_ViewportScrolls(t *testing.T) {
+	// Create a model with many proposals so items exceed viewport height.
+	keys := shared.NewKeyMap("arrows")
+	cfg := testdata.TestConfig()
+
+	// Generate 20 proposals.
+	proposals := make([]pipeline.ProposalWithSession, 20)
+	for i := range proposals {
+		proposals[i] = testdata.TestProposal(func(p *pipeline.Proposal) {
+			p.ID = fmt.Sprintf("prop-%03d", i)
+		})
+	}
+
+	m := New(proposals, nil, testdata.TestDashboardStats(), &keys, cfg)
+	// Height 8, chrome = 3 (column header + sort indicator + status bar) → viewport = 5.
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
+
+	if m.viewport.Height != 5 {
+		t.Fatalf("viewport height = %d, want 5", m.viewport.Height)
+	}
+
+	// Cursor starts at 0, viewport at top.
+	if m.viewport.YOffset != 0 {
+		t.Errorf("initial YOffset = %d, want 0", m.viewport.YOffset)
+	}
+
+	// Move cursor down past the viewport.
+	for i := 0; i < 10; i++ {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if m.cursor != 10 {
+		t.Fatalf("cursor = %d, want 10", m.cursor)
+	}
+
+	// Cursor line maps directly to viewport row (no header offset).
+	cursorLine := m.cursor
+	if cursorLine < m.viewport.YOffset || cursorLine >= m.viewport.YOffset+m.viewport.Height {
+		t.Errorf("cursor line %d not visible: YOffset=%d Height=%d", cursorLine, m.viewport.YOffset, m.viewport.Height)
+	}
+
+	// GotoBottom should show last item.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	if m.cursor != 19 {
+		t.Fatalf("cursor after End = %d, want 19", m.cursor)
+	}
+	cursorLine = m.cursor
+	if cursorLine < m.viewport.YOffset || cursorLine >= m.viewport.YOffset+m.viewport.Height {
+		t.Errorf("cursor line %d not visible after End: YOffset=%d", cursorLine, m.viewport.YOffset)
+	}
+
+	// GotoTop should scroll back to top.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	if m.cursor != 0 {
+		t.Fatalf("cursor after Home = %d, want 0", m.cursor)
+	}
+	if m.viewport.YOffset != 0 {
+		t.Errorf("YOffset after Home = %d, want 0", m.viewport.YOffset)
+	}
+}
+
+func TestDashboard_HalfPageScroll(t *testing.T) {
+	keys := shared.NewKeyMap("arrows")
+	cfg := testdata.TestConfig()
+
+	proposals := make([]pipeline.ProposalWithSession, 30)
+	for i := range proposals {
+		proposals[i] = testdata.TestProposal(func(p *pipeline.Proposal) {
+			p.ID = fmt.Sprintf("prop-%03d", i)
+		})
+	}
+
+	m := New(proposals, nil, testdata.TestDashboardStats(), &keys, cfg)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 21}) // viewport height = 18 (21 - 3 chrome)
+	halfPage := m.viewport.Height / 2                          // 9
+
+	// PgDn moves cursor by half a page.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	if m.cursor != halfPage {
+		t.Errorf("cursor after PgDn = %d, want %d", m.cursor, halfPage)
+	}
+
+	// PgUp moves back.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	if m.cursor != 0 {
+		t.Errorf("cursor after PgUp = %d, want 0", m.cursor)
+	}
+
+	// PgUp at top stays at 0.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	if m.cursor != 0 {
+		t.Errorf("cursor after PgUp at top = %d, want 0", m.cursor)
+	}
+}
+
 func TestDashboardItem_Methods(t *testing.T) {
 	m := newTestModel()
 
@@ -300,5 +403,40 @@ func TestDashboardItem_Methods(t *testing.T) {
 	}
 	if fitnessItem.Target() != "docx-helper" {
 		t.Errorf("fitness Target = %q, want %q", fitnessItem.Target(), "docx-helper")
+	}
+}
+
+func TestDashboard_StatusMessage_Shown(t *testing.T) {
+	m := newTestModel()
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	m, cmd := m.Update(message.StatusMessage{Text: "Change applied.", Duration: 3 * time.Second})
+	if m.statusMsg != "Change applied." {
+		t.Errorf("statusMsg = %q, want %q", m.statusMsg, "Change applied.")
+	}
+	if cmd == nil {
+		t.Fatal("expected expiry tick cmd")
+	}
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "Change applied.") {
+		t.Error("View() should contain the status message")
+	}
+}
+
+func TestDashboard_StatusMessage_Expiry(t *testing.T) {
+	m := newTestModel()
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	m, _ = m.Update(message.StatusMessage{Text: "hello", Duration: 3 * time.Second})
+	if m.statusMsg != "hello" {
+		t.Fatalf("statusMsg = %q", m.statusMsg)
+	}
+
+	// Simulate expiry: travel past the deadline.
+	m.statusExpiry = time.Now().Add(-1 * time.Second)
+	m, _ = m.Update(message.StatusMessageExpired{})
+	if m.statusMsg != "" {
+		t.Errorf("statusMsg should be cleared, got %q", m.statusMsg)
 	}
 }

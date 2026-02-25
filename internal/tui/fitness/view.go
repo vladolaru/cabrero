@@ -55,7 +55,7 @@ func (m Model) View() string {
 	}
 
 	// Status bar.
-	content += components.RenderStatusBar(m.keys.FitnessShortHelp(), "", m.width)
+	content += components.RenderStatusBar(m.keys.FitnessShortHelp(), m.statusMsg, m.width)
 
 	return content
 }

@@ -4,6 +4,8 @@
 package sources
 
 import (
+	"time"
+
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
@@ -20,6 +22,8 @@ type Model struct {
 	confirm         components.ConfirmModel
 	confirmState    ConfirmState
 	ownershipPrompt string // prompt text for ownership choice (m/n/esc)
+	statusMsg       string
+	statusExpiry    time.Time
 	width           int
 	height          int
 	keys            *shared.KeyMap

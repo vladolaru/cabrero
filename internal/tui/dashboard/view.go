@@ -36,34 +36,30 @@ func (m Model) View() string {
 
 	var b strings.Builder
 
-	// Column headers and content.
-	if len(m.filtered) == 0 {
-		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  " + components.EmptyProposals()))
-		b.WriteString("\n")
-	} else {
+	// Fixed chrome above viewport: column headers (only when items exist).
+	if len(m.filtered) > 0 {
 		b.WriteString(m.renderColumnHeaders())
 		b.WriteString("\n")
-		b.WriteString(m.renderItemList())
 	}
 
-	// Fill remaining space.
-	content := b.String()
-	lines := strings.Count(content, "\n")
-	statusBarHeight := 1
-	remaining := m.height - lines - statusBarHeight
-	if remaining > 0 {
-		content += strings.Repeat("\n", remaining)
+	// Scrollable item rows.
+	b.WriteString(m.viewport.View())
+	b.WriteString("\n")
+
+	// Fixed chrome below viewport: sort indicator (only when items exist).
+	if len(m.filtered) > 0 {
+		b.WriteString(mutedStyle.Render(fmt.Sprintf("  Sort: %s", m.sortOrder)))
+		b.WriteString("\n")
 	}
 
 	// Filter bar or status bar.
 	if m.filterActive {
-		content += m.filterInput.View()
+		b.WriteString(m.filterInput.View())
 	} else {
-		content += m.renderStatusBar()
+		b.WriteString(m.renderStatusBar())
 	}
 
-	return content
+	return b.String()
 }
 
 // RenderHeader renders the persistent header bar (title, version, daemon status, hooks).
@@ -148,7 +144,7 @@ func (m Model) renderColumnHeaders() string {
 	return mutedStyle.Render(header)
 }
 
-func (m Model) renderItemList() string {
+func (m Model) renderItemRows() string {
 	var b strings.Builder
 	cols := m.columnLayout()
 
@@ -177,13 +173,10 @@ func (m Model) renderItemList() string {
 		}
 
 		b.WriteString(line)
-		b.WriteString("\n")
+		if i < len(m.filtered)-1 {
+			b.WriteString("\n")
+		}
 	}
-
-	// Sort indicator.
-	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  Sort: %s", m.sortOrder)))
-	b.WriteString("\n")
 
 	return b.String()
 }
@@ -194,7 +187,7 @@ func (m Model) renderStatusBar() string {
 	// Empty state: show only navigation keys that make sense.
 	if len(m.filtered) == 0 {
 		bindings := []key.Binding{keys.Sources, keys.Pipeline, keys.Help}
-		return components.RenderStatusBar(bindings, "", m.width)
+		return components.RenderStatusBar(bindings, m.statusMsg, m.width)
 	}
 
 	// Show different actions depending on the selected item type.
@@ -203,10 +196,10 @@ func (m Model) renderStatusBar() string {
 		bindings := []key.Binding{
 			keys.Up, keys.Down, keys.Open, keys.Sources, keys.Help,
 		}
-		return components.RenderStatusBar(bindings, "", m.width)
+		return components.RenderStatusBar(bindings, m.statusMsg, m.width)
 	}
 
-	return components.RenderStatusBar(keys.ShortHelp(), "", m.width)
+	return components.RenderStatusBar(keys.ShortHelp(), m.statusMsg, m.width)
 }
 
 // Column layout.
