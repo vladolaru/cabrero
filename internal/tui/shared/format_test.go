@@ -23,3 +23,17 @@ func TestRelativeTime(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckmark(t *testing.T) {
+	ok := Checkmark(true)
+	if ok == "" {
+		t.Error("Checkmark(true) should return non-empty string")
+	}
+	notOk := Checkmark(false)
+	if notOk == "" {
+		t.Error("Checkmark(false) should return non-empty string")
+	}
+	if ok == notOk {
+		t.Error("Checkmark(true) and Checkmark(false) should differ")
+	}
+}

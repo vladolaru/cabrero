@@ -96,8 +96,8 @@ func (m Model) renderDaemonHeader() string {
 	var right strings.Builder
 	right.WriteString("  " + sectionHeaderStyle.Render("HOOKS"))
 	right.WriteString("\n")
-	right.WriteString(fmt.Sprintf("  pre-compact:  %s\n", checkmark(m.dashStats.HookPreCompact)))
-	right.WriteString(fmt.Sprintf("  session-end:  %s", checkmark(m.dashStats.HookSessionEnd)))
+	right.WriteString(fmt.Sprintf("  pre-compact:  %s\n", shared.Checkmark(m.dashStats.HookPreCompact)))
+	right.WriteString(fmt.Sprintf("  session-end:  %s", shared.Checkmark(m.dashStats.HookSessionEnd)))
 
 	if mode != layoutNarrow {
 		right.WriteString("\n\n")
@@ -334,13 +334,6 @@ func statusIndicator(status string) string {
 	default:
 		return "?"
 	}
-}
-
-func checkmark(ok bool) string {
-	if ok {
-		return successStyle.Render("✓")
-	}
-	return errorStyle.Render("✗")
 }
 
 // formatTimingForMode formats per-stage timing based on layout mode.

@@ -24,6 +24,14 @@ func ShortenHome(path string) string {
 	return path
 }
 
+// Checkmark renders a ✓ (success) or ✗ (error) with appropriate color.
+func Checkmark(ok bool) string {
+	if ok {
+		return SuccessStyle.Render("✓")
+	}
+	return ErrorStyle.Render("✗")
+}
+
 // Truncate shortens s to maxLen runes, appending "..." if truncated.
 // If maxLen is <= 0, returns empty. If maxLen <= 3, returns a raw slice.
 func Truncate(s string, maxLen int) string {

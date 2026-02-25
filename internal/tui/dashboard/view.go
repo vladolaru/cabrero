@@ -84,8 +84,8 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 		lastCapture = mutedStyle.Render("Last capture:") + " " + shared.RelativeTime(*stats.LastCaptureTime)
 	}
 
-	hookPre := checkMark(stats.HookPreCompact)
-	hookEnd := checkMark(stats.HookSessionEnd)
+	hookPre := shared.Checkmark(stats.HookPreCompact)
+	hookEnd := shared.Checkmark(stats.HookSessionEnd)
 	hooks := mutedStyle.Render("Hooks:") + fmt.Sprintf(" pre-compact %s  session-end %s", hookPre, hookEnd)
 
 	debugIndicator := ""
@@ -223,12 +223,5 @@ func (m Model) columnLayout() columnSpec {
 		targetWidth = 15
 	}
 	return columnSpec{typeWidth: colType, targetWidth: targetWidth}
-}
-
-func checkMark(ok bool) string {
-	if ok {
-		return successStyle.Render("✓")
-	}
-	return errorStyle.Render("✗")
 }
 
