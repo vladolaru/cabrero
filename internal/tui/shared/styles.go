@@ -27,8 +27,9 @@ var (
 	SuccessStyle  = lipgloss.NewStyle().Foreground(ColorSuccess)
 	ErrorStyle    = lipgloss.NewStyle().Foreground(ColorError)
 	WarningStyle  = lipgloss.NewStyle().Foreground(ColorWarning)
-	AccentStyle   = lipgloss.NewStyle().Foreground(ColorAccent)
-	SelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(ColorFgBold)
+	AccentStyle     = lipgloss.NewStyle().Foreground(ColorAccent)
+	AccentBoldStyle = lipgloss.NewStyle().Bold(true).Foreground(ColorAccent)
+	SelectedStyle   = lipgloss.NewStyle().Bold(true).Foreground(ColorFgBold)
 )
 
 // HighlightFg returns the foreground color string for search match highlighting.
