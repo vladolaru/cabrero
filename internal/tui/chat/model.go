@@ -8,7 +8,6 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
@@ -195,30 +194,30 @@ func (m *Model) updateViewportContent() {
 	for _, msg := range m.messages {
 		switch msg.Role {
 		case "user":
-			b.WriteString(chatLabelStyle.Render("You:") + " " + msg.Rendered)
+			b.WriteString(shared.ChatAccentStyle.Bold(true).Render("You:") + " " + msg.Rendered)
 			b.WriteString("\n\n")
 		case "assistant":
-			b.WriteString(chatLabelStyle.Render("AI:") + " " + msg.Rendered)
+			b.WriteString(shared.ChatAccentStyle.Bold(true).Render("AI:") + " " + msg.Rendered)
 			b.WriteString("\n\n")
 		}
 	}
 
 	if m.streaming {
 		spinnerPrefix := m.spinner.View() + " "
-		b.WriteString(spinnerPrefix + chatAccent.Render(m.waitingMsg))
+		b.WriteString(spinnerPrefix + shared.ChatAccentStyle.Render(m.waitingMsg))
 		if len(m.activityLines) > 0 {
 			// Pad activity lines to align with text after spinner.
 			pad := strings.Repeat(" ", lipgloss.Width(spinnerPrefix))
 			b.WriteString("\n")
 			for _, line := range m.activityLines {
-				b.WriteString(pad + chatMuted.Render(line) + "\n")
+				b.WriteString(pad + shared.MutedStyle.Render(line) + "\n")
 			}
 		}
 	}
 
 	content := b.String()
 	if !m.Focused {
-		content = muteANSI(content)
+		content = shared.MuteANSI(content)
 	}
 	m.rawContent = content
 	wasAtBottom := m.viewport.AtBottom()
@@ -226,19 +225,6 @@ func (m *Model) updateViewportContent() {
 	if wasAtBottom {
 		m.viewport.GotoBottom()
 	}
-}
-
-// muteANSI strips all ANSI escape codes and re-applies chatMuted foreground,
-// producing uniformly muted text for the unfocused viewport.
-func muteANSI(s string) string {
-	stripped := ansi.Strip(s)
-	lines := strings.Split(stripped, "\n")
-	for i, line := range lines {
-		if line != "" {
-			lines[i] = chatMuted.Render(line)
-		}
-	}
-	return strings.Join(lines, "\n")
 }
 
 // applyHangingIndent adds indent spaces before all lines except the first.

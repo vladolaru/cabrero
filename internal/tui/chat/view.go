@@ -4,28 +4,17 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-var (
-	chatAccent     = lipgloss.NewStyle().Foreground(shared.ColorChat)
-	chatLabelStyle = lipgloss.NewStyle().Foreground(shared.ColorChat).Bold(true)
-	chatMuted      = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	chipNumStyle   = lipgloss.NewStyle().Foreground(shared.ColorChat).Bold(true)
-	chipTextStyle  = lipgloss.NewStyle().Foreground(shared.ColorChat)
-	chipMutedNum   = lipgloss.NewStyle().Foreground(shared.ColorMuted).Bold(true)
-	chipMutedText  = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-)
 
 // renderChip formats a single question chip as "  [N] text".
 func renderChip(idx int, text string, focused bool) string {
-	numStyle := chipMutedNum
-	textStyle := chipMutedText
+	numStyle := shared.MutedStyle.Bold(true)
+	textStyle := shared.MutedStyle
 	if focused {
-		numStyle = chipNumStyle
-		textStyle = chipTextStyle
+		numStyle = shared.ChatAccentStyle.Bold(true)
+		textStyle = shared.ChatAccentStyle
 	}
 	return numStyle.Render(fmt.Sprintf("[%d]", idx+1)) + " " + textStyle.Render(text)
 }
@@ -33,9 +22,9 @@ func renderChip(idx int, text string, focused bool) string {
 // RenderInline returns the chat content with a bounded viewport for messages.
 // Used in narrow mode where the chat is part of the detail's scrollable viewport.
 func (m Model) RenderInline() string {
-	headerStyle := chatAccent
+	headerStyle := shared.ChatAccentStyle
 	if !m.Focused {
-		headerStyle = chatMuted
+		headerStyle = shared.MutedStyle
 	}
 
 	var b strings.Builder
@@ -74,7 +63,7 @@ func (m Model) RenderInlineInput() string {
 	if m.input.Focused() {
 		return "  " + m.input.View()
 	}
-	return chatMuted.Render("  Press enter to type...")
+	return shared.MutedStyle.Render("  Press enter to type...")
 }
 
 // View renders the chat panel (wide mode, horizontal split).
@@ -83,9 +72,9 @@ func (m Model) View() string {
 		return ""
 	}
 
-	headerStyle := chatAccent
+	headerStyle := shared.ChatAccentStyle
 	if !m.Focused {
-		headerStyle = chatMuted
+		headerStyle = shared.MutedStyle
 	}
 
 	var b strings.Builder
@@ -122,7 +111,7 @@ func (m Model) View() string {
 	if m.input.Focused() {
 		content += m.input.View()
 	} else {
-		content += chatMuted.Render("Press enter to type...")
+		content += shared.MutedStyle.Render("Press enter to type...")
 	}
 	content += "\n"
 

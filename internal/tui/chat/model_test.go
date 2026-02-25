@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 func newTestChat() Model {
@@ -273,16 +274,16 @@ func TestChat_SetFocused_NoopOnSameValue(t *testing.T) {
 }
 
 func TestChat_MuteANSI_EmptyString(t *testing.T) {
-	result := muteANSI("")
+	result := shared.MuteANSI("")
 	if result != "" {
-		t.Errorf("muteANSI(\"\") = %q, want empty", result)
+		t.Errorf("shared.MuteANSI(\"\") = %q, want empty", result)
 	}
 }
 
 func TestChat_MuteANSI_PreservesText(t *testing.T) {
 	// muteANSI should strip ANSI codes and still contain the original text.
 	input := "\x1b[1;34mYou:\x1b[0m Hello world"
-	result := muteANSI(input)
+	result := shared.MuteANSI(input)
 	if !strings.Contains(result, "You:") || !strings.Contains(result, "Hello world") {
 		t.Errorf("muteANSI should preserve text, got %q", result)
 	}
@@ -291,7 +292,7 @@ func TestChat_MuteANSI_PreservesText(t *testing.T) {
 func TestChat_MuteANSI_BlankLines(t *testing.T) {
 	// Blank lines should remain blank (not wrapped in a style).
 	input := "line1\n\nline3"
-	result := muteANSI(input)
+	result := shared.MuteANSI(input)
 	lines := strings.Split(result, "\n")
 	if len(lines) != 3 {
 		t.Fatalf("expected 3 lines, got %d", len(lines))

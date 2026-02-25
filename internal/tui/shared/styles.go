@@ -26,14 +26,15 @@ var (
 
 // Reusable lipgloss styles — rebuilt by InitStyles/ReinitStyles.
 var (
-	HeaderStyle     lipgloss.Style
-	MutedStyle      lipgloss.Style
-	SuccessStyle    lipgloss.Style
-	ErrorStyle      lipgloss.Style
-	WarningStyle    lipgloss.Style
-	AccentStyle     lipgloss.Style
-	SelectedStyle   lipgloss.Style
-	AccentBoldStyle lipgloss.Style
+	HeaderStyle      lipgloss.Style
+	MutedStyle       lipgloss.Style
+	SuccessStyle     lipgloss.Style
+	ErrorStyle       lipgloss.Style
+	WarningStyle     lipgloss.Style
+	AccentStyle      lipgloss.Style
+	SelectedStyle    lipgloss.Style
+	AccentBoldStyle  lipgloss.Style
+	ChatAccentStyle  lipgloss.Style
 )
 
 // InitStyles sets all color and style vars for the given background.
@@ -61,6 +62,7 @@ func InitStyles(isDark bool) {
 	AccentStyle = lipgloss.NewStyle().Foreground(ColorAccent)
 	SelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(ColorFgBold)
 	AccentBoldStyle = lipgloss.NewStyle().Bold(true).Foreground(ColorAccent)
+	ChatAccentStyle = lipgloss.NewStyle().Foreground(ColorChat)
 }
 
 // ReinitStyles rebuilds all styles for the updated background. Call from
