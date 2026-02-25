@@ -2,6 +2,7 @@ package sources
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -30,7 +31,6 @@ var (
 	mutedStyle         = shared.MutedStyle
 	selectedStyle      = shared.SelectedStyle
 	successStyle       = shared.SuccessStyle
-	warningStyle       = shared.WarningStyle
 	accentStyle        = shared.AccentStyle
 	errorStyle         = shared.ErrorStyle
 )
@@ -273,7 +273,24 @@ func renderHealth(s fitness.Source) string {
 		return mutedStyle.Render("n/a")
 	}
 
-	return renderBar(s.HealthScore, s.Approach)
+	c := healthColor(s.HealthScore, s.Approach)
+	bar := components.RenderBar(s.HealthScore, 10, c)
+	return fmt.Sprintf("%s %3.0f%%", bar, s.HealthScore)
+}
+
+// healthColor returns the bar color for a source health score.
+func healthColor(score float64, approach string) color.Color {
+	if approach == "iterate" {
+		return shared.ColorSuccess
+	}
+	switch {
+	case score >= 80:
+		return shared.ColorSuccess
+	case score >= 50:
+		return shared.ColorWarning
+	default:
+		return shared.ColorError
+	}
 }
 
 // renderHealthText returns a plain-text health summary for the detail info section.
@@ -285,39 +302,6 @@ func renderHealthText(s *fitness.Source) string {
 		return "n/a"
 	}
 	return fmt.Sprintf("%.0f%%", s.HealthScore)
-}
-
-// renderBar renders a text-based progress bar.
-// For iterate sources: green filled bar (approval ratio).
-// For evaluate sources: colored by score thresholds.
-func renderBar(score float64, approach string) string {
-	const barWidth = 10
-	filled := int(score / 100.0 * float64(barWidth))
-	if filled > barWidth {
-		filled = barWidth
-	}
-	if filled < 0 {
-		filled = 0
-	}
-
-	empty := barWidth - filled
-
-	var barStyle lipgloss.Style
-	switch {
-	case approach == "iterate":
-		barStyle = successStyle
-	case score >= 80:
-		barStyle = successStyle
-	case score >= 50:
-		barStyle = warningStyle
-	default:
-		barStyle = errorStyle
-	}
-
-	bar := barStyle.Render(strings.Repeat("\u2588", filled)) +
-		mutedStyle.Render(strings.Repeat("\u2591", empty))
-
-	return fmt.Sprintf("%s %3.0f%%", bar, score)
 }
 
 // Detail sub-view.

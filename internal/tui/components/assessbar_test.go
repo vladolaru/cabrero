@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 func TestRenderAssessBar_Full(t *testing.T) {
@@ -48,6 +49,34 @@ func TestRenderAssessBar_Half(t *testing.T) {
 	}
 	if empty != 10 {
 		t.Errorf("expected 10 empty chars, got %d", empty)
+	}
+}
+
+func TestRenderBar_FilledEmpty(t *testing.T) {
+	// At 0%: all empty.
+	bar := RenderBar(0, 10, shared.ColorSuccess)
+	stripped := ansi.Strip(bar)
+	if strings.ContainsRune(stripped, barFilled) {
+		t.Error("0% bar should have no filled chars")
+	}
+	if len([]rune(stripped)) != 10 {
+		t.Errorf("bar width = %d, want 10", len([]rune(stripped)))
+	}
+
+	// At 100%: all filled.
+	bar = RenderBar(100, 10, shared.ColorSuccess)
+	stripped = ansi.Strip(bar)
+	if strings.ContainsRune(stripped, barEmpty) {
+		t.Error("100% bar should have no empty chars")
+	}
+
+	// At 50%: half filled.
+	bar = RenderBar(50, 10, shared.ColorSuccess)
+	stripped = ansi.Strip(bar)
+	filled := strings.Count(stripped, string(barFilled))
+	empty := strings.Count(stripped, string(barEmpty))
+	if filled != 5 || empty != 5 {
+		t.Errorf("50%% bar: filled=%d empty=%d, want 5 each", filled, empty)
 	}
 }
 

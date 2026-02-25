@@ -40,35 +40,31 @@ func categoryColor(category string) color.Color {
 	}
 }
 
-// RenderAssessBar renders a horizontal fitness bar.
-// percent is 0-100, width is the total character width available for the bar.
-// category determines the filled portion color (green/yellow/red).
-func RenderAssessBar(percent float64, width int, category string) string {
+// RenderBar renders a horizontal progress bar of the given width.
+// percent is 0–100, c is applied to the filled portion.
+func RenderBar(percent float64, width int, c color.Color) string {
 	if width <= 0 {
 		return ""
 	}
-
-	// Clamp percent to [0, 100].
 	if percent < 0 {
 		percent = 0
 	}
 	if percent > 100 {
 		percent = 100
 	}
-
 	filled := int(math.Round(float64(width) * percent / 100))
 	if filled > width {
 		filled = width
 	}
 	empty := width - filled
-
-	color := categoryColor(category)
-	filledStyle := lipgloss.NewStyle().Foreground(color)
-
-	bar := filledStyle.Render(strings.Repeat(string(barFilled), filled)) +
+	filledStyle := lipgloss.NewStyle().Foreground(c)
+	return filledStyle.Render(strings.Repeat(string(barFilled), filled)) +
 		strings.Repeat(string(barEmpty), empty)
+}
 
-	return bar
+// RenderAssessBar renders a horizontal fitness bar colored by assessment category.
+func RenderAssessBar(percent float64, width int, category string) string {
+	return RenderBar(percent, width, categoryColor(category))
 }
 
 // RenderAssessment renders the full three-row assessment with labels and bars.
@@ -151,9 +147,7 @@ func renderAssessRow(r assessRow, labelWidth, totalWidth int) string {
 		dots = " "
 	}
 
-	mutedStyle := lipgloss.NewStyle().Foreground(shared.ColorMuted)
-
 	bar := RenderAssessBar(r.percent, barWidth, r.category)
 
-	return indent + label + mutedStyle.Render(dots) + " " + countStr + "  " + bar + "  " + pctStr
+	return indent + label + shared.MutedStyle.Render(dots) + " " + countStr + "  " + bar + "  " + pctStr
 }
