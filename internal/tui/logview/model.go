@@ -11,7 +11,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
-	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 
@@ -285,24 +285,24 @@ func (m *Model) scrollToCursor() {
 
 // Color helper functions that read the adaptive colors.
 func mutedColor() string {
-	if lipgloss.HasDarkBackground() {
-		return shared.ColorMuted.Dark
+	if compat.HasDarkBackground {
+		return "#9E9E9E" // ColorMuted.Dark
 	}
-	return shared.ColorMuted.Light
+	return "#757575" // ColorMuted.Light
 }
 
 func errorColor() string {
-	if lipgloss.HasDarkBackground() {
-		return shared.ColorError.Dark
+	if compat.HasDarkBackground {
+		return "#EF5350" // ColorError.Dark
 	}
-	return shared.ColorError.Light
+	return "#C62828" // ColorError.Light
 }
 
 func accentColor() string {
-	if lipgloss.HasDarkBackground() {
-		return shared.ColorAccent.Dark
+	if compat.HasDarkBackground {
+		return "#CE93D8" // ColorAccent.Dark
 	}
-	return shared.ColorAccent.Light
+	return "#6A1B9A" // ColorAccent.Light
 }
 
 // renderLevel returns a colored level badge.

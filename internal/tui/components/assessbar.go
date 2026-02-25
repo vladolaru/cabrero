@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 	"strings"
 
@@ -26,7 +27,7 @@ type assessRow struct {
 }
 
 // categoryColor returns the lipgloss color for a given assessment category.
-func categoryColor(category string) lipgloss.TerminalColor {
+func categoryColor(category string) color.Color {
 	switch category {
 	case "followed":
 		return shared.ColorSuccess

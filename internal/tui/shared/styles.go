@@ -1,20 +1,23 @@
 package shared
 
-import "charm.land/lipgloss/v2"
+import (
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
+)
 
 // Adaptive color pairs for light and dark terminals.
 var (
-	ColorSuccess = lipgloss.AdaptiveColor{Light: "#2E7D32", Dark: "#66BB6A"}
-	ColorError   = lipgloss.AdaptiveColor{Light: "#C62828", Dark: "#EF5350"}
-	ColorWarning = lipgloss.AdaptiveColor{Light: "#E65100", Dark: "#FFA726"}
-	ColorAccent  = lipgloss.AdaptiveColor{Light: "#6A1B9A", Dark: "#CE93D8"}
-	ColorMuted   = lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"}
-	ColorChat    = lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#4DB6AC"}
+	ColorSuccess = compat.AdaptiveColor{Light: lipgloss.Color("#2E7D32"), Dark: lipgloss.Color("#66BB6A")}
+	ColorError   = compat.AdaptiveColor{Light: lipgloss.Color("#C62828"), Dark: lipgloss.Color("#EF5350")}
+	ColorWarning = compat.AdaptiveColor{Light: lipgloss.Color("#E65100"), Dark: lipgloss.Color("#FFA726")}
+	ColorAccent  = compat.AdaptiveColor{Light: lipgloss.Color("#6A1B9A"), Dark: lipgloss.Color("#CE93D8")}
+	ColorMuted   = compat.AdaptiveColor{Light: lipgloss.Color("#757575"), Dark: lipgloss.Color("#9E9E9E")}
+	ColorChat    = compat.AdaptiveColor{Light: lipgloss.Color("#00695C"), Dark: lipgloss.Color("#4DB6AC")}
 
-	ColorFgBold      = lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}
-	ColorBorder      = lipgloss.AdaptiveColor{Light: "#BDBDBD", Dark: "#616161"}
-	ColorHighlightFg = lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#FFFFFF"}
-	ColorHighlightBg = lipgloss.AdaptiveColor{Light: "#6A1B9A", Dark: "#9C27B0"}
+	ColorFgBold      = compat.AdaptiveColor{Light: lipgloss.Color("#000000"), Dark: lipgloss.Color("#FFFFFF")}
+	ColorBorder      = compat.AdaptiveColor{Light: lipgloss.Color("#BDBDBD"), Dark: lipgloss.Color("#616161")}
+	ColorHighlightFg = compat.AdaptiveColor{Light: lipgloss.Color("#FFFFFF"), Dark: lipgloss.Color("#FFFFFF")}
+	ColorHighlightBg = compat.AdaptiveColor{Light: lipgloss.Color("#6A1B9A"), Dark: lipgloss.Color("#9C27B0")}
 )
 
 // Common reusable lipgloss styles.
@@ -31,18 +34,17 @@ var (
 // HighlightFg returns the foreground color string for search match highlighting.
 // Selects the correct adaptive variant based on terminal background.
 func HighlightFg() string {
-	if lipgloss.HasDarkBackground() {
-		return ColorHighlightFg.Dark
+	if compat.HasDarkBackground {
+		return "#FFFFFF"
 	}
-	return ColorHighlightFg.Light
+	return "#FFFFFF"
 }
 
 // HighlightBg returns the background color string for search match highlighting.
 // Selects the correct adaptive variant based on terminal background.
 func HighlightBg() string {
-	if lipgloss.HasDarkBackground() {
-		return ColorHighlightBg.Dark
+	if compat.HasDarkBackground {
+		return "#9C27B0"
 	}
-	return ColorHighlightBg.Light
+	return "#6A1B9A"
 }
-

@@ -3,15 +3,18 @@
 // package has no dependency on TUI internals.
 package cli
 
-import "charm.land/lipgloss/v2"
+import (
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
+)
 
 // Adaptive color pairs for light and dark terminals.
 var (
-	colorSuccess = lipgloss.AdaptiveColor{Light: "#2E7D32", Dark: "#66BB6A"}
-	colorError   = lipgloss.AdaptiveColor{Light: "#C62828", Dark: "#EF5350"}
-	colorWarning = lipgloss.AdaptiveColor{Light: "#E65100", Dark: "#FFA726"}
-	colorAccent  = lipgloss.AdaptiveColor{Light: "#6A1B9A", Dark: "#CE93D8"}
-	colorMuted   = lipgloss.AdaptiveColor{Light: "#757575", Dark: "#9E9E9E"}
+	colorSuccess = compat.AdaptiveColor{Light: lipgloss.Color("#2E7D32"), Dark: lipgloss.Color("#66BB6A")}
+	colorError   = compat.AdaptiveColor{Light: lipgloss.Color("#C62828"), Dark: lipgloss.Color("#EF5350")}
+	colorWarning = compat.AdaptiveColor{Light: lipgloss.Color("#E65100"), Dark: lipgloss.Color("#FFA726")}
+	colorAccent  = compat.AdaptiveColor{Light: lipgloss.Color("#6A1B9A"), Dark: lipgloss.Color("#CE93D8")}
+	colorMuted   = compat.AdaptiveColor{Light: lipgloss.Color("#757575"), Dark: lipgloss.Color("#9E9E9E")}
 )
 
 var (
