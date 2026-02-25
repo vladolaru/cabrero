@@ -15,6 +15,22 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
 )
 
+func TestDashboardItem_FilterValue(t *testing.T) {
+	p := testdata.TestProposal()
+	item := DashboardItem{Proposal: &p}
+
+	fv := item.FilterValue()
+	if !strings.Contains(fv, item.TypeName()) {
+		t.Errorf("FilterValue %q should contain TypeName %q", fv, item.TypeName())
+	}
+	if !strings.Contains(fv, "target:") {
+		t.Error("FilterValue should contain 'target:' tag")
+	}
+	if !strings.Contains(fv, "type:") {
+		t.Error("FilterValue should contain 'type:' tag")
+	}
+}
+
 func newTestModel() Model {
 	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()

@@ -66,7 +66,7 @@ func (m Model) SubHeader() string {
 }
 
 func (m Model) renderColumnHeaders() string {
-	cols := m.columnLayout()
+	cols := columnLayoutForWidth(m.width)
 
 	// Row: prefix(2) + " " + indicator(1) + " " + type(18) + "  " + target + "  " + confidence
 	// TYPE aligns with the bullet indicator at position 3 (prefix + space).
@@ -79,7 +79,7 @@ func (m Model) renderColumnHeaders() string {
 
 func (m Model) renderItemRows() string {
 	var b strings.Builder
-	cols := m.columnLayout()
+	cols := columnLayoutForWidth(m.width)
 
 	for i, item := range m.filtered {
 		prefix := "  "
@@ -147,11 +147,12 @@ type columnSpec struct {
 	targetWidth int
 }
 
-func (m Model) columnLayout() columnSpec {
+// columnLayoutForWidth computes column widths for the given terminal width.
+func columnLayoutForWidth(width int) columnSpec {
 	// Row: prefix(2) + " " + indicator(1) + " " + type + "  " + target + "  " + confidence
 	// Fixed overhead = 5 + typeWidth + 2 + 2 + confidenceWidth
 	overhead := 5 + colType + 2 + 2 + colConfidence
-	targetWidth := m.width - overhead
+	targetWidth := width - overhead
 	if targetWidth < 15 {
 		targetWidth = 15
 	}

@@ -65,6 +65,12 @@ func (d DashboardItem) Target() string {
 	return d.FitnessReport.SourceName
 }
 
+// FilterValue implements list.Item. Returns a tagged string used by dashboardFilter.
+// Format: "type:<TypeName> target:<Target> confidence:<Confidence>"
+func (d DashboardItem) FilterValue() string {
+	return "type:" + d.TypeName() + " target:" + d.Target() + " confidence:" + d.Confidence()
+}
+
 // Confidence returns the confidence level for proposals, or a health summary for reports.
 func (d DashboardItem) Confidence() string {
 	if d.IsProposal() {
