@@ -4,29 +4,21 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-var (
-	fitnessHeader  = lipgloss.NewStyle().Bold(true)
-	fitnessMuted   = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	fitnessSection = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
-	fitnessAccent  = lipgloss.NewStyle().Foreground(shared.ColorAccent)
-)
 
 // SubHeader returns the view title and contextual stats for the fitness report.
 func (m Model) SubHeader() string {
-	title := fitnessHeader.Render("  Fitness Report")
+	title := shared.HeaderStyle.Render("  Fitness Report")
 	if m.report == nil {
 		return title
 	}
 	r := m.report
 	statsLine := fmt.Sprintf("  %s  ·  ownership: %s  ·  %d sessions",
 		r.SourceName, r.Ownership, r.ObservedCount)
-	return title + "\n" + fitnessMuted.Render(statsLine)
+	return title + "\n" + shared.MutedStyle.Render(statsLine)
 }
 
 // View renders the fitness report detail view.
@@ -70,7 +62,7 @@ func (m Model) renderViewportContent() string {
 	var b strings.Builder
 
 	// ASSESSMENT section.
-	b.WriteString(fitnessSection.Render("  ASSESSMENT"))
+	b.WriteString(shared.AccentBoldStyle.Render("  ASSESSMENT"))
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("\u2500", 17))
 	b.WriteString("\n")
@@ -83,7 +75,7 @@ func (m Model) renderViewportContent() string {
 	b.WriteString("\n\n")
 
 	// VERDICT section.
-	b.WriteString(fitnessSection.Render("  VERDICT"))
+	b.WriteString(shared.AccentBoldStyle.Render("  VERDICT"))
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("\u2500", 17))
 	b.WriteString("\n")
@@ -92,7 +84,7 @@ func (m Model) renderViewportContent() string {
 
 	// SESSION EVIDENCE section.
 	if len(m.evidence) > 0 {
-		b.WriteString(fitnessSection.Render(fmt.Sprintf("  SESSION EVIDENCE (%d groups)", len(m.evidence))))
+		b.WriteString(shared.AccentBoldStyle.Render(fmt.Sprintf("  SESSION EVIDENCE (%d groups)", len(m.evidence))))
 		b.WriteString("\n")
 		b.WriteString("  " + strings.Repeat("\u2500", 17))
 		b.WriteString("\n")
@@ -129,15 +121,15 @@ func (m Model) renderEvidence() string {
 		b.WriteString(fmt.Sprintf("  %s%s %s %s\n",
 			prefix,
 			chevron,
-			fitnessAccent.Render(categoryLabel),
-			fitnessMuted.Render(countLabel)))
+			shared.AccentStyle.Render(categoryLabel),
+			shared.MutedStyle.Render(countLabel)))
 
 		// Expanded entries.
 		if eg.Expanded {
 			for _, entry := range eg.Entries {
 				ts := entry.Timestamp.Format("2006-01-02 15:04")
 				b.WriteString(fmt.Sprintf("      %s  %s\n",
-					fitnessMuted.Render(ts),
+					shared.MutedStyle.Render(ts),
 					entry.Summary))
 				if entry.Detail != "" {
 					b.WriteString(shared.IndentBlock(entry.Detail, 8))

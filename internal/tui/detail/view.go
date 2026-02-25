@@ -6,22 +6,15 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-var (
-	detailHeader  = lipgloss.NewStyle().Bold(true)
-	detailMuted   = lipgloss.NewStyle().Foreground(shared.ColorMuted)
-	detailSection = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
-	detailAccent  = lipgloss.NewStyle().Foreground(shared.ColorAccent)
-)
 
 // SubHeader returns the view title and contextual stats for the proposal detail.
 func (m Model) SubHeader() string {
-	title := detailHeader.Render("  Proposal Detail")
+	title := shared.HeaderStyle.Render("  Proposal Detail")
 	if m.proposal == nil {
 		return title
 	}
@@ -30,7 +23,7 @@ func (m Model) SubHeader() string {
 		p.Type,
 		shared.ShortenHome(p.Target),
 		p.Confidence)
-	return title + "\n" + detailMuted.Render(statsLine)
+	return title + "\n" + shared.MutedStyle.Render(statsLine)
 }
 
 // View renders the proposal detail view.
@@ -85,7 +78,7 @@ func renderCitations(citations []shared.CitationEntry, cursor int, width int) st
 		if i == cursor {
 			prefix = "  > "
 		}
-		b.WriteString(fmt.Sprintf("%s%s\n", prefix, detailMuted.Render(c.Summary)))
+		b.WriteString(fmt.Sprintf("%s%s\n", prefix, shared.MutedStyle.Render(c.Summary)))
 		if c.Expanded {
 			b.WriteString(shared.WrapIndent(c.RawJSON, width, 6))
 			b.WriteString("\n")
