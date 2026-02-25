@@ -71,12 +71,12 @@ func TestDashboard_Navigation(t *testing.T) {
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	// Start at top.
-	if m.cursor != 0 {
-		t.Fatalf("initial cursor = %d, want 0", m.cursor)
+	if m.list.Index() != 0 {
+		t.Fatalf("initial index = %d, want 0", m.list.Index())
 	}
 
 	// Total items: 3 proposals + 2 fitness reports = 5.
-	totalItems := len(m.filtered)
+	totalItems := len(m.list.Items())
 	if totalItems != 5 {
 		t.Fatalf("total items = %d, want 5", totalItems)
 	}
@@ -84,33 +84,33 @@ func TestDashboard_Navigation(t *testing.T) {
 	// Move down through all items.
 	for i := 1; i < totalItems; i++ {
 		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-		if m.cursor != i {
-			t.Errorf("cursor after down %d = %d, want %d", i, m.cursor, i)
+		if m.list.Index() != i {
+			t.Errorf("index after down %d = %d, want %d", i, m.list.Index(), i)
 		}
 	}
 
 	// At bottom — should not go further.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	if m.cursor != totalItems-1 {
-		t.Errorf("cursor should stay at %d (bottom), got %d", totalItems-1, m.cursor)
+	if m.list.Index() != totalItems-1 {
+		t.Errorf("index should stay at %d (bottom), got %d", totalItems-1, m.list.Index())
 	}
 
 	// Move up.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
-	if m.cursor != totalItems-2 {
-		t.Errorf("cursor after up = %d, want %d", m.cursor, totalItems-2)
+	if m.list.Index() != totalItems-2 {
+		t.Errorf("index after up = %d, want %d", m.list.Index(), totalItems-2)
 	}
 
 	// Go to top.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyHome})
-	if m.cursor != 0 {
-		t.Errorf("cursor after home = %d, want 0", m.cursor)
+	if m.list.Index() != 0 {
+		t.Errorf("index after home = %d, want 0", m.list.Index())
 	}
 
 	// Go to bottom.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
-	if m.cursor != totalItems-1 {
-		t.Errorf("cursor after end = %d, want %d", m.cursor, totalItems-1)
+	if m.list.Index() != totalItems-1 {
+		t.Errorf("index after end = %d, want %d", m.list.Index(), totalItems-1)
 	}
 }
 
@@ -320,7 +320,7 @@ func TestDashboard_ActionKeysGatedOnProposal(t *testing.T) {
 	}
 }
 
-func TestDashboard_ViewportScrolls(t *testing.T) {
+func TestDashboard_ListScrolls(t *testing.T) {
 	// Create a model with many proposals so items exceed viewport height.
 	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()
@@ -334,53 +334,45 @@ func TestDashboard_ViewportScrolls(t *testing.T) {
 	}
 
 	m := New(proposals, nil, testdata.TestDashboardStats(), &keys, cfg)
-	// Height 8, chrome = 3 (column header + sort indicator + status bar) → viewport = 5.
+	// Height 8, chrome = 3 (column header + sort indicator + status bar) → list height = 5.
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
 
-	if m.viewport.Height() != 5 {
-		t.Fatalf("viewport height = %d, want 5", m.viewport.Height())
+	if m.list.Height() != 5 {
+		t.Fatalf("list height = %d, want 5", m.list.Height())
 	}
 
-	// Cursor starts at 0, viewport at top.
-	if m.viewport.YOffset() != 0 {
-		t.Errorf("initial YOffset = %d, want 0", m.viewport.YOffset())
+	// Cursor starts at 0.
+	if m.list.Index() != 0 {
+		t.Errorf("initial index = %d, want 0", m.list.Index())
 	}
 
 	// Move cursor down past the viewport.
 	for i := 0; i < 10; i++ {
 		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
-	if m.cursor != 10 {
-		t.Fatalf("cursor = %d, want 10", m.cursor)
+	if m.list.Index() != 10 {
+		t.Fatalf("index = %d, want 10", m.list.Index())
 	}
 
-	// Cursor line maps directly to viewport row (no header offset).
-	cursorLine := m.cursor
-	if cursorLine < m.viewport.YOffset() || cursorLine >= m.viewport.YOffset()+m.viewport.Height() {
-		t.Errorf("cursor line %d not visible: YOffset=%d Height=%d", cursorLine, m.viewport.YOffset(), m.viewport.Height())
+	// bubbles/list always keeps the selected item visible — verify index is correct.
+	if m.list.Index() < 0 || m.list.Index() >= len(m.list.Items()) {
+		t.Error("index out of range")
 	}
 
 	// GotoBottom should show last item.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
-	if m.cursor != 19 {
-		t.Fatalf("cursor after End = %d, want 19", m.cursor)
-	}
-	cursorLine = m.cursor
-	if cursorLine < m.viewport.YOffset() || cursorLine >= m.viewport.YOffset()+m.viewport.Height() {
-		t.Errorf("cursor line %d not visible after End: YOffset=%d", cursorLine, m.viewport.YOffset())
+	if m.list.Index() != 19 {
+		t.Fatalf("index after End = %d, want 19", m.list.Index())
 	}
 
 	// GotoTop should scroll back to top.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyHome})
-	if m.cursor != 0 {
-		t.Fatalf("cursor after Home = %d, want 0", m.cursor)
-	}
-	if m.viewport.YOffset() != 0 {
-		t.Errorf("YOffset after Home = %d, want 0", m.viewport.YOffset())
+	if m.list.Index() != 0 {
+		t.Fatalf("index after Home = %d, want 0", m.list.Index())
 	}
 }
 
-func TestDashboard_HalfPageScroll(t *testing.T) {
+func TestDashboard_PageScroll(t *testing.T) {
 	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()
 
@@ -392,25 +384,31 @@ func TestDashboard_HalfPageScroll(t *testing.T) {
 	}
 
 	m := New(proposals, nil, testdata.TestDashboardStats(), &keys, cfg)
-	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 21}) // viewport height = 18 (21 - 3 chrome)
-	halfPage := m.viewport.Height() / 2                          // 9
+	// Height 21, chrome = 3 → list height = 18.
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 21})
 
-	// PgDn moves cursor by half a page.
+	listHeight := m.list.Height() // should be 18
+	if listHeight != 18 {
+		t.Fatalf("list height = %d, want 18", listHeight)
+	}
+
+	// PgDn moves cursor by a full page (list's NextPage = listHeight items).
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
-	if m.cursor != halfPage {
-		t.Errorf("cursor after PgDn = %d, want %d", m.cursor, halfPage)
+	afterPgDn := m.list.Index()
+	if afterPgDn != listHeight {
+		t.Errorf("index after PgDn = %d, want %d (one full page)", afterPgDn, listHeight)
 	}
 
 	// PgUp moves back.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
-	if m.cursor != 0 {
-		t.Errorf("cursor after PgUp = %d, want 0", m.cursor)
+	if m.list.Index() != 0 {
+		t.Errorf("index after PgUp = %d, want 0", m.list.Index())
 	}
 
 	// PgUp at top stays at 0.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
-	if m.cursor != 0 {
-		t.Errorf("cursor after PgUp at top = %d, want 0", m.cursor)
+	if m.list.Index() != 0 {
+		t.Errorf("index after PgUp at top = %d, want 0", m.list.Index())
 	}
 }
 
@@ -418,7 +416,7 @@ func TestDashboardItem_Methods(t *testing.T) {
 	m := newTestModel()
 
 	// First item is a proposal.
-	item := m.filtered[0]
+	item := m.list.Items()[0].(DashboardItem)
 	if !item.IsProposal() {
 		t.Error("first item should be a proposal")
 	}
@@ -433,7 +431,7 @@ func TestDashboardItem_Methods(t *testing.T) {
 	}
 
 	// Fourth item (index 3) is a fitness report.
-	fitnessItem := m.filtered[3]
+	fitnessItem := m.list.Items()[3].(DashboardItem)
 	if !fitnessItem.IsFitnessReport() {
 		t.Error("item at index 3 should be a fitness report")
 	}

@@ -32,10 +32,17 @@ func (m Model) View() string {
 
 	// Scrollable list (handles empty state internally via custom rendering).
 	if len(m.list.VisibleItems()) == 0 && !m.list.SettingFilter() {
-		// No items at all — show flavor text.
-		b.WriteString("\n")
-		b.WriteString(shared.MutedStyle.Render("  " + components.EmptyProposals()))
-		b.WriteString("\n")
+		// No items — show flavor text padded to the list height so the view
+		// fills the terminal exactly as the list would when items are present.
+		// The empty block does NOT append a trailing \n; it's self-contained.
+		emptyLine := "\n" + shared.MutedStyle.Render("  "+components.EmptyProposals())
+		listHeight := m.list.Height()
+		padding := listHeight - strings.Count(emptyLine, "\n") - 1
+		if padding > 0 {
+			emptyLine += strings.Repeat("\n", padding)
+		}
+		b.WriteString(emptyLine)
+		b.WriteString("\n") // terminates the block (equivalent to list.View() + "\n")
 	} else {
 		b.WriteString(m.list.View())
 		b.WriteString("\n")
