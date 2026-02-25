@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"os/exec"
+	"strings"
 )
 
 // Notify sends a macOS notification using osascript.
@@ -12,16 +13,21 @@ func Notify(title, message string) error {
 }
 
 func escapeAppleScript(s string) string {
-	var out []byte
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
+	var b strings.Builder
+	b.Grow(len(s) + 8)
+	for _, r := range s {
+		switch r {
 		case '"':
-			out = append(out, '\\', '"')
+			b.WriteString(`\"`)
 		case '\\':
-			out = append(out, '\\', '\\')
+			b.WriteString(`\\`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
 		default:
-			out = append(out, s[i])
+			b.WriteRune(r)
 		}
 	}
-	return string(out)
+	return b.String()
 }
