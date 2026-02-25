@@ -147,7 +147,11 @@ func (m Model) renderBodyContent() string {
 		b.WriteString("  " + components.ConfirmApprove())
 	}
 
-	return b.String()
+	content := b.String()
+	if m.focus == FocusChat {
+		content = shared.MuteANSI(content)
+	}
+	return content
 }
 
 // Proposal returns the underlying proposal, or nil.
@@ -192,8 +196,15 @@ func (m *Model) ClearInlineChat() {
 // CurrentFocus returns which pane currently has focus.
 func (m Model) CurrentFocus() Focus { return m.focus }
 
-// SetFocus updates which pane has focus.
-func (m *Model) SetFocus(f Focus) { m.focus = f }
+// SetFocus updates which pane has focus and refreshes the body viewport so that
+// muting is applied or removed immediately.
+func (m *Model) SetFocus(f Focus) {
+	if m.focus == f {
+		return
+	}
+	m.focus = f
+	m.bodyViewport.SetContent(m.renderBodyContent())
+}
 
 // HasActivePrompt returns true when a confirmation prompt is active
 // and the view should handle Esc itself (to dismiss the prompt).

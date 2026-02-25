@@ -86,6 +86,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			} else {
 				m.focus = FocusProposal
 			}
+			m.bodyViewport.SetContent(m.renderBodyContent())
 		}
 		return m, nil
 

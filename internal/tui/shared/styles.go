@@ -2,8 +2,10 @@ package shared
 
 import (
 	"image/color"
+	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // IsDark reports whether the terminal has a dark background.
@@ -65,6 +67,19 @@ func InitStyles(isDark bool) {
 // appModel.Update() when tea.BackgroundColorMsg arrives.
 func ReinitStyles(isDark bool) {
 	InitStyles(isDark)
+}
+
+// MuteANSI strips all ANSI escape codes and re-applies MutedStyle foreground,
+// producing uniformly muted text for unfocused panels.
+func MuteANSI(s string) string {
+	stripped := ansi.Strip(s)
+	lines := strings.Split(stripped, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = MutedStyle.Render(line)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // HighlightFg returns the foreground hex for search match highlighting.
