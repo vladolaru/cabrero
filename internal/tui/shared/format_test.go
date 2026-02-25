@@ -1,8 +1,11 @@
 package shared
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestRelativeTime(t *testing.T) {
@@ -21,6 +24,21 @@ func TestRelativeTime(t *testing.T) {
 		if got != c.want {
 			t.Errorf("RelativeTime(%v) = %q, want %q", time.Since(c.t).Round(time.Second), got, c.want)
 		}
+	}
+}
+
+func TestRenderSubHeader(t *testing.T) {
+	result := RenderSubHeader("  Proposals", "  3 awaiting review")
+	stripped := ansi.Strip(result)
+	if !strings.Contains(stripped, "Proposals") {
+		t.Error("SubHeader should contain title")
+	}
+	if !strings.Contains(stripped, "3 awaiting review") {
+		t.Error("SubHeader should contain stats")
+	}
+	// Should be exactly two lines.
+	if strings.Count(result, "\n") != 1 {
+		t.Errorf("SubHeader should have exactly 1 newline, got %d", strings.Count(result, "\n"))
 	}
 }
 

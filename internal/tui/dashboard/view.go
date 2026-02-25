@@ -106,8 +106,6 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 
 // SubHeader returns the view title and stats line for the dashboard.
 func (m Model) SubHeader() string {
-	title := shared.HeaderStyle.Render("  Proposals")
-
 	statsLine := fmt.Sprintf("  %d awaiting review", m.stats.PendingCount)
 	if m.stats.ApprovedCount > 0 {
 		statsLine += fmt.Sprintf("  ·  %d approved", m.stats.ApprovedCount)
@@ -118,8 +116,7 @@ func (m Model) SubHeader() string {
 	if m.stats.FitnessReportCount > 0 {
 		statsLine += fmt.Sprintf("  ·  %d fitness reports", m.stats.FitnessReportCount)
 	}
-
-	return title + "\n" + shared.MutedStyle.Render(statsLine)
+	return shared.RenderSubHeader("  Proposals", statsLine)
 }
 
 func (m Model) renderColumnHeaders() string {

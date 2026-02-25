@@ -3,29 +3,20 @@ package logview
 import (
 	"fmt"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
-)
-
-var (
-	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
-	followOnStyle  = lipgloss.NewStyle().Foreground(shared.ColorSuccess)
-	followOffStyle = lipgloss.NewStyle().Foreground(shared.ColorMuted)
 )
 
 // SubHeader returns the view title and stats for the log viewer.
 func (m Model) SubHeader() string {
 	var followIndicator string
 	if m.followMode {
-		followIndicator = followOnStyle.Render("●")
+		followIndicator = shared.SuccessStyle.Render("●")
 	} else {
-		followIndicator = followOffStyle.Render("○")
+		followIndicator = shared.MutedStyle.Render("○")
 	}
-	title := "  " + titleStyle.Render("Log Viewer")
 	statsLine := fmt.Sprintf("  %d entries  ·  follow %s", len(m.entries), followIndicator)
-	return title + "\n" + statsLine
+	return shared.RenderSubHeader("  Log Viewer", statsLine)
 }
 
 // View renders the log viewer.

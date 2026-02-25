@@ -134,3 +134,9 @@ func WrapHangingIndent(s string, width, indent int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// RenderSubHeader renders the standard two-line view sub-header:
+// a bold title on the first line and a muted stats string on the second.
+func RenderSubHeader(title, stats string) string {
+	return HeaderStyle.Render(title) + "\n" + MutedStyle.Render(stats)
+}

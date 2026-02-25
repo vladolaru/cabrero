@@ -35,11 +35,10 @@ func (m Model) SubHeader() string {
 
 // detailSubHeader returns the sub-header for the source detail sub-view.
 func (m Model) detailSubHeader() string {
-	title := shared.HeaderStyle.Render("  Source Detail")
 	if m.detailSource == nil {
-		return title
+		return shared.RenderSubHeader("  Source Detail", "")
 	}
-	return title + "\n" + shared.MutedStyle.Render("  "+m.detailSource.Name)
+	return shared.RenderSubHeader("  Source Detail", "  "+m.detailSource.Name)
 }
 
 // View renders the source manager.
@@ -96,20 +95,18 @@ func (m Model) View() string {
 func (m Model) renderHeader() string {
 	total, iterate, evaluate, unclassified := m.sourceCounts()
 
-	title := shared.HeaderStyle.Render("  Source Manager")
-
 	stats := fmt.Sprintf("  %d sources", total)
 	if iterate > 0 {
-		stats += fmt.Sprintf("  \u00b7  %d iterate", iterate)
+		stats += fmt.Sprintf("  ·  %d iterate", iterate)
 	}
 	if evaluate > 0 {
-		stats += fmt.Sprintf("  \u00b7  %d evaluate", evaluate)
+		stats += fmt.Sprintf("  ·  %d evaluate", evaluate)
 	}
 	if unclassified > 0 {
-		stats += fmt.Sprintf("  \u00b7  %d unclassified", unclassified)
+		stats += fmt.Sprintf("  ·  %d unclassified", unclassified)
 	}
 
-	return title + "\n" + shared.MutedStyle.Render(stats)
+	return shared.RenderSubHeader("  Source Manager", stats)
 }
 
 func (m Model) renderColumnHeaders() string {

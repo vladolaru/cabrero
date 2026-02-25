@@ -14,16 +14,12 @@ import (
 
 // SubHeader returns the view title and contextual stats for the proposal detail.
 func (m Model) SubHeader() string {
-	title := shared.HeaderStyle.Render("  Proposal Detail")
 	if m.proposal == nil {
-		return title
+		return shared.RenderSubHeader("  Proposal Detail", "")
 	}
 	p := &m.proposal.Proposal
-	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s",
-		p.Type,
-		shared.ShortenHome(p.Target),
-		p.Confidence)
-	return title + "\n" + shared.MutedStyle.Render(statsLine)
+	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s", p.Type, shared.ShortenHome(p.Target), p.Confidence)
+	return shared.RenderSubHeader("  Proposal Detail", statsLine)
 }
 
 // View renders the proposal detail view.

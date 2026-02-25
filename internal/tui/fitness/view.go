@@ -11,14 +11,13 @@ import (
 
 // SubHeader returns the view title and contextual stats for the fitness report.
 func (m Model) SubHeader() string {
-	title := shared.HeaderStyle.Render("  Fitness Report")
 	if m.report == nil {
-		return title
+		return shared.RenderSubHeader("  Fitness Report", "")
 	}
 	r := m.report
 	statsLine := fmt.Sprintf("  %s  ·  ownership: %s  ·  %d sessions",
 		r.SourceName, r.Ownership, r.ObservedCount)
-	return title + "\n" + shared.MutedStyle.Render(statsLine)
+	return shared.RenderSubHeader("  Fitness Report", statsLine)
 }
 
 // View renders the fitness report detail view.
