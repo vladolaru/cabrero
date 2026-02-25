@@ -3,10 +3,12 @@ package tui
 import (
 	"os"
 	"testing"
+
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 func TestMain(m *testing.M) {
-	// Disable colors in tests for consistent output across terminals and CI.
 	os.Setenv("NO_COLOR", "1")
+	shared.InitStyles(true) // seed styles for all tests in this package
 	os.Exit(m.Run())
 }
