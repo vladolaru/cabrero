@@ -3,14 +3,15 @@ package dashboard
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
-	"charm.land/bubbles/v2/textinput"
-	"charm.land/bubbles/v2/viewport"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
-	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
@@ -65,12 +66,6 @@ func (d DashboardItem) Target() string {
 	return d.FitnessReport.SourceName
 }
 
-// FilterValue implements list.Item. Returns a tagged string used by dashboardFilter.
-// Format: "type:<TypeName> target:<Target> confidence:<Confidence>"
-func (d DashboardItem) FilterValue() string {
-	return "type:" + d.TypeName() + " target:" + d.Target() + " confidence:" + d.Confidence()
-}
-
 // Confidence returns the confidence level for proposals, or a health summary for reports.
 func (d DashboardItem) Confidence() string {
 	if d.IsProposal() {
@@ -80,21 +75,20 @@ func (d DashboardItem) Confidence() string {
 	return fmt.Sprintf("%d%% health", int(d.FitnessReport.Assessment.Followed.Percent))
 }
 
+// FilterValue implements list.Item. Returns a tagged string used by dashboardFilter.
+// Format: "type:<TypeName> target:<Target> confidence:<Confidence>"
+func (d DashboardItem) FilterValue() string {
+	return "type:" + d.TypeName() + " target:" + d.Target() + " confidence:" + d.Confidence()
+}
+
 // Model is the dashboard view model.
 type Model struct {
-	items        []DashboardItem
-	filtered     []DashboardItem // after filter applied
-	cursor       int
+	items        []DashboardItem // source of truth for sorting; also passed to list
+	list         list.Model
 	stats        message.DashboardStats
-	viewport     viewport.Model
-	filterInput  textinput.Model
-	filterActive bool
-	filterText   string
 	statusMsg    string
 	statusExpiry time.Time
 	sortOrder    string
-	width        int
-	height       int
 	keys         *shared.KeyMap
 	config       *shared.Config
 }
@@ -103,16 +97,29 @@ type Model struct {
 func New(proposals []pipeline.ProposalWithSession, reports []fitness.Report,
 	stats message.DashboardStats, keys *shared.KeyMap, cfg *shared.Config) Model {
 
-	fi := textinput.New()
-	fi.Placeholder = "type:skill target:docx or free text..."
-	fi.Prompt = "/ "
-
 	sortOrder := cfg.Dashboard.SortOrder
 	if sortOrder == "" {
 		sortOrder = SortNewest
 	}
 
-	// Build the unified item list: proposals first, then fitness reports.
+	// Build and sort the unified item list.
+	items := buildItems(proposals, reports)
+	sorted := sortItems(items, sortOrder)
+
+	l := newList(sorted, keys)
+
+	return Model{
+		items:     items,
+		list:      l,
+		stats:     stats,
+		sortOrder: sortOrder,
+		keys:      keys,
+		config:    cfg,
+	}
+}
+
+// buildItems constructs the unified item slice: proposals first, then fitness reports.
+func buildItems(proposals []pipeline.ProposalWithSession, reports []fitness.Report) []DashboardItem {
 	items := make([]DashboardItem, 0, len(proposals)+len(reports))
 	for i := range proposals {
 		items = append(items, DashboardItem{Proposal: &proposals[i]})
@@ -120,31 +127,108 @@ func New(proposals []pipeline.ProposalWithSession, reports []fitness.Report,
 	for i := range reports {
 		items = append(items, DashboardItem{FitnessReport: &reports[i]})
 	}
+	return items
+}
 
-	m := Model{
-		items:       items,
-		cursor:      0,
-		stats:       stats,
-		filterInput: fi,
-		sortOrder:   sortOrder,
-		keys:        keys,
-		config:      cfg,
+// sortItems returns a new slice sorted by the given sort order.
+func sortItems(items []DashboardItem, order string) []DashboardItem {
+	out := slices.Clone(items)
+	switch order {
+	case SortOldest:
+		slices.Reverse(out)
+	case SortConfidence:
+		slices.SortStableFunc(out, func(a, b DashboardItem) int {
+			return confidenceRank(b) - confidenceRank(a) // higher confidence first
+		})
+	case SortType:
+		slices.SortStableFunc(out, func(a, b DashboardItem) int {
+			if a.TypeName() < b.TypeName() {
+				return -1
+			}
+			if a.TypeName() > b.TypeName() {
+				return 1
+			}
+			return 0
+		})
+	default: // SortNewest — keep original order
 	}
-	m.applyFilter()
-	return m
+	return out
+}
+
+// confidenceRank maps confidence strings to sortable integers.
+func confidenceRank(d DashboardItem) int {
+	if d.IsFitnessReport() {
+		return int(d.FitnessReport.Assessment.Followed.Percent) // 0–100
+	}
+	switch d.Proposal.Proposal.Confidence {
+	case "high":
+		return 300
+	case "medium":
+		return 200
+	case "low":
+		return 100
+	default:
+		return 0
+	}
+}
+
+// newList constructs a configured list.Model for the dashboard.
+func newList(items []DashboardItem, keys *shared.KeyMap) list.Model {
+	listItems := toListItems(items)
+	l := list.New(listItems, dashboardDelegate{}, 0, 0)
+
+	// Disable all list chrome — we render our own.
+	l.SetShowTitle(false)
+	l.SetShowStatusBar(false)
+	l.SetShowPagination(false)
+	l.SetShowHelp(false)
+	l.SetShowFilter(false) // we render filter input ourselves in the status bar area
+	l.DisableQuitKeybindings()
+
+	// Custom filter for type:/target: prefix syntax.
+	l.Filter = dashboardFilter
+
+	// Remap list navigation to our KeyMap (respects arrows vs vim setting).
+	l.KeyMap.CursorUp = keys.Up
+	l.KeyMap.CursorDown = keys.Down
+	l.KeyMap.NextPage = keys.HalfPageDown
+	l.KeyMap.PrevPage = keys.HalfPageUp
+	l.KeyMap.GoToStart = keys.GotoTop
+	l.KeyMap.GoToEnd = keys.GotoBottom
+	l.KeyMap.Filter = keys.Filter
+	l.KeyMap.ClearFilter = keys.Back
+	l.KeyMap.CancelWhileFiltering = keys.Back
+	l.KeyMap.AcceptWhileFiltering = keys.Open
+
+	// Disable list's own quit/help bindings (root handles these).
+	off := key.NewBinding(key.WithDisabled())
+	l.KeyMap.Quit = off
+	l.KeyMap.ForceQuit = off
+	l.KeyMap.ShowFullHelp = off
+	l.KeyMap.CloseFullHelp = off
+
+	return l
+}
+
+func toListItems(items []DashboardItem) []list.Item {
+	out := make([]list.Item, len(items))
+	for i, item := range items {
+		out[i] = item
+	}
+	return out
 }
 
 // SelectedItem returns the DashboardItem at the current cursor position.
 func (m Model) SelectedItem() *DashboardItem {
-	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
+	item := m.list.SelectedItem()
+	if item == nil {
 		return nil
 	}
-	item := m.filtered[m.cursor]
-	return &item
+	di := item.(DashboardItem)
+	return &di
 }
 
-// SelectedProposal returns the proposal at the current cursor position, or nil
-// if the cursor is on a fitness report or the list is empty.
+// SelectedProposal returns the proposal at the cursor, or nil.
 func (m Model) SelectedProposal() *pipeline.ProposalWithSession {
 	item := m.SelectedItem()
 	if item == nil || !item.IsProposal() {
@@ -153,8 +237,7 @@ func (m Model) SelectedProposal() *pipeline.ProposalWithSession {
 	return item.Proposal
 }
 
-// SelectedFitnessReport returns the fitness report at the current cursor position,
-// or nil if the cursor is on a proposal or the list is empty.
+// SelectedFitnessReport returns the fitness report at the cursor, or nil.
 func (m Model) SelectedFitnessReport() *fitness.Report {
 	item := m.SelectedItem()
 	if item == nil || !item.IsFitnessReport() {
@@ -163,79 +246,25 @@ func (m Model) SelectedFitnessReport() *fitness.Report {
 	return item.FitnessReport
 }
 
-// HasActiveInput returns true when the filter input is active (user is typing).
+// HasActiveInput returns true when the filter input is active.
 func (m Model) HasActiveInput() bool {
-	return m.filterActive
+	return m.list.SettingFilter()
 }
 
-// CycleSortOrder advances to the next sort order.
-func (m *Model) CycleSortOrder() {
+// CycleSortOrder advances to the next sort order and refreshes the list.
+func (m *Model) CycleSortOrder() tea.Cmd {
 	for i, s := range sortOrders {
 		if s == m.sortOrder {
 			m.sortOrder = sortOrders[(i+1)%len(sortOrders)]
-			m.applyFilter()
-			return
+			return m.applySort()
 		}
 	}
 	m.sortOrder = SortNewest
-	m.applyFilter()
+	return m.applySort()
 }
 
-func (m *Model) applyFilter() {
-	m.filtered = m.items
-	// Future: implement actual filtering by type/target/text.
-	// For now, show all items.
-	if m.cursor >= len(m.filtered) {
-		m.cursor = max(0, len(m.filtered)-1)
-	}
-	m.updateContent()
-}
-
-// viewportHeight returns the height available for the scrollable item list.
-// Fixed chrome: status/filter bar (1). When items exist: column header (1) + sort line (1).
-func (m Model) viewportHeight() int {
-	chrome := 1 // status/filter bar
-	if len(m.filtered) > 0 {
-		chrome += 2 // column header + sort indicator
-	}
-	h := m.height - chrome
-	if h < 1 {
-		h = 1
-	}
-	return h
-}
-
-// updateContent rebuilds the viewport content from the current items and cursor.
-// Only item rows go in the viewport; column headers and sort indicator are rendered
-// as fixed chrome in View().
-func (m *Model) updateContent() {
-	if m.width == 0 || m.height == 0 {
-		return
-	}
-
-	m.viewport.SetHeight(m.viewportHeight())
-
-	if len(m.filtered) == 0 {
-		m.viewport.SetContent("\n" + shared.MutedStyle.Render("  "+components.EmptyProposals()) + "\n")
-	} else {
-		m.viewport.SetContent(m.renderItemRows())
-	}
-
-	m.ensureCursorVisible()
-}
-
-// ensureCursorVisible adjusts the viewport scroll offset so the cursor row is visible.
-func (m *Model) ensureCursorVisible() {
-	if len(m.filtered) == 0 {
-		return
-	}
-	cursorLine := m.cursor
-	yOff := m.viewport.YOffset()
-	h := m.viewport.Height()
-
-	if cursorLine < yOff {
-		m.viewport.SetYOffset(cursorLine)
-	} else if cursorLine >= yOff+h {
-		m.viewport.SetYOffset(cursorLine - h + 1)
-	}
+// applySort re-sorts m.items and updates the list.
+func (m *Model) applySort() tea.Cmd {
+	sorted := sortItems(m.items, m.sortOrder)
+	return m.list.SetItems(toListItems(sorted))
 }

@@ -31,6 +31,35 @@ func TestDashboardItem_FilterValue(t *testing.T) {
 	}
 }
 
+func TestDashboard_ListIndex_Navigation(t *testing.T) {
+	m := newTestModel()
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	if m.list.Index() != 0 {
+		t.Fatalf("initial index = %d, want 0", m.list.Index())
+	}
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	if m.list.Index() != 1 {
+		t.Errorf("index after down = %d, want 1", m.list.Index())
+	}
+}
+
+func TestDashboard_HasActiveInput_WhenFiltering(t *testing.T) {
+	m := newTestModel()
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	if m.HasActiveInput() {
+		t.Error("HasActiveInput should be false initially")
+	}
+
+	// Open filter.
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if !m.HasActiveInput() {
+		t.Error("HasActiveInput should be true while filtering")
+	}
+}
+
 func newTestModel() Model {
 	keys := shared.NewKeyMap("arrows")
 	cfg := testdata.TestConfig()

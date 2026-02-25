@@ -18,31 +18,45 @@ const (
 
 // View renders the dashboard.
 func (m Model) View() string {
-	if m.width == 0 || m.height == 0 {
+	if m.list.Width() == 0 || m.list.Height() == 0 {
 		return ""
 	}
 
 	var b strings.Builder
 
-	// Fixed chrome above viewport: column headers (only when items exist).
-	if len(m.filtered) > 0 {
+	// Fixed chrome above list: column headers (only when items exist).
+	if len(m.list.Items()) > 0 {
 		b.WriteString(m.renderColumnHeaders())
 		b.WriteString("\n")
 	}
 
-	// Scrollable item rows.
-	b.WriteString(m.viewport.View())
-	b.WriteString("\n")
-
-	// Fixed chrome below viewport: sort indicator (only when items exist).
-	if len(m.filtered) > 0 {
-		b.WriteString(shared.MutedStyle.Render(fmt.Sprintf("  Sort: %s", m.sortOrder)))
+	// Scrollable list (handles empty state internally via custom rendering).
+	if len(m.list.VisibleItems()) == 0 && !m.list.SettingFilter() {
+		// No items at all — show flavor text.
+		b.WriteString("\n")
+		b.WriteString(shared.MutedStyle.Render("  " + components.EmptyProposals()))
+		b.WriteString("\n")
+	} else {
+		b.WriteString(m.list.View())
 		b.WriteString("\n")
 	}
 
-	// Filter bar or status bar.
-	if m.filterActive {
-		b.WriteString(m.filterInput.View())
+	// Sort indicator + filter status (only when items exist and not in filter input mode).
+	if len(m.list.Items()) > 0 && !m.list.SettingFilter() {
+		sortLine := fmt.Sprintf("  Sort: %s", m.sortOrder)
+		if m.list.IsFiltered() {
+			sortLine += fmt.Sprintf("  ·  filter: %q  (%d/%d)",
+				m.list.FilterValue(),
+				len(m.list.VisibleItems()),
+				len(m.list.Items()))
+		}
+		b.WriteString(shared.MutedStyle.Render(sortLine))
+		b.WriteString("\n")
+	}
+
+	// Filter input or status bar.
+	if m.list.SettingFilter() {
+		b.WriteString("/ " + m.list.FilterInput.View())
 	} else {
 		b.WriteString(m.renderStatusBar())
 	}
@@ -66,73 +80,37 @@ func (m Model) SubHeader() string {
 }
 
 func (m Model) renderColumnHeaders() string {
-	cols := columnLayoutForWidth(m.width)
-
-	// Row: prefix(2) + " " + indicator(1) + " " + type(18) + "  " + target + "  " + confidence
-	// TYPE aligns with the bullet indicator at position 3 (prefix + space).
+	cols := columnLayoutForWidth(m.list.Width())
 	header := shared.PadRight("   TYPE", cols.typeWidth+3) +
 		"  " + shared.PadRight("TARGET", cols.targetWidth) +
 		"  " + "CONFIDENCE"
-
 	return shared.MutedStyle.Render(header)
 }
 
-func (m Model) renderItemRows() string {
-	var b strings.Builder
-	cols := columnLayoutForWidth(m.width)
-
-	for i, item := range m.filtered {
-		prefix := "  "
-		if i == m.cursor {
-			prefix = "> "
-		}
-
-		// Choose indicator style based on item type.
-		var indicator string
-		if item.IsProposal() {
-			indicator = shared.AccentStyle.Render(indicatorProposal)
-		} else {
-			indicator = shared.WarningStyle.Render(indicatorFitness)
-		}
-
-		typeName := shared.PadRight(item.TypeName(), cols.typeWidth)
-		target := shared.TruncatePad(shared.ShortenHome(item.Target()), cols.targetWidth)
-		confidence := shared.MutedStyle.Render(item.Confidence())
-
-		line := fmt.Sprintf("%s %s %s  %s  %s", prefix, indicator, typeName, target, confidence)
-
-		if i == m.cursor {
-			line = shared.SelectedStyle.Render(line)
-		}
-
-		b.WriteString(line)
-		if i < len(m.filtered)-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	return b.String()
-}
-
 func (m Model) renderStatusBar() string {
-	keys := m.keys
-
-	// Empty state: show only navigation keys that make sense.
-	if len(m.filtered) == 0 {
-		bindings := []key.Binding{keys.Sources, keys.Pipeline, keys.Help}
-		return components.RenderStatusBar(bindings, m.statusMsg, m.width)
+	if len(m.list.VisibleItems()) == 0 {
+		bindings := []key.Binding{m.keys.Sources, m.keys.Pipeline, m.keys.Help}
+		return components.RenderStatusBar(bindings, m.statusMsg, m.list.Width())
 	}
-
-	// Show different actions depending on the selected item type.
 	item := m.SelectedItem()
 	if item != nil && item.IsFitnessReport() {
-		bindings := []key.Binding{
-			keys.Up, keys.Down, keys.Open, keys.Sources, keys.Help,
-		}
-		return components.RenderStatusBar(bindings, m.statusMsg, m.width)
+		bindings := []key.Binding{m.keys.Up, m.keys.Down, m.keys.Open, m.keys.Sources, m.keys.Help}
+		return components.RenderStatusBar(bindings, m.statusMsg, m.list.Width())
 	}
+	return components.RenderStatusBar(m.keys.ShortHelp(), m.statusMsg, m.list.Width())
+}
 
-	return components.RenderStatusBar(keys.ShortHelp(), m.statusMsg, m.width)
+// viewportHeight returns the list height accounting for chrome.
+func (m Model) viewportHeight(width, height int) int {
+	chrome := 1 // status/filter bar
+	if len(m.list.Items()) > 0 {
+		chrome += 2 // column headers + sort indicator
+	}
+	h := height - chrome
+	if h < 1 {
+		h = 1
+	}
+	return h
 }
 
 // Column layout.
@@ -158,4 +136,3 @@ func columnLayoutForWidth(width int) columnSpec {
 	}
 	return columnSpec{typeWidth: colType, targetWidth: targetWidth}
 }
-

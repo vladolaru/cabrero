@@ -11,12 +11,11 @@ import (
 
 // Update handles messages for the dashboard.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	// When filter bar is active, route input to the text input.
-	if m.filterActive {
-		return m.updateFilter(msg)
-	}
-
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.list.SetSize(msg.Width, m.viewportHeight(msg.Width, msg.Height))
+		return m, nil
+
 	case message.StatusMessage:
 		m.statusMsg = msg.Text
 		if msg.Duration > 0 {
@@ -33,67 +32,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.viewport.SetWidth(msg.Width)
-		m.viewport.SetHeight(m.viewportHeight())
-		m.updateContent()
-		return m, nil
-
 	case tea.KeyPressMsg:
+		// While filter is active, route all keys to the list.
+		if m.list.SettingFilter() {
+			var cmd tea.Cmd
+			m.list, cmd = m.list.Update(msg)
+			return m, cmd
+		}
 		return m.handleKey(msg)
 	}
 
-	return m, nil
+	// Forward all other messages (mouse, spinner ticks, etc.) to list.
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.Down):
-		if m.cursor < len(m.filtered)-1 {
-			m.cursor++
-		}
-		m.updateContent()
-		return m, nil
-
-	case key.Matches(msg, m.keys.Up):
-		if m.cursor > 0 {
-			m.cursor--
-		}
-		m.updateContent()
-		return m, nil
-
-	case key.Matches(msg, m.keys.HalfPageDown):
-		jump := m.viewport.Height() / 2
-		m.cursor += jump
-		if m.cursor >= len(m.filtered) {
-			m.cursor = max(0, len(m.filtered)-1)
-		}
-		m.updateContent()
-		return m, nil
-
-	case key.Matches(msg, m.keys.HalfPageUp):
-		jump := m.viewport.Height() / 2
-		m.cursor -= jump
-		if m.cursor < 0 {
-			m.cursor = 0
-		}
-		m.updateContent()
-		return m, nil
-
-	case key.Matches(msg, m.keys.GotoTop):
-		m.cursor = 0
-		m.updateContent()
-		return m, nil
-
-	case key.Matches(msg, m.keys.GotoBottom):
-		if len(m.filtered) > 0 {
-			m.cursor = len(m.filtered) - 1
-		}
-		m.updateContent()
-		return m, nil
-
 	case key.Matches(msg, m.keys.Open):
 		item := m.SelectedItem()
 		if item == nil {
@@ -109,23 +65,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, m.keys.Sort):
-		m.CycleSortOrder()
-		return m, nil
-
-	case key.Matches(msg, m.keys.Filter):
-		m.filterActive = true
-		m.filterInput.Focus()
-		return m, nil
-
-	case key.Matches(msg, m.keys.Sources):
-		return m, func() tea.Msg {
-			return message.PushView{View: message.ViewSourceManager}
-		}
-
-	case key.Matches(msg, m.keys.Pipeline):
-		return m, func() tea.Msg {
-			return message.PushView{View: message.ViewPipelineMonitor}
-		}
+		cmd := m.CycleSortOrder()
+		return m, cmd
 
 	case key.Matches(msg, m.keys.Approve):
 		if m.SelectedProposal() != nil {
@@ -150,31 +91,20 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-	}
 
-	return m, nil
-}
+	case key.Matches(msg, m.keys.Sources):
+		return m, func() tea.Msg {
+			return message.PushView{View: message.ViewSourceManager}
+		}
 
-func (m Model) updateFilter(msg tea.Msg) (Model, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyPressMsg); ok {
-		switch {
-		case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
-			m.filterActive = false
-			m.filterInput.Blur()
-			m.filterText = ""
-			m.filterInput.SetValue("")
-			m.applyFilter()
-			return m, nil
-		case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
-			m.filterActive = false
-			m.filterInput.Blur()
-			m.filterText = m.filterInput.Value()
-			m.applyFilter()
-			return m, nil
+	case key.Matches(msg, m.keys.Pipeline):
+		return m, func() tea.Msg {
+			return message.PushView{View: message.ViewPipelineMonitor}
 		}
 	}
 
+	// Navigation (up/down/half-page/goto) handled by list.
 	var cmd tea.Cmd
-	m.filterInput, cmd = m.filterInput.Update(msg)
+	m.list, cmd = m.list.Update(msg)
 	return m, cmd
 }
