@@ -12,25 +12,27 @@ import (
 )
 
 // Runner orchestrates the analysis pipeline for single or batched sessions.
-// Hook fields allow testing without LLM calls — when nil, the real
-// package-level functions are used.
+// Inject a PipelineStages implementation via NewRunnerWithStages for testing
+// without LLM calls. When stages is nil, the real package-level functions are used.
 type Runner struct {
 	Config       PipelineConfig
 	MaxBatchSize int    // 0 means DefaultMaxBatchSize
 	Source       string // "daemon", "cli-run", "cli-backfill" — set by caller before RunOne/RunGroup
 	OnStatus     func(sessionID string, event BatchEvent)
 
-	// Testing hooks — when nil, package-level functions are used.
-	ParseSessionFunc func(sessionID string) (*parser.Digest, error)
-	AggregateFunc    func(sessionID string, project string) (*patterns.AggregatorOutput, error)
-	ClassifyFunc     func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error)
-	EvalFunc         func(sessionID string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
-	EvalBatchFunc    func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
+	// stages overrides pipeline execution for testing. nil = use built-in production logic.
+	stages PipelineStages
 }
 
-// NewRunner creates a Runner with default (nil) hooks.
+// NewRunner creates a Runner with production (nil stages) defaults.
 func NewRunner(cfg PipelineConfig) *Runner {
 	return &Runner{Config: cfg}
+}
+
+// NewRunnerWithStages creates a Runner with a custom PipelineStages implementation.
+// Use TestStages{...} to override individual stages in tests.
+func NewRunnerWithStages(cfg PipelineConfig, s PipelineStages) *Runner {
+	return &Runner{Config: cfg, stages: s}
 }
 
 func (r *Runner) log() Logger {
@@ -51,8 +53,10 @@ func (r *Runner) emit(sessionID string, event BatchEvent) {
 }
 
 func (r *Runner) classify(sessionID string) (*ClassifierResult, *ClaudeResult, error) {
-	if r.ClassifyFunc != nil {
-		return r.ClassifyFunc(sessionID, r.Config)
+	if r.stages != nil {
+		if cr, cl, err := r.stages.Classify(sessionID, r.Config); cr != nil || cl != nil || err != nil {
+			return cr, cl, err
+		}
 	}
 
 	// Default: pre-parse, aggregate, then classify.
@@ -101,29 +105,37 @@ func (r *Runner) classify(sessionID string) (*ClassifierResult, *ClaudeResult, e
 }
 
 func (r *Runner) evalOne(sessionID string, digest *parser.Digest, co *ClassifierOutput) (*EvaluatorOutput, *ClaudeResult, error) {
-	if r.EvalFunc != nil {
-		return r.EvalFunc(sessionID, digest, co, r.Config)
+	if r.stages != nil {
+		if out, cl, err := r.stages.EvalOne(sessionID, digest, co, r.Config); out != nil || cl != nil || err != nil {
+			return out, cl, err
+		}
 	}
 	return RunEvaluator(sessionID, digest, co, r.Config)
 }
 
 func (r *Runner) evalMany(sessions []BatchSession) (*EvaluatorOutput, *ClaudeResult, error) {
-	if r.EvalBatchFunc != nil {
-		return r.EvalBatchFunc(sessions, r.Config)
+	if r.stages != nil {
+		if out, cl, err := r.stages.EvalBatch(sessions, r.Config); out != nil || cl != nil || err != nil {
+			return out, cl, err
+		}
 	}
 	return RunEvaluatorBatch(sessions, r.Config)
 }
 
 func (r *Runner) parseSession(sessionID string) (*parser.Digest, error) {
-	if r.ParseSessionFunc != nil {
-		return r.ParseSessionFunc(sessionID)
+	if r.stages != nil {
+		if d, err := r.stages.ParseSession(sessionID); d != nil || err != nil {
+			return d, err
+		}
 	}
 	return parser.ParseSession(sessionID)
 }
 
 func (r *Runner) aggregate(sessionID, project string) (*patterns.AggregatorOutput, error) {
-	if r.AggregateFunc != nil {
-		return r.AggregateFunc(sessionID, project)
+	if r.stages != nil {
+		if a, err := r.stages.Aggregate(sessionID, project); a != nil || err != nil {
+			return a, err
+		}
 	}
 	return patterns.Aggregate(sessionID, project)
 }

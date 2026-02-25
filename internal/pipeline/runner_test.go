@@ -16,21 +16,9 @@ import (
 func TestNewRunner_DefaultHooks(t *testing.T) {
 	r := NewRunner(PipelineConfig{})
 
-	// All hook fields should be nil (defaults to package-level functions).
-	if r.ParseSessionFunc != nil {
-		t.Error("ParseSessionFunc should be nil by default")
-	}
-	if r.AggregateFunc != nil {
-		t.Error("AggregateFunc should be nil by default")
-	}
-	if r.ClassifyFunc != nil {
-		t.Error("ClassifyFunc should be nil by default")
-	}
-	if r.EvalFunc != nil {
-		t.Error("EvalFunc should be nil by default")
-	}
-	if r.EvalBatchFunc != nil {
-		t.Error("EvalBatchFunc should be nil by default")
+	// stages should be nil by default (production logic used directly).
+	if r.stages != nil {
+		t.Error("stages should be nil by default")
 	}
 }
 
@@ -60,14 +48,15 @@ func TestRunner_MaxBatch(t *testing.T) {
 
 func TestRunner_Classify_UsesHook(t *testing.T) {
 	hookCalled := false
-	r := NewRunner(PipelineConfig{})
-	r.ClassifyFunc = func(sid string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		hookCalled = true
-		return &ClassifierResult{
-			Digest:           &parser.Digest{SessionID: sid},
-			ClassifierOutput: &ClassifierOutput{SessionID: sid, Triage: "clean"},
-		}, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{}, TestStages{
+		ClassifyFunc: func(sid string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			hookCalled = true
+			return &ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sid},
+				ClassifierOutput: &ClassifierOutput{SessionID: sid, Triage: "clean"},
+			}, nil, nil
+		},
+	})
 
 	result, _, err := r.classify("test-session")
 	if err != nil {
@@ -83,18 +72,19 @@ func TestRunner_Classify_UsesHook(t *testing.T) {
 
 func TestRunner_EvalOne_UsesHook(t *testing.T) {
 	hookCalled := false
-	r := NewRunner(PipelineConfig{})
-	r.EvalFunc = func(sid string, d *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		hookCalled = true
-		return &EvaluatorOutput{SessionID: sid}, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{}, TestStages{
+		EvalOneFunc: func(sid string, d *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			hookCalled = true
+			return &EvaluatorOutput{SessionID: sid}, nil, nil
+		},
+	})
 
 	result, _, err := r.evalOne("test-session", &parser.Digest{}, &ClassifierOutput{})
 	if err != nil {
 		t.Fatalf("evalOne: %v", err)
 	}
 	if !hookCalled {
-		t.Error("EvalFunc hook not called")
+		t.Error("EvalOneFunc hook not called")
 	}
 	if result.SessionID != "test-session" {
 		t.Errorf("SessionID = %q, want 'test-session'", result.SessionID)
@@ -103,11 +93,12 @@ func TestRunner_EvalOne_UsesHook(t *testing.T) {
 
 func TestRunner_EvalMany_UsesHook(t *testing.T) {
 	hookCalled := false
-	r := NewRunner(PipelineConfig{})
-	r.EvalBatchFunc = func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		hookCalled = true
-		return &EvaluatorOutput{SessionID: "batch"}, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{}, TestStages{
+		EvalBatchFunc: func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			hookCalled = true
+			return &EvaluatorOutput{SessionID: "batch"}, nil, nil
+		},
+	})
 
 	result, _, err := r.evalMany([]BatchSession{{SessionID: "s1"}})
 	if err != nil {
@@ -123,11 +114,12 @@ func TestRunner_EvalMany_UsesHook(t *testing.T) {
 
 func TestRunner_ParseSession_UsesHook(t *testing.T) {
 	hookCalled := false
-	r := NewRunner(PipelineConfig{})
-	r.ParseSessionFunc = func(sid string) (*parser.Digest, error) {
-		hookCalled = true
-		return &parser.Digest{SessionID: sid}, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{}, TestStages{
+		ParseSessionFunc: func(sid string) (*parser.Digest, error) {
+			hookCalled = true
+			return &parser.Digest{SessionID: sid}, nil
+		},
+	})
 
 	result, err := r.parseSession("test-session")
 	if err != nil {
@@ -143,11 +135,12 @@ func TestRunner_ParseSession_UsesHook(t *testing.T) {
 
 func TestRunner_Aggregate_UsesHook(t *testing.T) {
 	hookCalled := false
-	r := NewRunner(PipelineConfig{})
-	r.AggregateFunc = func(sid string, project string) (*patterns.AggregatorOutput, error) {
-		hookCalled = true
-		return &patterns.AggregatorOutput{}, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{}, TestStages{
+		AggregateFunc: func(sid string, project string) (*patterns.AggregatorOutput, error) {
+			hookCalled = true
+			return &patterns.AggregatorOutput{}, nil
+		},
+	})
 
 	_, err := r.aggregate("test-session", "my-project")
 	if err != nil {
@@ -165,15 +158,16 @@ func TestRunOne_DryRun(t *testing.T) {
 	writeTranscript(t, sid, []string{"uuid-1"})
 
 	parseCalled := false
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		parseCalled = true
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		t.Fatal("ClassifyFunc should not be called in dry-run")
-		return nil, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			parseCalled = true
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			t.Fatal("ClassifyFunc should not be called in dry-run")
+			return nil, nil, nil
+		},
+	})
 
 	result, err := r.RunOne(context.Background(), sid, true)
 	if err != nil {
@@ -193,15 +187,16 @@ func TestRunOne_CleanTriage_SkipsEvaluator(t *testing.T) {
 	createBatchSession(t, sid)
 
 	evalCalled := false
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = fakeClassifyClean
-	r.EvalFunc = func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		evalCalled = true
-		return nil, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyClean,
+		EvalOneFunc: func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			evalCalled = true
+			return nil, nil, nil
+		},
+	})
 
 	result, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -223,12 +218,13 @@ func TestRunOne_Evaluate_ProducesProposals(t *testing.T) {
 	sid := "runone-eval000001"
 	createBatchSession(t, sid)
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalFunc = fakeEvalWithProposals(2)
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalOneFunc:  fakeEvalWithProposals(2),
+	})
 
 	result, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -259,8 +255,9 @@ func TestRunOne_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ClassifyFunc = fakeClassifyEvaluate
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+	})
 
 	_, err := r.RunOne(ctx, sid, false)
 	if err == nil {
@@ -274,12 +271,13 @@ func TestRunOne_LoggerReceivesMessages(t *testing.T) {
 	createBatchSession(t, sid)
 
 	spy := &spyLogger{}
-	r := NewRunner(PipelineConfig{Logger: spy})
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalFunc = fakeEvalWithProposals(1)
+	r := NewRunnerWithStages(PipelineConfig{Logger: spy}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalOneFunc:  fakeEvalWithProposals(1),
+	})
 
 	r.RunOne(context.Background(), sid, false)
 
@@ -293,8 +291,9 @@ func TestRunGroup_AllClean(t *testing.T) {
 	s1 := createBatchSession(t, "rg-clean00000001")
 	s2 := createBatchSession(t, "rg-clean00000002")
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ClassifyFunc = fakeClassifyClean
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyClean,
+	})
 	results := r.RunGroup(context.Background(), []BatchSession{s1, s2})
 
 	if len(results) != 2 {
@@ -315,17 +314,18 @@ func TestRunGroup_SingleEvalUsesEvalFunc(t *testing.T) {
 	s := createBatchSession(t, "rg-single000001")
 
 	singleCalled := false
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalFunc = func(sid string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		singleCalled = true
-		return &EvaluatorOutput{SessionID: sid, Proposals: []Proposal{}}, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalOneFunc: func(sid string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			singleCalled = true
+			return &EvaluatorOutput{SessionID: sid, Proposals: []Proposal{}}, nil, nil
+		},
+	})
 
 	results := r.RunGroup(context.Background(), []BatchSession{s})
 
 	if !singleCalled {
-		t.Error("EvalFunc not called")
+		t.Error("EvalOneFunc not called")
 	}
 	if results[0].Status != "processed" {
 		t.Errorf("Status = %q, want 'processed'", results[0].Status)
@@ -338,14 +338,15 @@ func TestRunGroup_BatchEval(t *testing.T) {
 	s2 := createBatchSession(t, "rg-batch00000002")
 
 	batchCalled := false
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalBatchFunc = func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		batchCalled = true
-		return &EvaluatorOutput{Proposals: []Proposal{
-			{ID: "prop-rg-bat-0", Type: "skill_improvement", Confidence: "high", Rationale: "t"},
-		}}, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalBatchFunc: func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			batchCalled = true
+			return &EvaluatorOutput{Proposals: []Proposal{
+				{ID: "prop-rg-bat-0", Type: "skill_improvement", Confidence: "high", Rationale: "t"},
+			}}, nil, nil
+		},
+	})
 
 	r.RunGroup(context.Background(), []BatchSession{s1, s2})
 
@@ -358,10 +359,11 @@ func TestRunGroup_ClassifierError(t *testing.T) {
 	setupBatchStore(t)
 	s := createBatchSession(t, "rg-classerr00001")
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ClassifyFunc = func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		return nil, nil, fmt.Errorf("classifier boom")
-	}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("classifier boom")
+		},
+	})
 
 	results := r.RunGroup(context.Background(), []BatchSession{s})
 	if results[0].Status != "error" {
@@ -379,14 +381,15 @@ func TestRunGroup_ContextCancel(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	callCount := 0
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ClassifyFunc = func(sid string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		callCount++
-		if callCount == 1 {
-			cancel()
-		}
-		return fakeClassifyClean(sid, cfg)
-	}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: func(sid string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			callCount++
+			if callCount == 1 {
+				cancel()
+			}
+			return fakeClassifyClean(sid, cfg)
+		},
+	})
 
 	results := r.RunGroup(ctx, []BatchSession{s1, s2})
 	if results[1].Status != "error" {
@@ -399,9 +402,10 @@ func TestRunGroup_OnStatusEmitsEvents(t *testing.T) {
 	s := createBatchSession(t, "rg-events0000001")
 
 	var events []BatchEvent
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalFunc = fakeEvalNoProposals
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalOneFunc:  fakeEvalNoProposals,
+	})
 	r.OnStatus = func(_ string, event BatchEvent) {
 		events = append(events, event)
 	}
@@ -432,18 +436,19 @@ func TestRunGroup_MaxBatchSizeForcesSingleEval(t *testing.T) {
 	s2 := createBatchSession(t, "rg-maxbatch00002")
 
 	singleCount := 0
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalOneFunc: func(sid string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			singleCount++
+			return &EvaluatorOutput{SessionID: sid, Proposals: []Proposal{}}, nil, nil
+		},
+	})
 	r.MaxBatchSize = 1
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalFunc = func(sid string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		singleCount++
-		return &EvaluatorOutput{SessionID: sid, Proposals: []Proposal{}}, nil, nil
-	}
 
 	r.RunGroup(context.Background(), []BatchSession{s1, s2})
 
 	if singleCount != 2 {
-		t.Errorf("EvalFunc called %d times, want 2", singleCount)
+		t.Errorf("EvalOneFunc called %d times, want 2", singleCount)
 	}
 }
 
@@ -479,12 +484,13 @@ func TestRunOne_CleanTriage_WritesHistory(t *testing.T) {
 	cfg := DefaultPipelineConfig()
 	cfg.Logger = &discardLogger{}
 
-	r := NewRunner(cfg)
+	r := NewRunnerWithStages(cfg, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyClean,
+	})
 	r.Source = "cli-run"
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = fakeClassifyClean
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -539,27 +545,28 @@ func TestRunOne_Evaluate_WritesHistory(t *testing.T) {
 
 	cfg := DefaultPipelineConfig()
 	cfg.Logger = &discardLogger{}
-	r := NewRunner(cfg)
+	r := NewRunnerWithStages(cfg, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			return &ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate", PromptVersion: "classifier-v3"},
+			}, nil, nil
+		},
+		EvalOneFunc: func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return &EvaluatorOutput{
+				SessionID:     sessionID,
+				PromptVersion: "evaluator-v3",
+				Proposals: []Proposal{
+					{ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+					{ID: fmt.Sprintf("prop-%s-1", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				},
+			}, nil, nil
+		},
+	})
 	r.Source = "daemon"
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		return &ClassifierResult{
-			Digest:           &parser.Digest{SessionID: sessionID},
-			ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate", PromptVersion: "classifier-v3"},
-		}, nil, nil
-	}
-	r.EvalFunc = func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		return &EvaluatorOutput{
-			SessionID:     sessionID,
-			PromptVersion: "evaluator-v3",
-			Proposals: []Proposal{
-				{ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
-				{ID: fmt.Sprintf("prop-%s-1", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
-			},
-		}, nil, nil
-	}
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -609,11 +616,12 @@ func TestRunOne_ClassifierError_WritesHistory(t *testing.T) {
 	sid := "hist-clerr0000001"
 	createBatchSession(t, sid)
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("classifier boom")
+		},
+	})
 	r.Source = "cli-run"
-	r.ClassifyFunc = func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		return nil, nil, fmt.Errorf("classifier boom")
-	}
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err == nil {
@@ -645,15 +653,16 @@ func TestRunOne_EvaluatorError_WritesHistory(t *testing.T) {
 	sid := "hist-everr0000001"
 	createBatchSession(t, sid)
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalOneFunc: func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("evaluator boom")
+		},
+	})
 	r.Source = "cli-run"
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalFunc = func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		return nil, nil, fmt.Errorf("evaluator boom")
-	}
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err == nil {
@@ -689,11 +698,12 @@ func TestRunOne_DryRun_NoHistory(t *testing.T) {
 	createBatchSession(t, sid)
 	writeTranscript(t, sid, []string{"uuid-1"})
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+	})
 	r.Source = "cli-run"
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
 
 	_, err := r.RunOne(context.Background(), sid, true)
 	if err != nil {
@@ -713,29 +723,32 @@ func TestRunGroup_WritesHistoryWithBatchContext(t *testing.T) {
 	s2 := createBatchSession(t, "bbbbbb-hist-b0002")
 	s3 := createBatchSession(t, "cccccc-hist-b0003")
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
-	r.Source = "cli-backfill"
 	// s1 and s3 evaluate, s2 is clean.
-	r.ClassifyFunc = func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		triage := "evaluate"
-		if sessionID == s2.SessionID {
-			triage = "clean"
-		}
-		return &ClassifierResult{
-			Digest:           &parser.Digest{SessionID: sessionID},
-			ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: triage, PromptVersion: "classifier-v3"},
-		}, nil, nil
-	}
-	r.EvalBatchFunc = func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		var proposals []Proposal
-		for _, s := range sessions {
-			proposals = append(proposals, Proposal{
-				ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(s.SessionID)),
-				Type: "skill_improvement", Confidence: "high", Rationale: "test",
-			})
-		}
-		return &EvaluatorOutput{Proposals: proposals, PromptVersion: "evaluator-v3"}, nil, nil
-	}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			triage := "evaluate"
+			if sessionID == s2.SessionID {
+				triage = "clean"
+			}
+			return &ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: triage, PromptVersion: "classifier-v3"},
+			}, nil, nil
+		},
+		EvalBatchFunc: func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			var proposals []Proposal
+			for _, s := range sessions {
+				proposals = append(proposals, Proposal{
+					ID:         fmt.Sprintf("prop-%s-0", store.ShortSessionID(s.SessionID)),
+					Type:       "skill_improvement",
+					Confidence: "high",
+					Rationale:  "test",
+				})
+			}
+			return &EvaluatorOutput{Proposals: proposals, PromptVersion: "evaluator-v3"}, nil, nil
+		},
+	})
+	r.Source = "cli-backfill"
 
 	r.RunGroup(context.Background(), []BatchSession{s1, s2, s3})
 
@@ -799,11 +812,12 @@ func TestRunGroup_ClassifierError_WritesHistory(t *testing.T) {
 	setupBatchStore(t)
 	s := createBatchSession(t, "hist-grperr000001")
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("batch classifier boom")
+		},
+	})
 	r.Source = "daemon"
-	r.ClassifyFunc = func(_ string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		return nil, nil, fmt.Errorf("batch classifier boom")
-	}
 
 	r.RunGroup(context.Background(), []BatchSession{s})
 
@@ -828,12 +842,13 @@ func TestRunGroup_EvalSingleError_WritesHistory(t *testing.T) {
 	setupBatchStore(t)
 	s := createBatchSession(t, "hist-evserr000001")
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalOneFunc: func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("eval single boom")
+		},
+	})
 	r.Source = "daemon"
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalFunc = func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		return nil, nil, fmt.Errorf("eval single boom")
-	}
 
 	r.RunGroup(context.Background(), []BatchSession{s})
 
@@ -859,12 +874,13 @@ func TestRunGroup_EvalBatchError_WritesHistory(t *testing.T) {
 	s1 := createBatchSession(t, "hist-evberr000001")
 	s2 := createBatchSession(t, "hist-evberr000002")
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalBatchFunc: func(_ []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("eval batch boom")
+		},
+	})
 	r.Source = "daemon"
-	r.ClassifyFunc = fakeClassifyEvaluate
-	r.EvalBatchFunc = func(_ []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		return nil, nil, fmt.Errorf("eval batch boom")
-	}
 
 	r.RunGroup(context.Background(), []BatchSession{s1, s2})
 
@@ -901,9 +917,10 @@ func TestRunOne_PreviousStatus_CapturedBeforeMarkError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyClean,
+	})
 	r.Source = "cli-backfill"
-	r.ClassifyFunc = fakeClassifyClean
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -932,39 +949,40 @@ func TestRunOne_UsageTrackedInHistory(t *testing.T) {
 	sid := "hist-usage0000001"
 	createBatchSession(t, sid)
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			return &ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate"},
+			}, &ClaudeResult{
+				SessionID:    "cc-classify-sess",
+				NumTurns:     3,
+				InputTokens:  5000,
+				OutputTokens: 1500,
+				TotalCostUSD: 0.01,
+			}, nil
+		},
+		EvalOneFunc: func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return &EvaluatorOutput{
+				SessionID: sessionID,
+				Proposals: []Proposal{
+					{ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				},
+			}, &ClaudeResult{
+				SessionID:           "cc-eval-sess",
+				NumTurns:            8,
+				InputTokens:         10000,
+				OutputTokens:        3000,
+				TotalCostUSD:        0.03,
+				CacheCreationTokens: 200,
+				CacheReadTokens:     4000,
+			}, nil
+		},
+	})
 	r.Source = "cli-run"
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		return &ClassifierResult{
-			Digest:           &parser.Digest{SessionID: sessionID},
-			ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate"},
-		}, &ClaudeResult{
-			SessionID:    "cc-classify-sess",
-			NumTurns:     3,
-			InputTokens:  5000,
-			OutputTokens: 1500,
-			TotalCostUSD: 0.01,
-		}, nil
-	}
-	r.EvalFunc = func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		return &EvaluatorOutput{
-			SessionID: sessionID,
-			Proposals: []Proposal{
-				{ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
-			},
-		}, &ClaudeResult{
-			SessionID:           "cc-eval-sess",
-			NumTurns:            8,
-			InputTokens:         10000,
-			OutputTokens:        3000,
-			TotalCostUSD:        0.03,
-			CacheCreationTokens: 200,
-			CacheReadTokens:     4000,
-		}, nil
-	}
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -1034,23 +1052,24 @@ func TestRunOne_CleanTriage_OnlyClassifierUsage(t *testing.T) {
 	sid := "hist-cleanu000001"
 	createBatchSession(t, sid)
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			return &ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "clean"},
+			}, &ClaudeResult{
+				SessionID:    "cc-clean-sess",
+				NumTurns:     2,
+				InputTokens:  3000,
+				OutputTokens: 500,
+				TotalCostUSD: 0.005,
+			}, nil
+		},
+	})
 	r.Source = "cli-run"
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	r.ClassifyFunc = func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		return &ClassifierResult{
-			Digest:           &parser.Digest{SessionID: sessionID},
-			ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "clean"},
-		}, &ClaudeResult{
-			SessionID:    "cc-clean-sess",
-			NumTurns:     2,
-			InputTokens:  3000,
-			OutputTokens: 500,
-			TotalCostUSD: 0.005,
-		}, nil
-	}
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -1090,13 +1109,14 @@ func TestRunOne_NilClaudeResult_NoUsage(t *testing.T) {
 	sid := "hist-nilcr0000001"
 	createBatchSession(t, sid)
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		// ClassifyFunc returns nil ClaudeResult (backward compatible).
+		ClassifyFunc: fakeClassifyClean,
+	})
 	r.Source = "cli-run"
-	r.ParseSessionFunc = func(sessionID string) (*parser.Digest, error) {
-		return &parser.Digest{SessionID: sessionID}, nil
-	}
-	// Hooks return nil ClaudeResult (backward compatible).
-	r.ClassifyFunc = fakeClassifyClean
 
 	_, err := r.RunOne(context.Background(), sid, false)
 	if err != nil {
@@ -1126,35 +1146,38 @@ func TestRunGroup_BatchEval_UsageSplitAcrossSessions(t *testing.T) {
 	s1 := createBatchSession(t, "aausge-batch00001")
 	s2 := createBatchSession(t, "bbusge-batch00002")
 
-	r := NewRunner(PipelineConfig{Logger: &discardLogger{}})
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			return &ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate"},
+			}, &ClaudeResult{
+				SessionID:    "cc-class-" + sessionID[:6],
+				InputTokens:  2000,
+				OutputTokens: 500,
+				TotalCostUSD: 0.005,
+			}, nil
+		},
+		EvalBatchFunc: func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			var proposals []Proposal
+			for _, s := range sessions {
+				proposals = append(proposals, Proposal{
+					ID:         fmt.Sprintf("prop-%s-0", store.ShortSessionID(s.SessionID)),
+					Type:       "skill_improvement",
+					Confidence: "high",
+					Rationale:  "test",
+				})
+			}
+			return &EvaluatorOutput{Proposals: proposals}, &ClaudeResult{
+				SessionID:    "cc-batch-eval",
+				NumTurns:     12,
+				InputTokens:  20000,
+				OutputTokens: 6000,
+				TotalCostUSD: 0.06,
+			}, nil
+		},
+	})
 	r.Source = "daemon"
-	r.ClassifyFunc = func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
-		return &ClassifierResult{
-			Digest:           &parser.Digest{SessionID: sessionID},
-			ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate"},
-		}, &ClaudeResult{
-			SessionID:    "cc-class-" + sessionID[:6],
-			InputTokens:  2000,
-			OutputTokens: 500,
-			TotalCostUSD: 0.005,
-		}, nil
-	}
-	r.EvalBatchFunc = func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
-		var proposals []Proposal
-		for _, s := range sessions {
-			proposals = append(proposals, Proposal{
-				ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(s.SessionID)),
-				Type: "skill_improvement", Confidence: "high", Rationale: "test",
-			})
-		}
-		return &EvaluatorOutput{Proposals: proposals}, &ClaudeResult{
-			SessionID:    "cc-batch-eval",
-			NumTurns:     12,
-			InputTokens:  20000,
-			OutputTokens: 6000,
-			TotalCostUSD: 0.06,
-		}, nil
-	}
 
 	r.RunGroup(context.Background(), []BatchSession{s1, s2})
 

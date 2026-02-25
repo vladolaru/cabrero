@@ -16,6 +16,63 @@ type Logger interface {
 	Error(format string, args ...any)
 }
 
+// PipelineStages is the injection interface for pipeline stage execution.
+// Implement this (or embed TestStages) to override stages in tests.
+// Production code uses the Runner's built-in implementations.
+type PipelineStages interface {
+	ParseSession(sessionID string) (*parser.Digest, error)
+	Aggregate(sessionID, project string) (*patterns.AggregatorOutput, error)
+	Classify(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error)
+	EvalOne(sessionID string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
+	EvalBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
+}
+
+// TestStages implements PipelineStages via optional function overrides.
+// Unset fields cause the Runner to fall back to its built-in production logic.
+// Use NewRunnerWithStages to inject into a Runner.
+type TestStages struct {
+	ParseSessionFunc func(sessionID string) (*parser.Digest, error)
+	AggregateFunc    func(sessionID, project string) (*patterns.AggregatorOutput, error)
+	ClassifyFunc     func(sessionID string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error)
+	EvalOneFunc      func(sessionID string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
+	EvalBatchFunc    func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error)
+}
+
+func (s TestStages) ParseSession(sid string) (*parser.Digest, error) {
+	if s.ParseSessionFunc != nil {
+		return s.ParseSessionFunc(sid)
+	}
+	return nil, nil // nil signals "use Runner's built-in"
+}
+
+func (s TestStages) Aggregate(sid, project string) (*patterns.AggregatorOutput, error) {
+	if s.AggregateFunc != nil {
+		return s.AggregateFunc(sid, project)
+	}
+	return nil, nil
+}
+
+func (s TestStages) Classify(sid string, cfg PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+	if s.ClassifyFunc != nil {
+		return s.ClassifyFunc(sid, cfg)
+	}
+	return nil, nil, nil
+}
+
+func (s TestStages) EvalOne(sid string, digest *parser.Digest, co *ClassifierOutput, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+	if s.EvalOneFunc != nil {
+		return s.EvalOneFunc(sid, digest, co, cfg)
+	}
+	return nil, nil, nil
+}
+
+func (s TestStages) EvalBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+	if s.EvalBatchFunc != nil {
+		return s.EvalBatchFunc(sessions, cfg)
+	}
+	return nil, nil, nil
+}
+
 // stdLogger writes Info to stdout and Error to stderr.
 // Format strings carry their own indentation (e.g. "  Parsing session %s...").
 type stdLogger struct{}
