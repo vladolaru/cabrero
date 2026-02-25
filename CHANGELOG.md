@@ -5,6 +5,23 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.2] - 2026-02-25
+
+### Fixed
+- **Chat panel muting restored** — package-level style variables in the chat
+  view captured `shared.ColorChat` / `shared.ColorMuted` at package init time,
+  before `shared.InitStyles()` was called. Both colors were `nil` at that
+  point, making every chat style colorless and removing all visual distinction
+  between focused and unfocused states. Replaced with `shared.ChatAccentStyle`
+  and `shared.MutedStyle`, which are properly initialized before any rendering
+  occurs.
+- **Proposal panel muted when chat has focus** — the proposal content viewport
+  rendered at full color regardless of which pane held keyboard focus, giving
+  no visual indication of which panel was active. The body content is now
+  passed through `shared.MuteANSI` when `m.focus == FocusChat`, and the
+  viewport is refreshed on every focus transition (Tab and programmatic
+  `SetFocus`).
+
 ## [0.20.1] - 2026-02-25
 
 ### Fixed
@@ -763,6 +780,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.20.2]: https://github.com/vladolaru/cabrero/compare/v0.20.1...v0.20.2
 [0.20.1]: https://github.com/vladolaru/cabrero/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/vladolaru/cabrero/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/vladolaru/cabrero/compare/v0.18.0...v0.19.0
