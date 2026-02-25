@@ -37,7 +37,8 @@ func Run(version string) error {
 	// Load sessions once and reuse for all startup queries.
 	sessions, _ := store.ListSessions()
 
-	stats := gatherStatsFromSessions(sessions, proposals)
+	pipelineCfg := pipeline.DefaultPipelineConfig()
+	stats := gatherStatsFromSessions(sessions, proposals, pipelineCfg)
 	stats.Version = version
 
 	// Future: reports := fitness.ListReports()
@@ -65,7 +66,7 @@ func Run(version string) error {
 	// BackgroundColorMsg will correct this within the first frames.
 	shared.InitStyles(true)
 
-	m := newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
+	m := newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg, pipelineCfg)
 	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
@@ -76,7 +77,7 @@ func Run(version string) error {
 }
 
 // gatherStatsFromSessions collects dashboard statistics from pre-loaded sessions.
-func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.ProposalWithSession) message.DashboardStats {
+func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.ProposalWithSession, pipelineCfg pipeline.PipelineConfig) message.DashboardStats {
 	stats := message.DashboardStats{}
 
 	// Proposal count from already-loaded data.
@@ -111,9 +112,8 @@ func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.Pro
 	stats.InterSessionDelay = defaults.InterSessionDelay
 
 	// Pipeline timeouts (resolved from config.json → compile-time defaults).
-	pipelineDefaults := pipeline.DefaultPipelineConfig()
-	stats.ClassifierTimeout = pipelineDefaults.ClassifierTimeout
-	stats.EvaluatorTimeout = pipelineDefaults.EvaluatorTimeout
+	stats.ClassifierTimeout = pipelineCfg.ClassifierTimeout
+	stats.EvaluatorTimeout = pipelineCfg.EvaluatorTimeout
 
 	// Store metrics.
 	stats.StorePath = store.Root()

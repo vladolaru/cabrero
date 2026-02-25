@@ -71,12 +71,16 @@ type appModel struct {
 	// Pipeline refresh state: track whether a refresh is in flight.
 	pipelineRefreshing bool
 
+	// pipelineCfg caches the pipeline config resolved at startup from config.json.
+	// Used by gatherStatsFromSessions to avoid re-reading the file on every tick.
+	pipelineCfg pipeline.PipelineConfig
+
 	width  int
 	height int
 }
 
 // newAppModel creates the root model with loaded data.
-func newAppModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, runs []pipeline.PipelineRun, pipelineStats pipeline.PipelineStats, prompts []pipeline.PromptVersion, cfg *shared.Config) appModel {
+func newAppModel(proposals []pipeline.ProposalWithSession, reports []fitness.Report, stats message.DashboardStats, sourceGroups []fitness.SourceGroup, runs []pipeline.PipelineRun, pipelineStats pipeline.PipelineStats, prompts []pipeline.PromptVersion, cfg *shared.Config, pipelineCfg pipeline.PipelineConfig) appModel {
 	keys := shared.NewKeyMap(cfg.Navigation)
 
 	m := appModel{
@@ -87,6 +91,7 @@ func newAppModel(proposals []pipeline.ProposalWithSession, reports []fitness.Rep
 		proposals:       proposals,
 		sourceGroups:    sourceGroups,
 		isDark:          true, // matches shared.InitStyles(true) in tui.go; BackgroundColorMsg will update
+		pipelineCfg:     pipelineCfg,
 		dashboard:       dashboard.New(proposals, reports, stats, &keys, cfg),
 		pipelineMonitor: pipeline_tui.New(runs, pipelineStats, prompts, stats, &keys, cfg),
 	}
@@ -277,7 +282,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				runs, _ := pipeline.ListPipelineRunsFromHistory(sessions, recentRunsLimit)
 				stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, sparklineDays)
 				prompts, _ := pipeline.ListPromptVersions()
-				dashStats := gatherStatsFromSessions(sessions, proposals)
+				dashStats := gatherStatsFromSessions(sessions, proposals, m.pipelineCfg)
 				return message.PipelineDataRefreshed{
 					Runs:      runs,
 					Stats:     stats,

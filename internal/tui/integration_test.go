@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
 )
@@ -21,7 +22,7 @@ func newTestRoot() appModel {
 	pipelineStats := testdata.TestPipelineStats()
 	prompts := testdata.TestPromptVersions()
 	cfg := testdata.TestConfig()
-	return newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
+	return newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg, pipeline.PipelineConfig{})
 }
 
 // update is a helper that calls Update and returns the concrete appModel.
