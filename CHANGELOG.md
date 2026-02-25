@@ -5,6 +5,53 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-02-25
+
+### Added
+- **Scrollable help overlay** — the help overlay (`?` key) now wraps content
+  in a viewport. When content exceeds the terminal height, Up/Down,
+  HalfPageUp/Down, and GotoTop/GotoBottom keys scroll through it. Previously,
+  content below the fold was silently clipped.
+- **Dashboard filter** — `type:` and `target:` prefix filters plus free-text
+  search via the standard bubbles/list component. Replaces the previous
+  unfiltered proposal list.
+- **Async dark/light background detection** — uses `tea.RequestBackgroundColor`
+  and `BackgroundColorMsg` to detect terminal background color at runtime and
+  reinitialize styles accordingly. Replaces the previous compile-time default.
+
+### Changed
+- **Charm v2 upgrade** — migrated to BubbleTea v2, Bubbles v2, and Lipgloss v2
+  (`charm.land` import paths). Key types, view return types, and viewport APIs
+  updated throughout.
+- **Dashboard rewritten with bubbles/list** — replaces the custom list,
+  viewport, and filter implementation with the standard bubbles/list component
+  and a custom delegate.
+- **Unified TUI utilities** — extracted shared helpers across views:
+  `RenderSubHeader`, `RenderSectionHeader`, `FillToBottom`, `RenderBar`,
+  `Checkmark`, `RelativeTime`, `RenderConfirmOverlay`. `RenderHeader` moved
+  from dashboard to components package.
+- **Consolidated TUI styles** — removed local style aliases in detail, fitness,
+  and logview; all views use `shared.*Style` directly. Added `AccentBoldStyle`
+  for section headers.
+- Removed `ViewSourceDetail` ViewState — replaced by `sources.DetailOpen()`
+  query method.
+- Detail view status bar always rendered by root model; `HideStatusBar` flag
+  removed.
+
+### Fixed
+- **Pipeline monitor overflow** — added viewport to pipeline monitor for
+  overflow-safe scrolling when content exceeds terminal height.
+- **Source list overflow** — added viewport to source list for the same reason.
+- **Status message routing** — status messages now route to child views instead
+  of a dead root handler.
+- **Chat panel polish** — improved muting for unfocused chat and detail inline
+  layout in narrow mode.
+
+### Removed
+- `compat` package — fully replaced by `shared.InitStyles` with
+  `lipgloss.LightDark` adaptive colors.
+- Unused spinner field in fitness model.
+
 ## [0.19.0] - 2026-02-24
 
 ### Added
@@ -686,6 +733,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.20.0]: https://github.com/vladolaru/cabrero/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/vladolaru/cabrero/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vladolaru/cabrero/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/vladolaru/cabrero/compare/v0.16.1...v0.17.0
