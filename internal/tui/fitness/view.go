@@ -37,15 +37,8 @@ func (m Model) View() string {
 	b.WriteString(m.viewport.View())
 	b.WriteString("\n")
 
-	// Fill remaining space.
-	content := b.String()
-	lines := strings.Count(content, "\n")
-	remaining := m.height - lines - 1
-	if remaining > 0 {
-		content += strings.Repeat("\n", remaining)
-	}
-
 	// Status bar.
+	content := shared.FillToBottom(b.String(), m.height, 1)
 	content += components.RenderStatusBar(m.keys.FitnessShortHelp(), m.statusMsg, m.width)
 
 	return content

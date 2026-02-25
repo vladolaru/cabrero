@@ -135,6 +135,18 @@ func WrapHangingIndent(s string, width, indent int) string {
 	return strings.Join(lines, "\n")
 }
 
+// FillToBottom pads content with newlines so the total height is
+// (totalHeight - reservedLines). Use reservedLines=1 for a status bar.
+// Returns content unchanged if it already meets or exceeds the target.
+func FillToBottom(content string, totalHeight, reservedLines int) string {
+	lines := strings.Count(content, "\n")
+	remaining := totalHeight - lines - reservedLines
+	if remaining > 0 {
+		return content + strings.Repeat("\n", remaining)
+	}
+	return content
+}
+
 // RenderSubHeader renders the standard two-line view sub-header:
 // a bold title on the first line and a muted stats string on the second.
 func RenderSubHeader(title, stats string) string {

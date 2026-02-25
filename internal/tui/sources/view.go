@@ -75,14 +75,7 @@ func (m Model) View() string {
 		b.WriteString("\n")
 		b.WriteString(shared.MutedStyle.Render("  No sources tracked."))
 		b.WriteString("\n")
-		// Fill remaining space.
-		content := b.String()
-		lines := strings.Count(content, "\n")
-		remaining := m.height - lines - 1
-		if remaining > 0 {
-			content += strings.Repeat("\n", remaining)
-		}
-		return content + m.renderStatusBar()
+		return shared.FillToBottom(b.String(), m.height, 1) + m.renderStatusBar()
 	}
 
 	b.WriteString(m.viewport.View())
@@ -338,16 +331,8 @@ func (m Model) renderDetail() string {
 		b.WriteString(shared.MutedStyle.Render("  Press z to rollback the most recent change.") + "\n")
 	}
 
-	// Fill remaining space.
-	content := b.String()
-	lines := strings.Count(content, "\n")
-	statusBarHeight := 1
-	remaining := m.height - lines - statusBarHeight
-	if remaining > 0 {
-		content += strings.Repeat("\n", remaining)
-	}
-
 	// Status bar.
+	content := shared.FillToBottom(b.String(), m.height, 1)
 	content += m.renderDetailStatusBar()
 
 	return content

@@ -56,6 +56,25 @@ func TestRenderSectionHeader(t *testing.T) {
 	}
 }
 
+func TestFillToBottom_AddsNewlines(t *testing.T) {
+	content := "line1\nline2\nline3"
+	// content has 2 newlines → 3 lines rendered. Height=10, reserved=1 (status bar).
+	// remaining = 10 - 2 - 1 = 7 → append 7 newlines.
+	result := FillToBottom(content, 10, 1)
+	newlines := strings.Count(result, "\n")
+	if newlines != 9 { // 2 existing + 7 added
+		t.Errorf("FillToBottom newlines = %d, want 9", newlines)
+	}
+}
+
+func TestFillToBottom_NoOpWhenAlreadyFull(t *testing.T) {
+	content := strings.Repeat("line\n", 10)
+	result := FillToBottom(content, 10, 0)
+	if result != content {
+		t.Error("FillToBottom should not modify content that already fills height")
+	}
+}
+
 func TestCheckmark(t *testing.T) {
 	ok := Checkmark(true)
 	if ok == "" {

@@ -43,13 +43,8 @@ func (m Model) View() string {
 	if m.HideStatusBar {
 		// No fill — root handles layout (horizontal or vertical split).
 	} else {
-		// Fill remaining space.
-		lines := strings.Count(content, "\n")
-		// Reserve 1 line for the status bar.
-		remaining := m.height - lines - 1
-		if remaining > 0 {
-			content += strings.Repeat("\n", remaining)
-		}
+		// Fill remaining space and render the status bar.
+		content = shared.FillToBottom(content, m.height, 1)
 		bindings := m.keys.DetailShortHelp()
 		if !m.config.Detail.ChatPanelOpen {
 			var filtered []key.Binding
