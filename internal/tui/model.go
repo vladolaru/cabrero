@@ -104,7 +104,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 		// Compute persistent header height.
-		header := dashboard.RenderHeader(m.stats, m.width)
+		header := components.RenderHeader(m.stats, m.width)
 		m.headerHeight = strings.Count(header, "\n") + 2 // +1 trailing newline, +1 separator line
 		subHeaderHeight := 3                              // title + stats + separator
 		childMsg = tea.WindowSizeMsg{Width: msg.Width, Height: msg.Height - m.headerHeight - subHeaderHeight}
@@ -402,7 +402,7 @@ func (m appModel) View() tea.View {
 	}
 
 	// Persistent header + separator.
-	header := dashboard.RenderHeader(m.stats, m.width)
+	header := components.RenderHeader(m.stats, m.width)
 	separator := strings.Repeat("─", m.width)
 
 	// Sub-header (view title + stats).
