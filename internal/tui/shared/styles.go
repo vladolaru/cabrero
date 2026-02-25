@@ -12,16 +12,14 @@ var IsDark bool
 
 // Color palette — concrete color.Color values set by InitStyles/ReinitStyles.
 var (
-	ColorSuccess     color.Color
-	ColorError       color.Color
-	ColorWarning     color.Color
-	ColorAccent      color.Color
-	ColorMuted       color.Color
-	ColorChat        color.Color
-	ColorFgBold      color.Color
-	ColorBorder      color.Color
-	ColorHighlightFg color.Color
-	ColorHighlightBg color.Color
+	ColorSuccess color.Color
+	ColorError   color.Color
+	ColorWarning color.Color
+	ColorAccent  color.Color
+	ColorMuted   color.Color
+	ColorChat    color.Color
+	ColorFgBold  color.Color
+	ColorBorder  color.Color
 )
 
 // Reusable lipgloss styles — rebuilt by InitStyles/ReinitStyles.
@@ -52,8 +50,6 @@ func InitStyles(isDark bool) {
 	ColorChat = ld(lipgloss.Color("#00695C"), lipgloss.Color("#4DB6AC"))
 	ColorFgBold = ld(lipgloss.Color("#000000"), lipgloss.Color("#FFFFFF"))
 	ColorBorder = ld(lipgloss.Color("#BDBDBD"), lipgloss.Color("#616161"))
-	ColorHighlightFg = ld(lipgloss.Color("#FFFFFF"), lipgloss.Color("#FFFFFF"))
-	ColorHighlightBg = ld(lipgloss.Color("#6A1B9A"), lipgloss.Color("#9C27B0"))
 
 	HeaderStyle = lipgloss.NewStyle().Bold(true)
 	MutedStyle = lipgloss.NewStyle().Foreground(ColorMuted)
