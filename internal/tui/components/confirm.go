@@ -33,7 +33,7 @@ func (m ConfirmModel) Update(msg tea.Msg) (ConfirmModel, tea.Cmd) {
 		return m, nil
 	}
 
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("y", "Y"))):
 			m.Active = false
@@ -73,7 +73,7 @@ func (m RevisionConfirmModel) Update(msg tea.Msg) (RevisionConfirmModel, tea.Cmd
 		return m, nil
 	}
 
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("o", "O"))):
 			m.Active = false

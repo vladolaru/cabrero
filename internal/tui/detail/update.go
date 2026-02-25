@@ -26,7 +26,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case message.BlendFinished:
 		return m.handleBlendFinished(msg)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
@@ -51,7 +51,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// When confirming, route to confirm component.
 	if m.applyState == ApplyConfirming {
 		if m.HasRevision() {

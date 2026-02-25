@@ -56,7 +56,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.addMessage("assistant", "Error: "+msg.Err.Error())
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
@@ -82,7 +82,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Chip keys — only when chips are visible and input is not focused.
 	if m.chipsVisible && !m.input.Focused() {
 		switch {

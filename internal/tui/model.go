@@ -109,7 +109,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		subHeaderHeight := 3                              // title + stats + separator
 		childMsg = tea.WindowSizeMsg{Width: msg.Width, Height: msg.Height - m.headerHeight - subHeaderHeight}
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Global keys handled first.
 		if m2, cmd, handled := m.handleGlobalKey(msg); handled {
 			return m2, cmd
@@ -345,7 +345,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.resizeDetailChat()
 		} else if _, isToggle := childMsg.(message.ChatPanelToggled); isToggle {
 			m.resizeDetailChat() // calls syncInlineChat() for narrow mode
-		} else if keyMsg, isKey := childMsg.(tea.KeyMsg); isKey {
+		} else if keyMsg, isKey := childMsg.(tea.KeyPressMsg); isKey {
 			cmds = append(cmds, m.routeDetailKey(keyMsg)...)
 			m.syncInlineChat()
 		} else {
@@ -455,7 +455,7 @@ func (m appModel) View() tea.View {
 	return v
 }
 
-func (m appModel) handleGlobalKey(msg tea.KeyMsg) (appModel, tea.Cmd, bool) {
+func (m appModel) handleGlobalKey(msg tea.KeyPressMsg) (appModel, tea.Cmd, bool) {
 	switch {
 	case key.Matches(msg, m.keys.ForceQuit):
 		return m, tea.Quit, true
@@ -680,7 +680,7 @@ func (m *appModel) resizeDetailChat() {
 }
 
 // routeDetailKey routes a key event to the correct child model based on focus.
-func (m *appModel) routeDetailKey(msg tea.KeyMsg) []tea.Cmd {
+func (m *appModel) routeDetailKey(msg tea.KeyPressMsg) []tea.Cmd {
 	var cmds []tea.Cmd
 
 	// Tab always goes to detail for focus toggling.

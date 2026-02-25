@@ -39,7 +39,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.SetSize(msg.Width, msg.Height)
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
@@ -49,9 +49,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Two-stage Esc: first clears search, second propagates to root for PopView.
-	if msg.Type == tea.KeyEsc && m.HasActiveSearch() {
+	if msg.Code == tea.KeyEsc && m.HasActiveSearch() {
 		m.searchTerm = ""
 		m.matches = nil
 		m.matchIdx = -1
@@ -162,7 +162,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateSearch(msg tea.Msg) (Model, tea.Cmd) {
-	if kmsg, ok := msg.(tea.KeyMsg); ok {
+	if kmsg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))):
 			m.searchActive = false

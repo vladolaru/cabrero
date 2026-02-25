@@ -41,14 +41,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.updateContent()
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
 	return m, nil
 }
 
-func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Down):
 		if m.cursor < len(m.filtered)-1 {
@@ -156,7 +156,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateFilter(msg tea.Msg) (Model, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
 			m.filterActive = false

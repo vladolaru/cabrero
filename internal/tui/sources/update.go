@@ -69,7 +69,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
@@ -79,7 +79,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Down):
 		if m.cursor < len(m.flatItems)-1 {
@@ -193,7 +193,7 @@ func (m Model) handleSetOwnership() (Model, tea.Cmd) {
 
 // updateOwnershipPrompt handles the ownership choice prompt (m/n/esc).
 func (m Model) updateOwnershipPrompt(msg tea.Msg) (Model, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("m", "M"))):
 			m.confirmState = ConfirmNone
@@ -274,7 +274,7 @@ func (m Model) handleConfirmResult(result components.ConfirmResult) (Model, tea.
 
 // updateDetail handles keys when the detail sub-view is open.
 func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
 		case key.Matches(msg, m.keys.Back):
 			m.detailOpen = false

@@ -65,7 +65,7 @@ func (m Model) View() string {
 		if !m.config.Detail.ChatPanelOpen {
 			var filtered []key.Binding
 			for _, kb := range bindings {
-				if key.Matches(tea.KeyMsg{Type: tea.KeyTab}, kb) {
+				if key.Matches(tea.KeyPressMsg{Code: tea.KeyTab}, kb) {
 					continue
 				}
 				filtered = append(filtered, kb)
