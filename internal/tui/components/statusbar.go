@@ -37,15 +37,27 @@ func RenderStatusBar(bindings []key.Binding, timedMsg string, width int) string 
 	}
 
 	// Drop trailing bindings until the bar fits in one line.
+	// Pre-compute each part's rendered width once to avoid O(N²) re-joins.
 	sep := "  "
+	sepWidth := lipgloss.Width(sep)
 	contentWidth := width - 2 // statusBarStyle has Padding(0, 1)
-	for len(parts) > 0 {
-		bar := strings.Join(parts, sep)
-		if lipgloss.Width(bar) <= contentWidth {
-			return statusBarStyle.Width(width).Render(bar)
+
+	total := 0
+	cutoff := 0
+	for i, p := range parts {
+		w := lipgloss.Width(p)
+		if i > 0 {
+			w += sepWidth
 		}
-		parts = parts[:len(parts)-1]
+		if total+w > contentWidth {
+			break
+		}
+		total += w
+		cutoff = i + 1
 	}
 
+	if cutoff > 0 {
+		return statusBarStyle.Width(width).Render(strings.Join(parts[:cutoff], sep))
+	}
 	return statusBarStyle.Width(width).Render("")
 }
