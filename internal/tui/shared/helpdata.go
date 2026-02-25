@@ -22,7 +22,8 @@ type HelpContent struct {
 }
 
 // HelpForView returns help content (title, description, and key binding sections) for the given view.
-func HelpForView(view message.ViewState, km KeyMap) HelpContent {
+// sourceDetailOpen is an optional bool that, when true and view is ViewSourceManager, returns help for the source detail panel.
+func HelpForView(view message.ViewState, km KeyMap, sourceDetailOpen ...bool) HelpContent {
 	switch view {
 	case message.ViewDashboard:
 		return HelpContent{
@@ -79,6 +80,19 @@ func HelpForView(view message.ViewState, km KeyMap) HelpContent {
 			Sections: fitnessHelp(km),
 		}
 	case message.ViewSourceManager:
+		if len(sourceDetailOpen) > 0 && sourceDetailOpen[0] {
+			return HelpContent{
+				Title: "Source Detail Help",
+				Description: "Shows detailed information for a single source: its origin, " +
+					"ownership, approach, session count, health score, and when it was " +
+					"last classified.\n\n" +
+					"Below the info section, recent changes lists all proposals that " +
+					"have been approved or rejected for this source. You can rollback " +
+					"the most recent approved change to restore the previous file " +
+					"content — every approved change stores a verbatim backup.",
+				Sections: sourceDetailHelp(km),
+			}
+		}
 		return HelpContent{
 			Title: "Source Manager Help",
 			Description: "Lists all tracked sources (skills, commands, agents, CLAUDE.md " +
@@ -92,18 +106,6 @@ func HelpForView(view message.ViewState, km KeyMap) HelpContent {
 				"ownership.\n\n" +
 				"Groups can be collapsed and expanded with the left/right keys.",
 			Sections: sourcesHelp(km),
-		}
-	case message.ViewSourceDetail:
-		return HelpContent{
-			Title: "Source Detail Help",
-			Description: "Shows detailed information for a single source: its origin, " +
-				"ownership, approach, session count, health score, and when it was " +
-				"last classified.\n\n" +
-				"Below the info section, recent changes lists all proposals that " +
-				"have been approved or rejected for this source. You can rollback " +
-				"the most recent approved change to restore the previous file " +
-				"content — every approved change stores a verbatim backup.",
-			Sections: sourceDetailHelp(km),
 		}
 	case message.ViewPipelineMonitor:
 		return HelpContent{

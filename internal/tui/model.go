@@ -370,7 +370,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-	case message.ViewSourceManager, message.ViewSourceDetail:
+	case message.ViewSourceManager:
 		var cmd tea.Cmd
 		m.sources, cmd = m.sources.Update(childMsg)
 		if cmd != nil {
@@ -442,7 +442,7 @@ func (m appModel) View() tea.View {
 		}
 	case message.ViewFitnessDetail:
 		content = m.fitness.View()
-	case message.ViewSourceManager, message.ViewSourceDetail:
+	case message.ViewSourceManager:
 		content = m.sources.View()
 	case message.ViewPipelineMonitor:
 		content = m.pipelineMonitor.View()
@@ -452,11 +452,7 @@ func (m appModel) View() tea.View {
 
 	// Help overlay.
 	if m.helpOpen {
-		viewState := m.state
-		if m.state == message.ViewSourceManager && m.sources.DetailOpen() {
-			viewState = message.ViewSourceDetail
-		}
-		hc := shared.HelpForView(viewState, m.keys)
+		hc := shared.HelpForView(m.state, m.keys, m.state == message.ViewSourceManager && m.sources.DetailOpen())
 		content = components.RenderHelpOverlay(hc, m.width, m.height)
 	}
 
@@ -617,7 +613,7 @@ func (m appModel) subHeader() string {
 		return m.detail.SubHeader()
 	case message.ViewFitnessDetail:
 		return m.fitness.SubHeader()
-	case message.ViewSourceManager, message.ViewSourceDetail:
+	case message.ViewSourceManager:
 		return m.sources.SubHeader()
 	case message.ViewPipelineMonitor:
 		return m.pipelineMonitor.SubHeader()

@@ -15,7 +15,6 @@ func TestHelpForView_AllViewsCovered(t *testing.T) {
 		message.ViewProposalDetail,
 		message.ViewFitnessDetail,
 		message.ViewSourceManager,
-		message.ViewSourceDetail,
 		message.ViewPipelineMonitor,
 		message.ViewLogViewer,
 	}
@@ -25,6 +24,12 @@ func TestHelpForView_AllViewsCovered(t *testing.T) {
 		if len(hc.Sections) < 2 {
 			t.Errorf("ViewState %d: got %d sections, want at least 2", v, len(hc.Sections))
 		}
+	}
+
+	// Source detail (detail panel open within source manager) should also have sections.
+	hc := HelpForView(message.ViewSourceManager, km, true)
+	if len(hc.Sections) < 2 {
+		t.Errorf("ViewSourceManager (detail open): got %d sections, want at least 2", len(hc.Sections))
 	}
 }
 
@@ -101,7 +106,6 @@ func TestHelpForView_NoDuplicateKeys(t *testing.T) {
 		message.ViewProposalDetail,
 		message.ViewFitnessDetail,
 		message.ViewSourceManager,
-		message.ViewSourceDetail,
 		message.ViewPipelineMonitor,
 		message.ViewLogViewer,
 	}
@@ -128,7 +132,6 @@ func TestHelpForView_AllViewsHaveTitleAndDescription(t *testing.T) {
 		message.ViewProposalDetail,
 		message.ViewFitnessDetail,
 		message.ViewSourceManager,
-		message.ViewSourceDetail,
 		message.ViewPipelineMonitor,
 		message.ViewLogViewer,
 	}

@@ -15,7 +15,6 @@ const (
 	ViewProposalDetail
 	ViewFitnessDetail
 	ViewSourceManager
-	ViewSourceDetail
 	ViewPipelineMonitor
 	ViewLogViewer
 )
