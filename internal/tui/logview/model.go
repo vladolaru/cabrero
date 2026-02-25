@@ -89,6 +89,7 @@ type Model struct {
 	height       int
 	keys         *shared.KeyMap
 	config       *shared.Config
+	fileSize     int64 // byte offset of last-read position; set after initial load
 }
 
 // New creates a log viewer model with the given log content.
@@ -129,6 +130,13 @@ func (m *Model) SetSize(width, height int) {
 	m.cursor = max(0, len(m.entries)-1)
 	m.refreshViewportContent()
 	m.viewport.GotoBottom()
+}
+
+// SetFileSize records the byte length of the log content at last load.
+// Call this after creating the model from file content so FollowTick
+// can detect new bytes correctly.
+func (m *Model) SetFileSize(n int64) {
+	m.fileSize = n
 }
 
 // UpdateContent replaces the log content (for follow mode refresh).

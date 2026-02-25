@@ -65,9 +65,6 @@ type appModel struct {
 	// All proposals for navigation context
 	proposals []pipeline.ProposalWithSession
 
-	// Log follow mode: track file size for incremental reads.
-	logFileSize int64
-
 	// Pipeline refresh state: track whether a refresh is in flight.
 	pipelineRefreshing bool
 
@@ -304,33 +301,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.LogTickMsg:
 		if m.state == message.ViewLogViewer {
 			logPath := filepath.Join(store.Root(), "daemon.log")
-			info, err := os.Stat(logPath)
-			if err == nil {
-				newSize := info.Size()
-				if newSize > m.logFileSize {
-					// Read only new bytes from the end.
-					f, err := os.Open(logPath)
-					if err == nil {
-						buf := make([]byte, newSize-m.logFileSize)
-						n, _ := f.ReadAt(buf, m.logFileSize)
-						f.Close()
-						if n > 0 {
-							m.logViewer.AppendContent(string(buf[:n]))
-							m.logFileSize += int64(n)
-						}
-					}
-				} else if newSize < m.logFileSize {
-					// File was truncated (log rotation) — full reload.
-					content, _ := os.ReadFile(logPath)
-					m.logViewer.UpdateContent(string(content))
-					m.logFileSize = newSize
-				}
-			}
-			return m, tea.Tick(time.Second, func(time.Time) tea.Msg {
+			nextTick := tea.Tick(time.Second, func(time.Time) tea.Msg {
 				return message.LogTickMsg{}
 			})
+			return m, tea.Batch(m.logViewer.FollowTick(logPath), nextTick)
 		}
 		return m, nil
+
+	case logview.LogAppended, logview.LogReplaced:
+		var cmd tea.Cmd
+		m.logViewer, cmd = m.logViewer.Update(msg)
+		return m, cmd
 
 	case message.RetryRunStarted:
 		sessionID := msg.SessionID
@@ -643,8 +624,8 @@ func (m appModel) pushView(view message.ViewState, action string) (tea.Model, te
 	case message.ViewLogViewer:
 		logPath := filepath.Join(store.Root(), "daemon.log")
 		content, _ := os.ReadFile(logPath)
-		m.logFileSize = int64(len(content))
 		m.logViewer = logview.New(string(content), &m.keys, m.config)
+		m.logViewer.SetFileSize(int64(len(content)))
 		m.logViewer.SetSize(m.width, m.childHeight())
 		// Always poll for new log content while the viewer is open.
 		cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg {

@@ -27,6 +27,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.statusMsg = ""
 		}
 		return m, nil
+
+	case LogAppended:
+		m.fileSize = msg.NewFileSize
+		m.AppendContent(msg.NewContent)
+		return m, nil
+
+	case LogReplaced:
+		m.fileSize = msg.NewFileSize
+		m.UpdateContent(msg.Content)
+		return m, nil
+
 	default:
 	}
 

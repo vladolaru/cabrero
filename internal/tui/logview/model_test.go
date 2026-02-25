@@ -1,6 +1,8 @@
 package logview
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -676,5 +678,87 @@ func TestSearchJumpsToLastMatch(t *testing.T) {
 	}
 	if m.matchIdx != len(m.matches)-1 {
 		t.Errorf("matchIdx = %d, want %d (last match)", m.matchIdx, len(m.matches)-1)
+	}
+}
+
+func TestFollowTick_DetectsNewBytes(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "daemon.log")
+	initial := "line1\nline2\n"
+	if err := os.WriteFile(logPath, []byte(initial), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newTestLogModel()
+	m.SetFileSize(int64(len(initial)))
+
+	appended := "line3\n"
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(appended)
+	f.Close()
+
+	cmd := m.FollowTick(logPath)
+	msg := cmd()
+
+	result, ok := msg.(LogAppended)
+	if !ok {
+		t.Fatalf("expected LogAppended, got %T", msg)
+	}
+	if result.NewContent != appended {
+		t.Errorf("NewContent = %q, want %q", result.NewContent, appended)
+	}
+	want := int64(len(initial) + len(appended))
+	if result.NewFileSize != want {
+		t.Errorf("NewFileSize = %d, want %d", result.NewFileSize, want)
+	}
+}
+
+func TestFollowTick_DetectsRotation(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "daemon.log")
+	initial := "old line1\nold line2\n"
+	if err := os.WriteFile(logPath, []byte(initial), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newTestLogModel()
+	m.SetFileSize(int64(len(initial)))
+
+	rotated := "new\n"
+	if err := os.WriteFile(logPath, []byte(rotated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := m.FollowTick(logPath)
+	msg := cmd()
+
+	result, ok := msg.(LogReplaced)
+	if !ok {
+		t.Fatalf("expected LogReplaced, got %T", msg)
+	}
+	if result.Content != rotated {
+		t.Errorf("Content = %q, want %q", result.Content, rotated)
+	}
+}
+
+func TestFollowTick_NoChangeReturnsNil(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "daemon.log")
+	content := "line1\n"
+	if err := os.WriteFile(logPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newTestLogModel()
+	m.SetFileSize(int64(len(content)))
+
+	cmd := m.FollowTick(logPath)
+	msg := cmd()
+
+	if msg != nil {
+		t.Errorf("expected nil msg for unchanged file, got %T: %v", msg, msg)
 	}
 }
