@@ -61,7 +61,7 @@ func Run(version string) error {
 	}
 
 	m := newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("TUI error: %w", err)

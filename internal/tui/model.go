@@ -394,9 +394,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model.
-func (m appModel) View() string {
+func (m appModel) View() tea.View {
 	if m.width == 0 || m.height == 0 {
-		return ""
+		v := tea.NewView("")
+		v.AltScreen = true
+		return v
 	}
 
 	// Persistent header + separator.
@@ -448,7 +450,9 @@ func (m appModel) View() string {
 		content = components.RenderHelpOverlay(hc, m.width, m.height)
 	}
 
-	return header + "\n" + separator + "\n" + subHeader + "\n" + separator + "\n" + content
+	v := tea.NewView(header + "\n" + separator + "\n" + subHeader + "\n" + separator + "\n" + content)
+	v.AltScreen = true
+	return v
 }
 
 func (m appModel) handleGlobalKey(msg tea.KeyMsg) (appModel, tea.Cmd, bool) {
