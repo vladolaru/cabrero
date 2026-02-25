@@ -9,7 +9,7 @@ import (
 func TestConfirm_Yes(t *testing.T) {
 	m := NewConfirm("Apply this change?")
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	if m.Active {
 		t.Error("model should be inactive after response")
 	}
@@ -30,7 +30,7 @@ func TestConfirm_Yes(t *testing.T) {
 func TestConfirm_No(t *testing.T) {
 	m := NewConfirm("Apply this change?")
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if m.Active {
 		t.Error("model should be inactive after response")
 	}
@@ -51,7 +51,7 @@ func TestConfirm_No(t *testing.T) {
 func TestConfirm_Esc(t *testing.T) {
 	m := NewConfirm("Apply this change?")
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.Active {
 		t.Error("model should be inactive after Esc")
 	}
@@ -73,7 +73,7 @@ func TestConfirm_InactiveIgnoresInput(t *testing.T) {
 	m := NewConfirm("Apply this change?")
 	m.Active = false
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	if cmd != nil {
 		t.Error("inactive confirm should return nil cmd")
 	}
@@ -98,7 +98,7 @@ func TestConfirm_UnrecognizedKeyIgnored(t *testing.T) {
 
 	// Keys not in y/Y/n/N/esc should be silently ignored.
 	for _, r := range []rune{'a', 'b', 'm', 'x', '1'} {
-		m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m2, cmd := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		if !m2.Active {
 			t.Errorf("pressing %q should not deactivate confirm", string(r))
 		}
@@ -119,14 +119,14 @@ func TestConfirm_ViewMatchesAcceptedKeys(t *testing.T) {
 	}
 
 	// 'y' should confirm (matches [y] in prompt).
-	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m2, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	if m2.Active || cmd == nil {
 		t.Error("'y' (shown in prompt) should be accepted")
 	}
 
 	// 'N' should decline (matches [N] in prompt).
 	m3 := NewConfirm("Delete this?")
-	m3, cmd = m3.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'N'}})
+	m3, cmd = m3.Update(tea.KeyPressMsg{Code: 'N', Text: "N"})
 	if m3.Active || cmd == nil {
 		t.Error("'N' (shown in prompt) should be accepted")
 	}
@@ -152,7 +152,7 @@ func TestRevisionConfirm_UnrecognizedKeyIgnored(t *testing.T) {
 	m := NewRevisionConfirm("Which version?")
 
 	for _, r := range []rune{'a', 'y', 'n', 'x'} {
-		m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m2, cmd := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		if !m2.Active {
 			t.Errorf("pressing %q should not deactivate revision confirm", string(r))
 		}
@@ -165,7 +165,7 @@ func TestRevisionConfirm_UnrecognizedKeyIgnored(t *testing.T) {
 func TestRevisionConfirm_Original(t *testing.T) {
 	m := NewRevisionConfirm("Which version?")
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if m.Active {
 		t.Error("model should be inactive")
 	}
@@ -183,7 +183,7 @@ func TestRevisionConfirm_Original(t *testing.T) {
 func TestRevisionConfirm_Revision(t *testing.T) {
 	m := NewRevisionConfirm("Which version?")
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 	msg := cmd()
 	result := msg.(RevisionChoice)
 	if result.Choice != "revision" {
@@ -194,7 +194,7 @@ func TestRevisionConfirm_Revision(t *testing.T) {
 func TestRevisionConfirm_Cancel(t *testing.T) {
 	m := NewRevisionConfirm("Which version?")
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	msg := cmd()
 	result := msg.(RevisionChoice)
 	if result.Choice != "cancel" {

@@ -40,14 +40,14 @@ func TestFullNavigationFlow(t *testing.T) {
 	}
 
 	// Dashboard should render.
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "Cabrero") {
 		t.Error("dashboard missing title")
 	}
 
 	// Navigate down, then press Enter to open detail.
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	m, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	// Enter should produce PushView cmd.
 	if cmd == nil {
@@ -72,13 +72,13 @@ func TestFullNavigationFlow(t *testing.T) {
 	}
 
 	// Detail should render proposal content (sub-header rendered by root model).
-	view = ansi.Strip(m.View())
+	view = ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "Proposal Detail") {
 		t.Error("detail missing proposal sub-header")
 	}
 
 	// Press Esc to go back.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		popMsg := cmd()
 		m, _ = update(m, popMsg)
@@ -96,7 +96,7 @@ func TestQuitFromDashboard(t *testing.T) {
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	// Press 'q' should quit from dashboard.
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	_, cmd := update(m, tea.KeyPressMsg{Code: 'q', Text: "q"})
 	if cmd == nil {
 		t.Fatal("q should produce quit cmd")
 	}
@@ -118,7 +118,7 @@ func TestQuitFromDetail(t *testing.T) {
 	}
 
 	// Press 'q' should quit from detail (no active text input).
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	_, cmd := update(m, tea.KeyPressMsg{Code: 'q', Text: "q"})
 	if cmd == nil {
 		t.Fatal("q should produce quit cmd from detail view")
 	}
@@ -136,7 +136,7 @@ func TestForceQuitFromAnywhere(t *testing.T) {
 	m, _ = update(m, message.PushView{View: message.ViewProposalDetail})
 
 	// Ctrl+C should force quit.
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyCtrlC})
+	_, cmd := update(m, tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Fatal("ctrl+c should produce quit cmd")
 	}
@@ -156,13 +156,13 @@ func TestHelpOverlayToggle(t *testing.T) {
 	}
 
 	// Press '?' to open help.
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	m, _ = update(m, tea.KeyPressMsg{Code: '?', Text: "?"})
 	if !m.helpOpen {
 		t.Error("help should be open after ?")
 	}
 
 	// Press '?' again to close.
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	m, _ = update(m, tea.KeyPressMsg{Code: '?', Text: "?"})
 	if m.helpOpen {
 		t.Error("help should be closed after second ?")
 	}
@@ -227,11 +227,11 @@ func TestDashboardToFitnessAndBack(t *testing.T) {
 	// Navigate to a fitness report item (proposals are first, reports after).
 	// Our test data has 3 proposals then 2 fitness reports, so cursor 3 = first report.
 	for i := 0; i < 3; i++ {
-		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 
 	// Press Enter to open fitness detail.
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on fitness report should produce cmd")
 	}
@@ -251,13 +251,13 @@ func TestDashboardToFitnessAndBack(t *testing.T) {
 	}
 
 	// Fitness view should render.
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "docx-helper") {
 		t.Error("fitness view should contain source name")
 	}
 
 	// Press Esc to go back.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		popMsg := cmd()
 		m, _ = update(m, popMsg)
@@ -272,7 +272,7 @@ func TestDashboardToSourceManager(t *testing.T) {
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Press 's' to open source manager.
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m, cmd := update(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd == nil {
 		t.Fatal("s should produce cmd")
 	}
@@ -292,13 +292,13 @@ func TestDashboardToSourceManager(t *testing.T) {
 	}
 
 	// Source manager should render.
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "SOURCE") {
 		t.Error("source manager view should contain column header")
 	}
 
 	// Press Esc to go back.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		msg := cmd()
 		m, _ = update(m, msg)
@@ -314,11 +314,11 @@ func TestFitnessJumpToSources(t *testing.T) {
 
 	// Navigate to a fitness report (3 proposals, then fitness reports).
 	for i := 0; i < 3; i++ {
-		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 
 	// Push to fitness detail via Enter.
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter should produce cmd")
 	}
@@ -328,7 +328,7 @@ func TestFitnessJumpToSources(t *testing.T) {
 	}
 
 	// Press 's' to jump to sources.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m, cmd = update(m, tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd == nil {
 		t.Fatal("s in fitness view should produce cmd")
 	}
@@ -361,13 +361,13 @@ func TestSourceManagerGroupCollapse(t *testing.T) {
 	}
 
 	// Get initial view.
-	viewBefore := ansi.Strip(m.View())
+	viewBefore := ansi.Strip(m.View().Content)
 
 	// Press Left to collapse current group.
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyLeft})
 
 	// View should change (group collapsed, fewer lines).
-	viewAfter := ansi.Strip(m.View())
+	viewAfter := ansi.Strip(m.View().Content)
 	if viewBefore == viewAfter {
 		t.Error("collapsing group should change the view")
 	}
@@ -380,7 +380,7 @@ func TestDashboardToPipelineAndBack(t *testing.T) {
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Press 'p' to open pipeline monitor.
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	m, cmd := update(m, tea.KeyPressMsg{Code: 'p', Text: "p"})
 	if cmd == nil {
 		t.Fatal("p should produce cmd")
 	}
@@ -400,13 +400,13 @@ func TestDashboardToPipelineAndBack(t *testing.T) {
 	}
 
 	// Pipeline monitor should render.
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "DAEMON") || !strings.Contains(view, "RECENT RUNS") {
 		t.Error("pipeline monitor view missing expected sections")
 	}
 
 	// Press Esc to go back.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		m, _ = update(m, cmd())
 	}
@@ -426,7 +426,7 @@ func TestPipelineToLogViewerAndBack(t *testing.T) {
 	}
 
 	// Press 'l' to open log viewer.
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	m, cmd := update(m, tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
 		t.Fatal("l should produce cmd")
 	}
@@ -449,7 +449,7 @@ func TestPipelineToLogViewerAndBack(t *testing.T) {
 	}
 
 	// Press Esc to go back to pipeline.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		m, _ = update(m, cmd())
 	}
@@ -458,7 +458,7 @@ func TestPipelineToLogViewerAndBack(t *testing.T) {
 	}
 
 	// Press Esc again to go back to dashboard.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		m, _ = update(m, cmd())
 	}
@@ -478,21 +478,21 @@ func TestPipelineRetryFlow(t *testing.T) {
 	}
 
 	// Move cursor to the errored run at index 2.
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
 
 	// Press 'R' to retry — should activate confirmation dialog.
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m, cmd := update(m, tea.KeyPressMsg{Code: 'R', Text: "R"})
 	if cmd != nil {
 		t.Fatal("R on errored run with confirmation enabled should not produce cmd")
 	}
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "[y/N]") {
 		t.Error("confirmation dialog should be visible")
 	}
 
 	// Press 'y' to confirm — should produce ConfirmResult.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m, cmd = update(m, tea.KeyPressMsg{Code: 'y', Text: "y"})
 	if cmd == nil {
 		t.Fatal("y on confirm should produce cmd")
 	}
@@ -550,22 +550,22 @@ func TestLogViewerTwoStageEsc(t *testing.T) {
 	m.logViewer.SetSize(120, 37) // re-init viewport after content change
 
 	// Activate search.
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = update(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 
 	// Type search term.
 	for _, r := range "error" {
-		m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m, _ = update(m, tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
 
 	// Press Enter to confirm search.
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if !m.logViewer.HasActiveSearch() {
 		t.Fatal("log viewer should have active search after searching")
 	}
 
 	// First Esc: should stay in log viewer (matches cleared).
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd := update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		// Process any command (should be nil, but handle gracefully).
 		m, _ = update(m, cmd())
@@ -578,7 +578,7 @@ func TestLogViewerTwoStageEsc(t *testing.T) {
 	}
 
 	// Second Esc: should pop to pipeline monitor.
-	m, cmd = update(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd = update(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if cmd != nil {
 		m, _ = update(m, cmd())
 	}

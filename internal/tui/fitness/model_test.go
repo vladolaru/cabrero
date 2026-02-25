@@ -95,7 +95,7 @@ func TestFitness_EvidenceExpand(t *testing.T) {
 	}
 
 	// Press Enter to expand the first evidence group.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if !m.evidence[0].Expanded {
 		t.Error("first evidence group should be expanded after Enter")
@@ -108,19 +108,19 @@ func TestFitness_EvidenceExpand(t *testing.T) {
 	}
 
 	// Press Enter again to collapse.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if m.evidence[0].Expanded {
 		t.Error("first evidence group should be collapsed after second Enter")
 	}
 
 	// Move cursor down to second group and expand it.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.selectedEvidence != 1 {
 		t.Fatalf("selectedEvidence after Down = %d, want 1", m.selectedEvidence)
 	}
 
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !m.evidence[1].Expanded {
 		t.Error("second evidence group should be expanded")
 	}
@@ -141,7 +141,7 @@ func TestFitness_DismissEmitsMessage(t *testing.T) {
 	m := newTestFitness()
 
 	// Press 'x' to dismiss.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
 
 	if cmd == nil {
 		t.Fatal("dismiss should produce a cmd")
@@ -166,7 +166,7 @@ func TestFitness_JumpToSources(t *testing.T) {
 	m := newTestFitness()
 
 	// Press 's' to jump to sources.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 
 	if cmd == nil {
 		t.Fatal("jump to sources should produce a cmd")
@@ -192,13 +192,13 @@ func TestFitness_FocusToggle(t *testing.T) {
 	}
 
 	// Tab switches to chat.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	if m.focus != FocusChat {
 		t.Errorf("focus after Tab = %d, want FocusChat", m.focus)
 	}
 
 	// Tab switches back.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	if m.focus != FocusReport {
 		t.Errorf("focus after second Tab = %d, want FocusReport", m.focus)
 	}
@@ -208,7 +208,7 @@ func TestFitness_ChatKey(t *testing.T) {
 	m := newTestFitness()
 
 	// Press 'c' to focus chat.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	if m.focus != FocusChat {
 		t.Errorf("focus after 'c' = %d, want FocusChat", m.focus)
 	}
@@ -217,7 +217,7 @@ func TestFitness_ChatKey(t *testing.T) {
 func TestFitness_BackEmitsPopView(t *testing.T) {
 	m := newTestFitness()
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if cmd == nil {
 		t.Fatal("Esc should emit a cmd")
 	}
@@ -265,13 +265,13 @@ func TestFitness_NilReport(t *testing.T) {
 	}
 
 	// Dismiss should be a no-op.
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	if cmd != nil {
 		t.Error("dismiss on nil report should produce no cmd")
 	}
 
 	// Jump to sources should be a no-op.
-	_, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd != nil {
 		t.Error("jump to sources on nil report should produce no cmd")
 	}
@@ -286,32 +286,32 @@ func TestFitness_EvidenceNavigation(t *testing.T) {
 	}
 
 	// Move down to second group.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.selectedEvidence != 1 {
 		t.Errorf("selectedEvidence after Down = %d, want 1", m.selectedEvidence)
 	}
 
 	// Move down to third group.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.selectedEvidence != 2 {
 		t.Errorf("selectedEvidence after second Down = %d, want 2", m.selectedEvidence)
 	}
 
 	// At bottom, should not go further.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.selectedEvidence != 2 {
 		t.Errorf("selectedEvidence should stay at 2 (bottom), got %d", m.selectedEvidence)
 	}
 
 	// Move up.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.selectedEvidence != 1 {
 		t.Errorf("selectedEvidence after Up = %d, want 1", m.selectedEvidence)
 	}
 
 	// At top, should not go further.
 	m.selectedEvidence = 0
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.selectedEvidence != 0 {
 		t.Errorf("selectedEvidence should stay at 0 (top), got %d", m.selectedEvidence)
 	}

@@ -107,7 +107,7 @@ func TestSources_Navigation(t *testing.T) {
 	}
 
 	// Move down to first source.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.cursor != 1 {
 		t.Errorf("cursor after first down = %d, want 1", m.cursor)
 	}
@@ -122,27 +122,27 @@ func TestSources_Navigation(t *testing.T) {
 
 	// Move down through list.
 	for i := 0; i < 5; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	if m.cursor != 6 {
 		t.Errorf("cursor after navigating to end = %d, want 6", m.cursor)
 	}
 
 	// At bottom — should not go further.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.cursor != 6 {
 		t.Errorf("cursor should stay at 6 (bottom), got %d", m.cursor)
 	}
 
 	// Move up.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.cursor != 5 {
 		t.Errorf("cursor after up = %d, want 5", m.cursor)
 	}
 
 	// At top — should not go further.
 	m.cursor = 0
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.cursor != 0 {
 		t.Errorf("cursor should stay at 0 (top), got %d", m.cursor)
 	}
@@ -158,7 +158,7 @@ func TestSources_GroupCollapse(t *testing.T) {
 	}
 
 	// Cursor on "User-level" header (index 0). Collapse with Left.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 
 	// User-level collapsed: header + (Project: acme header + source + Unclassified header + source) = 5.
 	if len(m.flatItems) != 5 {
@@ -171,7 +171,7 @@ func TestSources_GroupCollapse(t *testing.T) {
 	}
 
 	// Expand with Right.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	if len(m.flatItems) != 7 {
 		t.Fatalf("after expand flatItems = %d, want 7", len(m.flatItems))
 	}
@@ -180,8 +180,8 @@ func TestSources_GroupCollapse(t *testing.T) {
 	}
 
 	// Navigate to a source (cursor 1) and collapse its parent group.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown}) // cursor -> 1
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})  // collapse parent group
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown}) // cursor -> 1
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})  // collapse parent group
 
 	if !m.groups[0].Collapsed {
 		t.Error("parent group should be collapsed when cursor is on child source")
@@ -198,7 +198,7 @@ func TestSources_ToggleApproach(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper" (cursor 1).
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 
 	s := m.SelectedSource()
 	if s == nil || s.Name != "docx-helper" {
@@ -209,7 +209,7 @@ func TestSources_ToggleApproach(t *testing.T) {
 	}
 
 	// Press 't' to toggle — should activate confirmation.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 
 	if m.confirmState != ConfirmToggleApproach {
 		t.Fatalf("confirmState = %d, want ConfirmToggleApproach", m.confirmState)
@@ -228,7 +228,7 @@ func TestSources_ToggleApproach(t *testing.T) {
 	}
 
 	// Confirm with 'y' — the key the prompt advertises.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 
 	if cmd == nil {
 		t.Fatal("expected cmd after pressing y")
@@ -273,13 +273,13 @@ func TestSources_ToggleApproach_Decline(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper".
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 
 	// Press 't' to toggle.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 
 	// Decline with 'n' — produces a cmd with ConfirmResult{Confirmed: false}.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 
 	if cmd != nil {
 		// Feed the ConfirmResult back.
@@ -308,7 +308,7 @@ func TestSources_ToggleApproach_Unclassified(t *testing.T) {
 	m.cursor = 6
 
 	// Press 't' — should work even for unclassified sources.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 
 	if m.confirmState != ConfirmToggleApproach {
 		t.Errorf("confirmState = %d, want ConfirmToggleApproach", m.confirmState)
@@ -407,8 +407,8 @@ func TestSources_DetailAndRollback(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper" and open detail.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if !m.detailOpen {
 		t.Fatal("detail should be open after Enter on source")
@@ -431,7 +431,7 @@ func TestSources_DetailAndRollback(t *testing.T) {
 	}
 
 	// Close detail with Esc.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.detailOpen {
 		t.Error("detail should be closed after Esc")
@@ -444,14 +444,14 @@ func TestSources_DetailAndRollback(t *testing.T) {
 	}
 
 	// Reopen detail with changes, test rollback with confirmation.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m.changes = []fitness.ChangeEntry{
 		{ID: "change-1", SourceName: "docx-helper", Description: "Updated workflow step"},
 		{ID: "change-2", SourceName: "docx-helper", Description: "Fixed template"},
 	}
 
 	// Rollback requires confirm (default config).
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
 
 	if m.confirmState != ConfirmRollback {
 		t.Fatalf("confirmState = %d, want ConfirmRollback", m.confirmState)
@@ -467,7 +467,7 @@ func TestSources_DetailAndRollback(t *testing.T) {
 	}
 
 	// Confirm with 'y' — the key the prompt advertises.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 
 	if cmd == nil {
 		t.Fatal("expected cmd after pressing y")
@@ -507,15 +507,15 @@ func TestSources_RollbackWithoutConfirm(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to source and open detail.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	m.changes = []fitness.ChangeEntry{
 		{ID: "change-1", SourceName: "docx-helper", Description: "Test change"},
 	}
 
 	// Rollback without confirm.
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'z', Text: "z"})
 
 	if cmd == nil {
 		t.Fatal("expected cmd for direct rollback")
@@ -538,7 +538,7 @@ func TestSources_OpenUnclassified(t *testing.T) {
 	m.cursor = 6
 
 	// Enter should open detail view for unclassified sources too.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if !m.detailOpen {
 		t.Fatal("detail should be open after Enter on unclassified source")
@@ -555,7 +555,7 @@ func TestSources_BackEmitsPopView(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 40)
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if cmd == nil {
 		t.Fatal("Esc should emit a cmd")
@@ -571,10 +571,10 @@ func TestSources_OwnershipMine(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper".
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 
 	// Press 'o' for ownership change.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 
 	if m.confirmState != ConfirmSetOwnership {
 		t.Fatalf("confirmState = %d, want ConfirmSetOwnership", m.confirmState)
@@ -590,7 +590,7 @@ func TestSources_OwnershipMine(t *testing.T) {
 	}
 
 	// Press 'm' — the key the prompt advertises for "mine".
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 
 	if cmd == nil {
 		t.Fatal("expected cmd after pressing m")
@@ -619,10 +619,10 @@ func TestSources_OwnershipNotMine(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper".
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 
 	// Press 'o' for ownership change.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 
 	// Verify prompt is shown.
 	view := m.View()
@@ -631,7 +631,7 @@ func TestSources_OwnershipNotMine(t *testing.T) {
 	}
 
 	// Press 'n' — the key the prompt advertises for "not mine".
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 
 	if cmd == nil {
 		t.Fatal("expected cmd after pressing n")
@@ -651,13 +651,13 @@ func TestSources_OwnershipCancel(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper".
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 
 	// Press 'o' for ownership change.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 
 	// Press Esc to cancel.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.confirmState != ConfirmNone {
 		t.Errorf("confirmState = %d, want ConfirmNone after cancel", m.confirmState)
@@ -682,12 +682,12 @@ func TestSources_OwnershipUnrecognizedKeyIgnored(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to "docx-helper" and open ownership prompt.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 
 	// Keys not in m/n/esc should be silently ignored.
 	for _, r := range []rune{'a', 'y', 'x', 'o', '1'} {
-		m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m2, cmd := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		if m2.confirmState != ConfirmSetOwnership {
 			t.Errorf("pressing %q should not change confirmState", string(r))
 		}
@@ -762,18 +762,18 @@ func TestSources_Viewport_ScrollsOnOverflow(t *testing.T) {
 	m.SetSize(120, 20) // 20 lines total; 31 items won't fit
 
 	// Viewport height = 20 - 2 (column header + status bar) = 18.
-	if m.viewport.Height != 18 {
-		t.Fatalf("viewport.Height = %d, want 18", m.viewport.Height)
+	if m.viewport.Height() != 18 {
+		t.Fatalf("viewport.Height = %d, want 18", m.viewport.Height())
 	}
 
 	// Navigate down past the viewport height — cursor should remain visible.
 	for i := 0; i < 25; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	cursorLine := m.cursor
-	if cursorLine < m.viewport.YOffset || cursorLine >= m.viewport.YOffset+m.viewport.Height {
+	if cursorLine < m.viewport.YOffset() || cursorLine >= m.viewport.YOffset()+m.viewport.Height() {
 		t.Errorf("cursor line %d not visible: YOffset=%d Height=%d",
-			cursorLine, m.viewport.YOffset, m.viewport.Height)
+			cursorLine, m.viewport.YOffset(), m.viewport.Height())
 	}
 }
 
@@ -796,7 +796,7 @@ func TestSources_GroupCollapsedDefault(t *testing.T) {
 	}
 
 	// Expand first group.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	if len(m.flatItems) != 5 {
 		t.Fatalf("after expanding first group, flatItems = %d, want 5", len(m.flatItems))
 	}

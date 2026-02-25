@@ -32,13 +32,13 @@ func TestDetail_FocusToggle(t *testing.T) {
 	}
 
 	// Tab switches to chat.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	if m.focus != FocusChat {
 		t.Errorf("focus after Tab = %d, want FocusChat", m.focus)
 	}
 
 	// Tab switches back.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	if m.focus != FocusProposal {
 		t.Errorf("focus after second Tab = %d, want FocusProposal", m.focus)
 	}
@@ -48,13 +48,13 @@ func TestDetail_ApproveFlow(t *testing.T) {
 	m := newTestDetail()
 
 	// Press 'a' to start approve.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	if m.applyState != ApplyConfirming {
 		t.Fatalf("state = %d, want ApplyConfirming", m.applyState)
 	}
 
 	// Confirm with 'y'.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	if cmd == nil {
 		t.Fatal("expected cmd from confirm")
 	}
@@ -80,13 +80,13 @@ func TestDetail_ApproveCancelled(t *testing.T) {
 	m := newTestDetail()
 
 	// Start approve.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	if m.applyState != ApplyConfirming {
 		t.Fatal("should be confirming")
 	}
 
 	// Cancel with 'n'.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if cmd == nil {
 		t.Fatal("expected cmd from cancel")
 	}
@@ -138,7 +138,7 @@ func TestDetail_BlendError(t *testing.T) {
 func TestDetail_RejectSendsMessage(t *testing.T) {
 	m := newTestDetail()
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 	if cmd == nil {
 		t.Fatal("reject should produce cmd")
 	}
@@ -156,7 +156,7 @@ func TestDetail_RejectSendsMessage(t *testing.T) {
 func TestDetail_DeferSendsMessage(t *testing.T) {
 	m := newTestDetail()
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if cmd == nil {
 		t.Fatal("defer should produce cmd")
 	}
@@ -179,13 +179,13 @@ func TestDetail_CitationNavigation(t *testing.T) {
 	}
 
 	// Press Down to move to next citation.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.citationCursor != 1 {
 		t.Errorf("citationCursor after Down = %d, want 1", m.citationCursor)
 	}
 
 	// Press Up to move back.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.citationCursor != 0 {
 		t.Errorf("citationCursor after Up = %d, want 0", m.citationCursor)
 	}
@@ -194,7 +194,7 @@ func TestDetail_CitationNavigation(t *testing.T) {
 	if m.citations[0].Expanded {
 		t.Fatal("citation should start collapsed")
 	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !m.citations[0].Expanded {
 		t.Error("citation should be expanded after Enter")
 	}
@@ -206,7 +206,7 @@ func TestDetail_CitationNavigation(t *testing.T) {
 	}
 
 	// Press Enter again to collapse.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.citations[0].Expanded {
 		t.Error("citation should be collapsed after second Enter")
 	}

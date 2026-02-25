@@ -62,18 +62,18 @@ func TestLogModelSearch(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Press / to activate search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	if !m.searchActive {
 		t.Error("search should be active after /")
 	}
 
 	// Type search term.
 	for _, r := range "classifier" {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
 
 	// Press Enter to search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.matches) == 0 {
 		t.Error("expected matches for 'classifier'")
 	}
@@ -88,13 +88,13 @@ func TestLogModelFollowToggle(t *testing.T) {
 	}
 
 	// Press 'f' to toggle.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	if m.followMode {
 		t.Error("follow should be off after f")
 	}
 
 	// Press 'f' again.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	if !m.followMode {
 		t.Error("follow should be on after second f")
 	}
@@ -105,15 +105,15 @@ func TestLogModelSearchHighlighting(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Activate search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 
 	// Type search term.
 	for _, r := range "classifier" {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
 
 	// Press Enter to search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.matches) == 0 {
 		t.Fatal("expected matches for 'classifier'")
 	}
@@ -146,13 +146,13 @@ func TestLogModelEscFromSearch(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Activate search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	if !m.searchActive {
 		t.Fatal("search should be active")
 	}
 
 	// Press Esc to close search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if m.searchActive {
 		t.Error("search should be closed after Esc")
 	}
@@ -168,11 +168,11 @@ func TestLogModelHasActiveSearch(t *testing.T) {
 	}
 
 	// Perform search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	for _, r := range "classifier" {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if !m.HasActiveSearch() {
 		t.Error("should have active search after searching with matches")
@@ -184,18 +184,18 @@ func TestLogModelTwoStageEsc(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Perform a search.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	for _, r := range "classifier" {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if !m.HasActiveSearch() {
 		t.Fatal("should have active search after searching")
 	}
 
 	// First Esc: should clear matches, not propagate.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if m.HasActiveSearch() {
 		t.Error("first Esc should clear active search")
 	}
@@ -478,19 +478,19 @@ func TestCursorNavigation(t *testing.T) {
 	}
 
 	// Move up.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.cursor != last-1 {
 		t.Errorf("cursor should be %d after Up, got %d", last-1, m.cursor)
 	}
 
 	// Move down.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.cursor != last {
 		t.Errorf("cursor should be %d after Down, got %d", last, m.cursor)
 	}
 
 	// Can't go below last.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.cursor != last {
 		t.Errorf("cursor should stay at %d, got %d", last, m.cursor)
 	}
@@ -505,7 +505,7 @@ func TestCursorNavigationDisablesFollow(t *testing.T) {
 	}
 
 	// Moving cursor should disable follow mode.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.followMode {
 		t.Error("cursor navigation should disable follow mode")
 	}
@@ -517,7 +517,7 @@ func TestCursorStaysInBounds(t *testing.T) {
 
 	// Move past the first entry.
 	for i := 0; i < len(m.entries)+5; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	}
 	if m.cursor != 0 {
 		t.Errorf("cursor should clamp to first entry (0), got %d", m.cursor)
@@ -532,13 +532,13 @@ func TestToggleExpand(t *testing.T) {
 
 	// Move cursor to the multi-line entry (index 1).
 	// Cursor starts at last entry (2), so move up once.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.cursor != 1 {
 		t.Fatalf("cursor should be 1, got %d", m.cursor)
 	}
 
 	// Press Enter to expand.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !m.entries[1].Expanded {
 		t.Error("entry should be expanded after Enter")
 	}
@@ -550,7 +550,7 @@ func TestToggleExpand(t *testing.T) {
 	}
 
 	// Press Enter again to collapse.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.entries[1].Expanded {
 		t.Error("entry should be collapsed after second Enter")
 	}
@@ -562,7 +562,7 @@ func TestToggleExpandSingleLine(t *testing.T) {
 
 	// All entries are single-line in testLogContent.
 	// Enter on single-line entry should be a no-op.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	// No crash, no change.
 }
 
@@ -573,7 +573,7 @@ func TestExpandAll(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Press 'e' to expand all.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	for i, entry := range m.entries {
 		if entry.IsMultiLine() && !entry.Expanded {
 			t.Errorf("entry[%d] should be expanded after 'e'", i)
@@ -588,10 +588,10 @@ func TestCollapseAll(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Expand all first.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 
 	// Press 'E' to collapse all.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'E'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'E', Text: "E"})
 	for i, entry := range m.entries {
 		if entry.Expanded {
 			t.Errorf("entry[%d] should be collapsed after 'E'", i)
@@ -606,11 +606,11 @@ func TestSearchExpandsAllMultiLineEntries(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Search for text that's in a continuation line.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	for _, r := range "config.Load" {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if len(m.matches) == 0 {
 		t.Fatal("expected matches for 'config.Load'")
@@ -629,11 +629,11 @@ func TestSearchJumpsToLastMatch(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Search for "session" which appears in multiple entries.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 	for _, r := range "session" {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m, _ = m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 	}
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if len(m.matches) == 0 {
 		t.Fatal("expected matches for 'session'")

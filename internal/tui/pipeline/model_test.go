@@ -156,13 +156,13 @@ func TestModelNavigation(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Move down.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.cursor != 1 {
 		t.Errorf("cursor after down = %d, want 1", m.cursor)
 	}
 
 	// Move up.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.cursor != 0 {
 		t.Errorf("cursor after up = %d, want 0", m.cursor)
 	}
@@ -173,13 +173,13 @@ func TestModelExpandRun(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Press Enter to expand.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.expandedIdx != 0 {
 		t.Errorf("expandedIdx = %d, want 0", m.expandedIdx)
 	}
 
 	// Press Enter again to collapse.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.expandedIdx != -1 {
 		t.Errorf("expandedIdx = %d, want -1", m.expandedIdx)
 	}
@@ -190,11 +190,11 @@ func TestModelRetryKey(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Navigate to errored run (index 2).
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 
 	// Press R.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
 
 	// Should activate confirm — note: .Active is a FIELD, not a method.
 	if !m.confirm.Active {
@@ -305,11 +305,11 @@ func TestPipeline_Viewport_ExistsAfterSetSize(t *testing.T) {
 	m.SetSize(120, 24)
 
 	// Viewport height = 24 - 1 (status bar).
-	if m.viewport.Height != 23 {
-		t.Fatalf("viewport.Height = %d, want 23", m.viewport.Height)
+	if m.viewport.Height() != 23 {
+		t.Fatalf("viewport.Height = %d, want 23", m.viewport.Height())
 	}
-	if m.viewport.Width != 120 {
-		t.Fatalf("viewport.Width = %d, want 120", m.viewport.Width)
+	if m.viewport.Width() != 120 {
+		t.Fatalf("viewport.Width = %d, want 120", m.viewport.Width())
 	}
 }
 
@@ -334,7 +334,7 @@ func TestModelPipelineKeyEmitsPushLogView(t *testing.T) {
 	m.SetSize(120, 40)
 
 	// Press L.
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if cmd == nil {
 		t.Fatal("L should produce cmd")
 	}

@@ -38,32 +38,32 @@ func TestDashboard_Navigation(t *testing.T) {
 
 	// Move down through all items.
 	for i := 1; i < totalItems; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 		if m.cursor != i {
 			t.Errorf("cursor after down %d = %d, want %d", i, m.cursor, i)
 		}
 	}
 
 	// At bottom — should not go further.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.cursor != totalItems-1 {
 		t.Errorf("cursor should stay at %d (bottom), got %d", totalItems-1, m.cursor)
 	}
 
 	// Move up.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.cursor != totalItems-2 {
 		t.Errorf("cursor after up = %d, want %d", m.cursor, totalItems-2)
 	}
 
 	// Go to top.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyHome})
 	if m.cursor != 0 {
 		t.Errorf("cursor after home = %d, want 0", m.cursor)
 	}
 
 	// Go to bottom.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
 	if m.cursor != totalItems-1 {
 		t.Errorf("cursor after end = %d, want %d", m.cursor, totalItems-1)
 	}
@@ -81,7 +81,7 @@ func TestDashboard_SelectedProposal(t *testing.T) {
 	}
 
 	// Move to second.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	p = m.SelectedProposal()
 	if p == nil {
 		t.Fatal("SelectedProposal returned nil at index 1")
@@ -96,7 +96,7 @@ func TestDashboard_SelectedItem_FitnessReport(t *testing.T) {
 
 	// Move past the 3 proposals to the first fitness report (index 3).
 	for i := 0; i < 3; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 
 	item := m.SelectedItem()
@@ -136,7 +136,7 @@ func TestDashboard_SortCycle(t *testing.T) {
 	// Cycle: newest -> oldest -> confidence -> type -> newest.
 	expected := []string{SortOldest, SortConfidence, SortType, SortNewest}
 	for _, want := range expected {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+		m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 		if m.sortOrder != want {
 			t.Errorf("sort = %q, want %q", m.sortOrder, want)
 		}
@@ -199,7 +199,7 @@ func TestDashboard_OpenSendsMessage(t *testing.T) {
 	m := newTestModel()
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter should produce a cmd")
 	}
@@ -220,10 +220,10 @@ func TestDashboard_OpenFitnessReport(t *testing.T) {
 
 	// Move to first fitness report (index 3).
 	for i := 0; i < 3; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on fitness report should produce a cmd")
 	}
@@ -242,7 +242,7 @@ func TestDashboard_SourcesKeySendsMessage(t *testing.T) {
 	m := newTestModel()
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd == nil {
 		t.Fatal("'s' should produce a cmd")
 	}
@@ -263,12 +263,12 @@ func TestDashboard_ActionKeysGatedOnProposal(t *testing.T) {
 
 	// Move to first fitness report (index 3).
 	for i := 0; i < 3; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 
 	// Approve, Reject, Defer should produce nil cmd on a fitness report.
 	for _, r := range []rune{'a', 'r', 'd'} {
-		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		_, cmd := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
 		if cmd != nil {
 			t.Errorf("key '%c' should not produce cmd on fitness report", r)
 		}
@@ -292,18 +292,18 @@ func TestDashboard_ViewportScrolls(t *testing.T) {
 	// Height 8, chrome = 3 (column header + sort indicator + status bar) → viewport = 5.
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
 
-	if m.viewport.Height != 5 {
-		t.Fatalf("viewport height = %d, want 5", m.viewport.Height)
+	if m.viewport.Height() != 5 {
+		t.Fatalf("viewport height = %d, want 5", m.viewport.Height())
 	}
 
 	// Cursor starts at 0, viewport at top.
-	if m.viewport.YOffset != 0 {
-		t.Errorf("initial YOffset = %d, want 0", m.viewport.YOffset)
+	if m.viewport.YOffset() != 0 {
+		t.Errorf("initial YOffset = %d, want 0", m.viewport.YOffset())
 	}
 
 	// Move cursor down past the viewport.
 	for i := 0; i < 10; i++ {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	if m.cursor != 10 {
 		t.Fatalf("cursor = %d, want 10", m.cursor)
@@ -311,27 +311,27 @@ func TestDashboard_ViewportScrolls(t *testing.T) {
 
 	// Cursor line maps directly to viewport row (no header offset).
 	cursorLine := m.cursor
-	if cursorLine < m.viewport.YOffset || cursorLine >= m.viewport.YOffset+m.viewport.Height {
-		t.Errorf("cursor line %d not visible: YOffset=%d Height=%d", cursorLine, m.viewport.YOffset, m.viewport.Height)
+	if cursorLine < m.viewport.YOffset() || cursorLine >= m.viewport.YOffset()+m.viewport.Height() {
+		t.Errorf("cursor line %d not visible: YOffset=%d Height=%d", cursorLine, m.viewport.YOffset(), m.viewport.Height())
 	}
 
 	// GotoBottom should show last item.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
 	if m.cursor != 19 {
 		t.Fatalf("cursor after End = %d, want 19", m.cursor)
 	}
 	cursorLine = m.cursor
-	if cursorLine < m.viewport.YOffset || cursorLine >= m.viewport.YOffset+m.viewport.Height {
-		t.Errorf("cursor line %d not visible after End: YOffset=%d", cursorLine, m.viewport.YOffset)
+	if cursorLine < m.viewport.YOffset() || cursorLine >= m.viewport.YOffset()+m.viewport.Height() {
+		t.Errorf("cursor line %d not visible after End: YOffset=%d", cursorLine, m.viewport.YOffset())
 	}
 
 	// GotoTop should scroll back to top.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyHome})
 	if m.cursor != 0 {
 		t.Fatalf("cursor after Home = %d, want 0", m.cursor)
 	}
-	if m.viewport.YOffset != 0 {
-		t.Errorf("YOffset after Home = %d, want 0", m.viewport.YOffset)
+	if m.viewport.YOffset() != 0 {
+		t.Errorf("YOffset after Home = %d, want 0", m.viewport.YOffset())
 	}
 }
 
@@ -348,22 +348,22 @@ func TestDashboard_HalfPageScroll(t *testing.T) {
 
 	m := New(proposals, nil, testdata.TestDashboardStats(), &keys, cfg)
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 21}) // viewport height = 18 (21 - 3 chrome)
-	halfPage := m.viewport.Height / 2                          // 9
+	halfPage := m.viewport.Height() / 2                          // 9
 
 	// PgDn moves cursor by half a page.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
 	if m.cursor != halfPage {
 		t.Errorf("cursor after PgDn = %d, want %d", m.cursor, halfPage)
 	}
 
 	// PgUp moves back.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
 	if m.cursor != 0 {
 		t.Errorf("cursor after PgUp = %d, want 0", m.cursor)
 	}
 
 	// PgUp at top stays at 0.
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyPgUp})
 	if m.cursor != 0 {
 		t.Errorf("cursor after PgUp at top = %d, want 0", m.cursor)
 	}

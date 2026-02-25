@@ -28,7 +28,7 @@ func TestChat_ChipSend(t *testing.T) {
 	m := newTestChat()
 
 	// Pressing '1' should send the first chip.
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
 	if cmd == nil {
 		t.Fatal("expected a cmd from chip press")
 	}
@@ -60,7 +60,7 @@ func TestChat_ChipsHideAfterManualInput(t *testing.T) {
 	// Focus input and type a message.
 	m.input.Focus()
 	m.input.SetValue("my question")
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if m.chipsVisible {
 		t.Error("chips should be hidden after manual input")
