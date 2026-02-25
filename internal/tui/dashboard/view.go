@@ -81,7 +81,7 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 
 	var lastCapture string
 	if stats.LastCaptureTime != nil {
-		lastCapture = mutedStyle.Render("Last capture:") + " " + timeAgo(*stats.LastCaptureTime)
+		lastCapture = mutedStyle.Render("Last capture:") + " " + shared.RelativeTime(*stats.LastCaptureTime)
 	}
 
 	hookPre := checkMark(stats.HookPreCompact)

@@ -256,7 +256,7 @@ func (m Model) renderRecentRuns() string {
 
 		status := statusIndicator(run.Status)
 		shortID := store.ShortSessionID(run.SessionID)
-		age := relativeTime(run.Timestamp)
+		age := shared.RelativeTime(run.Timestamp)
 		project := shared.Truncate(run.Project, projectMax)
 		timing := formatTimingForMode(run, mode)
 
@@ -314,7 +314,7 @@ func (m Model) renderPrompts() string {
 	b.WriteString("  " + sectionHeaderStyle.Render("PROMPTS"))
 	b.WriteString("\n")
 	for i, p := range m.prompts {
-		age := relativeTime(p.UpdatedAt)
+		age := shared.RelativeTime(p.UpdatedAt)
 		b.WriteString(fmt.Sprintf("  %-20s %-4s  updated: %s", p.Name, p.Version, age))
 		if i < len(m.prompts)-1 {
 			b.WriteString("\n")
@@ -410,19 +410,5 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 	}
 
 	return parseCol + evalCol
-}
-
-func relativeTime(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
 }
 
