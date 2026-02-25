@@ -2,8 +2,8 @@
 package components
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/bubbles/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/bubbles/v2/key"
 )
 
 // ConfirmResult is sent when the user completes a confirmation prompt.

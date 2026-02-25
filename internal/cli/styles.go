@@ -3,7 +3,7 @@
 // package has no dependency on TUI internals.
 package cli
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // Adaptive color pairs for light and dark terminals.
 var (

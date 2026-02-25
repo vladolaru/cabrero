@@ -14,7 +14,7 @@ import (
 	"os"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
@@ -30,7 +30,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/sources"
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 var views = []string{

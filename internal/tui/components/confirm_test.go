@@ -3,7 +3,7 @@ package components
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestConfirm_Yes(t *testing.T) {

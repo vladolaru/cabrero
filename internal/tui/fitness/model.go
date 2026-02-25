@@ -6,8 +6,8 @@ package fitness
 import (
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/viewport"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/shared"

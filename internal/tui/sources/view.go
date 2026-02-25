@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/lipgloss/v2"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/components"

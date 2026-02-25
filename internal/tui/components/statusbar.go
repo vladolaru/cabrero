@@ -3,8 +3,8 @@ package components
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/lipgloss/v2"
 )
 
 var (

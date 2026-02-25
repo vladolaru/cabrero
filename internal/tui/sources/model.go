@@ -6,7 +6,7 @@ package sources
 import (
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
+	"charm.land/bubbles/v2/viewport"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/components"

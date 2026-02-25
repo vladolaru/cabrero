@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
