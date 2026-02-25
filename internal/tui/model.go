@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
 
 	"bytes"
@@ -57,8 +58,9 @@ type appModel struct {
 	isDark bool
 
 	// Shared
-	helpOpen bool
-	keys     shared.KeyMap
+	helpOpen     bool
+	helpViewport viewport.Model
+	keys         shared.KeyMap
 
 	// All proposals for navigation context
 	proposals []pipeline.ProposalWithSession
@@ -117,6 +119,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.headerHeight = strings.Count(header, "\n") + 2 // +1 trailing newline, +1 separator line
 		subHeaderHeight := 3                              // title + stats + separator
 		childMsg = tea.WindowSizeMsg{Width: msg.Width, Height: msg.Height - m.headerHeight - subHeaderHeight}
+
+		if m.helpOpen {
+			m.helpViewport.SetWidth(m.width)
+			m.helpViewport.SetHeight(m.height - m.headerHeight - 3)
+		}
 
 	case tea.KeyPressMsg:
 		// Global keys handled first.
@@ -461,8 +468,7 @@ func (m appModel) View() tea.View {
 
 	// Help overlay.
 	if m.helpOpen {
-		hc := shared.HelpForView(m.state, m.keys, m.state == message.ViewSourceManager && m.sources.DetailOpen())
-		content = components.RenderHelpOverlay(hc, m.width, m.height)
+		content = m.helpViewport.View()
 	}
 
 	v := tea.NewView(header + "\n" + separator + "\n" + subHeader + "\n" + separator + "\n" + content)
@@ -471,6 +477,30 @@ func (m appModel) View() tea.View {
 }
 
 func (m appModel) handleGlobalKey(msg tea.KeyPressMsg) (appModel, tea.Cmd, bool) {
+	// When help is open, Up/Down scroll the viewport; other keys fall through to close help or pass.
+	if m.helpOpen {
+		switch {
+		case key.Matches(msg, m.keys.Up):
+			m.helpViewport.ScrollUp(1)
+			return m, nil, true
+		case key.Matches(msg, m.keys.Down):
+			m.helpViewport.ScrollDown(1)
+			return m, nil, true
+		case key.Matches(msg, m.keys.HalfPageUp):
+			m.helpViewport.HalfPageUp()
+			return m, nil, true
+		case key.Matches(msg, m.keys.HalfPageDown):
+			m.helpViewport.HalfPageDown()
+			return m, nil, true
+		case key.Matches(msg, m.keys.GotoTop):
+			m.helpViewport.GotoTop()
+			return m, nil, true
+		case key.Matches(msg, m.keys.GotoBottom):
+			m.helpViewport.GotoBottom()
+			return m, nil, true
+		}
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.ForceQuit):
 		return m, tea.Quit, true
@@ -487,6 +517,13 @@ func (m appModel) handleGlobalKey(msg tea.KeyPressMsg) (appModel, tea.Cmd, bool)
 			return m, nil, false
 		}
 		m.helpOpen = !m.helpOpen
+		if m.helpOpen {
+			hc := shared.HelpForView(m.state, m.keys, m.state == message.ViewSourceManager && m.sources.DetailOpen())
+			content := components.RenderHelpContent(hc, m.width)
+			vpH := m.height - m.headerHeight - 3 // -3 for subHeader
+			m.helpViewport = viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(vpH))
+			m.helpViewport.SetContent(content)
+		}
 		return m, nil, true
 
 	case key.Matches(msg, m.keys.Back):

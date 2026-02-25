@@ -587,6 +587,25 @@ func TestLogViewerTwoStageEsc(t *testing.T) {
 	}
 }
 
+func TestHelpOverlay_CanScrollDown(t *testing.T) {
+	m := buildTestAppModel(t)
+	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	// Open help overlay.
+	m, _ = update(m, tea.KeyPressMsg{Code: '?', Text: "?"})
+	if !m.helpOpen {
+		t.Fatal("help should be open after '?'")
+	}
+
+	initialOffset := m.helpViewport.YOffset()
+
+	// Press Down — if content overflows, viewport should scroll.
+	m, _ = update(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	if m.helpViewport.YOffset() == initialOffset && m.helpViewport.TotalLineCount() > m.helpViewport.Height() {
+		t.Error("help viewport should scroll down when Down is pressed and content overflows")
+	}
+}
+
 func TestFullStackNavigation(t *testing.T) {
 	m := newTestRoot()
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
