@@ -239,10 +239,11 @@ must follow these invariants to prevent corrupt reads:
   directory. Individual file reads are always of complete, atomically-written
   files. No separate index file that could drift from the directory contents.
 
-These invariants are enforced in the `internal/store` package. The TUI's file
-watcher (fsnotify) relies on rename events to trigger reloads — which aligns
-with the atomic write pattern since the final rename is the event that signals
-a complete write.
+These invariants are enforced in the `internal/store` package via `store.AtomicWrite`.
+All write sites — including `tui.SaveConfigTo` for `config.json` — use this shared
+helper. The TUI's file watcher (fsnotify) relies on rename events to trigger reloads —
+which aligns with the atomic write pattern since the final rename is the event that
+signals a complete write.
 
 ### Store Query & Status Helpers
 
@@ -507,6 +508,14 @@ maximums). Sessions without project metadata fall back to individual processing.
 `cabrero run <session_id>` always processes one session individually — batching
 only happens in the daemon and backfill when multiple sessions are queued.
 
+**`PipelineStages` interface.** `pipeline.Runner` exposes a single `stages PipelineStages`
+injection point (unexported) for overriding individual pipeline stages in tests. The five
+methods — `ParseSession`, `Aggregate`, `Classify`, `EvalOne`, `EvalBatch` — match the five
+dispatch points in the pipeline. Production code uses `NewRunner(cfg)` (nil stages, built-in
+logic). Tests use `NewRunnerWithStages(cfg, TestStages{...})` to override specific stages
+without modifying the struct. Adding a new pipeline stage means implementing a new interface
+method — the struct definition itself does not change.
+
 ### Human Approval Gate
 
 All SKILL.md modifications require explicit approval before writing. Gate shows full
@@ -652,8 +661,13 @@ stored outside all monitored skill paths — not in `~/.claude/` or any project 
 directory. Even if a session slipped through both filters, there would be no actionable
 skill to propose changes to.
 
-The env var approach handles the common case cleanly. The blocklist and path restriction
-make the guarantee structural rather than behavioral.
+**Hook SESSION_ID path guard.** Both hook scripts validate the `SESSION_ID` value
+extracted from the CC JSON payload before using it to construct filesystem paths. Values
+containing `/` or `..` are rejected with an exit 0. Prevents path traversal in the
+unlikely scenario of a malformed or adversarial hook payload.
+
+The env var approach handles the common case cleanly. The blocklist, path restriction,
+and SESSION_ID guard make the guarantee structural rather than behavioral.
 
 ## Key Design Principles
 
@@ -943,6 +957,11 @@ User rejects  → file untouched, back to proposal
 The final confirmation step matters because Claude is blending, not applying verbatim —
 you see what it actually produced before anything is locked in.
 
+**Target path validation.** Before invoking the CLI, `validateTarget` verifies that
+the resolved target path (a) ends in `.md` and (b) resides inside the user's home
+directory via a `strings.HasPrefix` check on the cleaned path. This is the programmatic
+safety boundary — it runs regardless of what the TUI approval screen displays.
+
 This also means the system compounds at two levels: as the SKILL.md writing skill itself
 improves over time (via Cabrero), the quality of how Cabrero writes its own changes
 improves with it.
@@ -1122,6 +1141,11 @@ uppercase (e.g. "PROPOSED CHANGE", "RATIONALE", "INFO", "RECENT CHANGES").
     expand/collapse for multi-line entries (Enter to toggle, `e`/`E` for all), blank-line
     separators, search with auto-expand of matching collapsed entries, follow mode (`f`).
     Accessible from the pipeline monitor via `L`.
+    The `logview.Model` owns all log file I/O: `FollowTick(logPath) tea.Cmd` checks
+    for new bytes (incremental read) or file shrinkage (rotation, full reload), returning
+    `LogAppended` or `LogReplaced` messages that `logview.Update()` handles directly.
+    The root model fires the command and schedules the next tick — it never touches
+    file sizes or raw bytes.
 
 **Phase 5 — Iteration tooling** ✓
 
@@ -1133,3 +1157,18 @@ uppercase (e.g. "PROPOSED CHANGE", "RATIONALE", "INFO", "RECENT CHANGES").
 21. **`cabrero calibrate`** — manages calibration set: tag/untag sessions as ground-truth
     examples (approve/reject labels with optional notes) for prompt regression testing.
     Stored at `~/.cabrero/calibration.json`.
+
+**Patch v0.20.1 — security, reliability, and architectural cleanup** ✓
+
+- **Security:** `validateTarget` home-directory prefix guard replaces the no-op `..`
+  string check (which was always false after `filepath.Clean`). Hook scripts now reject
+  SESSION_ID values containing `/` or `..` before filesystem path construction.
+- **Reliability:** `escapeAppleScript` now escapes `\n`/`\r`, preventing silent
+  `osascript` failures when notification text contains newlines.
+- **Architecture:** `PipelineStages` interface introduced on `Runner` (see pipeline
+  section). Log file I/O extracted from root model into `logview.FollowTick`. Format
+  helpers (`RelativeTime`, `ShortenHome`) consolidated in `internal/cli`. All write sites
+  now use `store.AtomicWrite` consistently.
+- **Performance:** Pipeline config resolved once at TUI startup instead of on every
+  5-second pipeline monitor tick. `RenderStatusBar` trimming is now O(N) via
+  pre-computed widths.
