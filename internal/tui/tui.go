@@ -16,6 +16,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
 // Run launches the interactive TUI dashboard.
@@ -59,6 +60,10 @@ func Run(version string) error {
 	if err != nil {
 		prompts = nil
 	}
+
+	// Assume dark background as starting default.
+	// BackgroundColorMsg will correct this within the first frames.
+	shared.InitStyles(true)
 
 	m := newAppModel(proposals, reports, stats, sourceGroups, runs, pipelineStats, prompts, cfg)
 	p := tea.NewProgram(m)

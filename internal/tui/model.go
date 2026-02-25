@@ -53,6 +53,9 @@ type appModel struct {
 	// Source groups for re-use when pushing ViewSourceManager.
 	sourceGroups []fitness.SourceGroup
 
+	// Terminal background detection.
+	isDark bool
+
 	// Shared
 	helpOpen bool
 	keys     shared.KeyMap
@@ -81,6 +84,7 @@ func newAppModel(proposals []pipeline.ProposalWithSession, reports []fitness.Rep
 		keys:            keys,
 		proposals:       proposals,
 		sourceGroups:    sourceGroups,
+		isDark:          true, // matches shared.InitStyles(true) in tui.go; BackgroundColorMsg will update
 		dashboard:       dashboard.New(proposals, reports, stats, &keys, cfg),
 		pipelineMonitor: pipeline_tui.New(runs, pipelineStats, prompts, stats, &keys, cfg),
 	}
@@ -90,7 +94,7 @@ func newAppModel(proposals []pipeline.ProposalWithSession, reports []fitness.Rep
 
 // Init implements tea.Model.
 func (m appModel) Init() tea.Cmd {
-	return nil
+	return tea.RequestBackgroundColor
 }
 
 // Update implements tea.Model.
@@ -99,6 +103,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	childMsg := msg // message forwarded to child views (may be height-adjusted)
 
 	switch msg := msg.(type) {
+	case tea.BackgroundColorMsg:
+		m.isDark = msg.IsDark()
+		shared.ReinitStyles(m.isDark)
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
