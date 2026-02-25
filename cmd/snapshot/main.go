@@ -138,7 +138,7 @@ func defaults(w, h int) (int, int) {
 // and returns the remaining height available for the child view.
 // Does NOT include sub-header — use renderWithSubHeader for the full frame.
 func renderWithHeader(stats message.DashboardStats, w int) (prefix string, headerHeight int) {
-	header := dashboard.RenderHeader(stats, w)
+	header := components.RenderHeader(stats, w)
 	separator := strings.Repeat("─", w)
 	prefix = header + "\n" + separator + "\n"
 	headerHeight = strings.Count(header, "\n") + 2 // +1 trailing newline, +1 separator line
