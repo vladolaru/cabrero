@@ -2,9 +2,30 @@
 package components
 
 import (
-	tea "charm.land/bubbletea/v2"
+	"strings"
+
 	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 )
+
+// RenderConfirmOverlay renders a confirmation prompt centered vertically
+// within the available terminal space. Use this for modal confirmations
+// in views that return early (pipeline, sources) rather than embedding
+// the prompt in a viewport.
+func RenderConfirmOverlay(text string, width, height int) string {
+	var b strings.Builder
+	topPad := height / 2
+	if topPad > 0 {
+		b.WriteString(strings.Repeat("\n", topPad))
+	}
+	b.WriteString(statusBarStyle.Width(width).Render(text))
+	// Fill remaining lines so the overlay occupies the full height.
+	bottomPad := height - topPad - 1 // -1 for the text line
+	if bottomPad > 0 {
+		b.WriteString(strings.Repeat("\n", bottomPad))
+	}
+	return b.String()
+}
 
 // ConfirmResult is sent when the user completes a confirmation prompt.
 type ConfirmResult struct {

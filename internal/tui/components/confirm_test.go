@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -188,6 +189,18 @@ func TestRevisionConfirm_Revision(t *testing.T) {
 	result := msg.(RevisionChoice)
 	if result.Choice != "revision" {
 		t.Errorf("Choice = %q, want %q", result.Choice, "revision")
+	}
+}
+
+func TestRenderConfirmOverlay_FillsHeight(t *testing.T) {
+	overlay := RenderConfirmOverlay("Apply this change? [y/N]", 80, 20)
+	lines := strings.Count(overlay, "\n") + 1
+	// Should be close to 20 lines.
+	if lines < 18 || lines > 22 {
+		t.Errorf("overlay lines = %d, want ~20", lines)
+	}
+	if !strings.Contains(overlay, "Apply this change?") {
+		t.Error("overlay should contain prompt text")
 	}
 }
 

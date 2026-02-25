@@ -47,7 +47,7 @@ func (m Model) View() string {
 
 	// Confirmation prompt overlay.
 	if m.confirm.Active {
-		return m.confirm.View()
+		return components.RenderConfirmOverlay(m.confirm.View(), m.width, m.height)
 	}
 
 	statusBar := components.RenderStatusBar(m.keys.PipelineShortHelp(), m.statusMsg, m.width)

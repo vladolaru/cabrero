@@ -49,12 +49,12 @@ func (m Model) View() string {
 
 	// Ownership choice prompt overlay.
 	if m.confirmState == ConfirmSetOwnership && m.ownershipPrompt != "" {
-		return m.ownershipPrompt
+		return components.RenderConfirmOverlay(m.ownershipPrompt, m.width, m.height)
 	}
 
 	// Confirmation prompt overlay.
 	if m.confirm.Active {
-		return m.confirm.View()
+		return components.RenderConfirmOverlay(m.confirm.View(), m.width, m.height)
 	}
 
 	// Detail sub-view.
