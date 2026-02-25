@@ -140,3 +140,13 @@ func WrapHangingIndent(s string, width, indent int) string {
 func RenderSubHeader(title, stats string) string {
 	return HeaderStyle.Render(title) + "\n" + MutedStyle.Render(stats)
 }
+
+// sectionSeparatorLen is the character width of the separator under section titles.
+// Matches the visual width of the longest section title ("PROPOSED CHANGE" = 15) plus indent.
+const sectionSeparatorLen = 17
+
+// RenderSectionHeader renders a bold accent section title with a separator line below it.
+// Both title and separator are indented by two spaces.
+func RenderSectionHeader(title string) string {
+	return AccentBoldStyle.Render("  "+title) + "\n" + "  " + strings.Repeat("─", sectionSeparatorLen)
+}

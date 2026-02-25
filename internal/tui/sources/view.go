@@ -302,7 +302,8 @@ func (m Model) renderDetail() string {
 	var b strings.Builder
 
 	// Source info.
-	b.WriteString("  " + shared.AccentBoldStyle.Render("INFO") + "\n\n")
+	b.WriteString(shared.RenderSectionHeader("INFO"))
+	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Origin:"), renderOrigin(src.Origin)))
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Ownership:"), renderOwnership(src.Ownership)))
 	b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Approach:"), renderApproach(src.Approach)))
@@ -314,7 +315,8 @@ func (m Model) renderDetail() string {
 	b.WriteString("\n")
 
 	// Recent changes.
-	b.WriteString("  " + shared.AccentBoldStyle.Render("RECENT CHANGES") + "\n\n")
+	b.WriteString(shared.RenderSectionHeader("RECENT CHANGES"))
+	b.WriteString("\n")
 
 	if len(m.changes) == 0 {
 		b.WriteString(shared.MutedStyle.Render("  No changes recorded.") + "\n")

@@ -59,7 +59,7 @@ func (m Model) renderDaemonHeader() string {
 
 	// Build left column: DAEMON section.
 	var left strings.Builder
-	left.WriteString("  " + shared.AccentBoldStyle.Render("DAEMON"))
+	left.WriteString(shared.RenderSectionHeader("DAEMON"))
 	left.WriteString("\n")
 	if m.dashStats.DaemonRunning {
 		left.WriteString(fmt.Sprintf("  Status:  %s (PID %d)\n", shared.SuccessStyle.Render("● running"), m.dashStats.DaemonPID))
@@ -84,14 +84,14 @@ func (m Model) renderDaemonHeader() string {
 
 	// Build right column: HOOKS + STORE (store hidden in narrow).
 	var right strings.Builder
-	right.WriteString("  " + shared.AccentBoldStyle.Render("HOOKS"))
+	right.WriteString(shared.RenderSectionHeader("HOOKS"))
 	right.WriteString("\n")
 	right.WriteString(fmt.Sprintf("  pre-compact:  %s\n", shared.Checkmark(m.dashStats.HookPreCompact)))
 	right.WriteString(fmt.Sprintf("  session-end:  %s", shared.Checkmark(m.dashStats.HookSessionEnd)))
 
 	if mode != layoutNarrow {
 		right.WriteString("\n\n")
-		right.WriteString("  " + shared.AccentBoldStyle.Render("STORE"))
+		right.WriteString(shared.RenderSectionHeader("STORE"))
 		right.WriteString("\n")
 		right.WriteString(fmt.Sprintf("  Path: %s\n", m.dashStats.StorePath))
 		right.WriteString(fmt.Sprintf("  Raw:  %d sessions\n", m.dashStats.SessionCount))
@@ -157,7 +157,7 @@ func (m Model) renderActivityStats() string {
 	mode := m.layoutMode()
 	var b strings.Builder
 	days := m.config.Pipeline.SparklineDays
-	b.WriteString("  " + shared.AccentBoldStyle.Render(fmt.Sprintf("PIPELINE ACTIVITY (last %d days)", days)))
+	b.WriteString(shared.RenderSectionHeader(fmt.Sprintf("PIPELINE ACTIVITY (last %d days)", days)))
 	b.WriteString("\n")
 
 	if mode == layoutNarrow {
@@ -232,7 +232,7 @@ func (m Model) runLayout() (idLen int, projectMax int) {
 
 func (m Model) renderRecentRuns() string {
 	var b strings.Builder
-	b.WriteString("  " + shared.AccentBoldStyle.Render("RECENT RUNS"))
+	b.WriteString(shared.RenderSectionHeader("RECENT RUNS"))
 	b.WriteString("\n")
 
 	idLen, projectMax := m.runLayout()
@@ -283,7 +283,7 @@ func (m Model) renderRunDetail(run pl.PipelineRun) string {
 
 func (m Model) renderModels() string {
 	var b strings.Builder
-	b.WriteString("  " + shared.AccentBoldStyle.Render("MODELS"))
+	b.WriteString(shared.RenderSectionHeader("MODELS"))
 	b.WriteString("\n")
 
 	cfg := pl.DefaultPipelineConfig()
@@ -301,7 +301,7 @@ func (m Model) renderModels() string {
 
 func (m Model) renderPrompts() string {
 	var b strings.Builder
-	b.WriteString("  " + shared.AccentBoldStyle.Render("PROMPTS"))
+	b.WriteString(shared.RenderSectionHeader("PROMPTS"))
 	b.WriteString("\n")
 	for i, p := range m.prompts {
 		age := shared.RelativeTime(p.UpdatedAt)

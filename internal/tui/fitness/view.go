@@ -61,9 +61,7 @@ func (m Model) renderViewportContent() string {
 	var b strings.Builder
 
 	// ASSESSMENT section.
-	b.WriteString(shared.AccentBoldStyle.Render("  ASSESSMENT"))
-	b.WriteString("\n")
-	b.WriteString("  " + strings.Repeat("\u2500", 17))
+	b.WriteString(shared.RenderSectionHeader("ASSESSMENT"))
 	b.WriteString("\n")
 
 	contentWidth := m.width - 4
@@ -74,18 +72,14 @@ func (m Model) renderViewportContent() string {
 	b.WriteString("\n\n")
 
 	// VERDICT section.
-	b.WriteString(shared.AccentBoldStyle.Render("  VERDICT"))
-	b.WriteString("\n")
-	b.WriteString("  " + strings.Repeat("\u2500", 17))
+	b.WriteString(shared.RenderSectionHeader("VERDICT"))
 	b.WriteString("\n")
 	b.WriteString(shared.WrapIndent(m.report.Verdict, m.viewport.Width(), 2))
 	b.WriteString("\n\n")
 
 	// SESSION EVIDENCE section.
 	if len(m.evidence) > 0 {
-		b.WriteString(shared.AccentBoldStyle.Render(fmt.Sprintf("  SESSION EVIDENCE (%d groups)", len(m.evidence))))
-		b.WriteString("\n")
-		b.WriteString("  " + strings.Repeat("\u2500", 17))
+		b.WriteString(shared.RenderSectionHeader(fmt.Sprintf("SESSION EVIDENCE (%d groups)", len(m.evidence))))
 		b.WriteString("\n")
 		b.WriteString(m.renderEvidence())
 	}

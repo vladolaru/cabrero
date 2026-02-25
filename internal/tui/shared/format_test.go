@@ -42,6 +42,20 @@ func TestRenderSubHeader(t *testing.T) {
 	}
 }
 
+func TestRenderSectionHeader(t *testing.T) {
+	result := RenderSectionHeader("ASSESSMENT")
+	stripped := ansi.Strip(result)
+	if !strings.Contains(stripped, "ASSESSMENT") {
+		t.Error("section header should contain title")
+	}
+	if !strings.Contains(stripped, "─") {
+		t.Error("section header should contain separator")
+	}
+	if strings.Count(result, "\n") != 1 {
+		t.Errorf("section header should have 1 newline, got %d", strings.Count(result, "\n"))
+	}
+}
+
 func TestCheckmark(t *testing.T) {
 	ok := Checkmark(true)
 	if ok == "" {

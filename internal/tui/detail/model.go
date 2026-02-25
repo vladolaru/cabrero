@@ -99,26 +99,20 @@ func (m Model) renderBodyContent() string {
 	p := &m.proposal.Proposal
 
 	// PROPOSED CHANGE section.
-	b.WriteString(shared.AccentBoldStyle.Render("  PROPOSED CHANGE"))
-	b.WriteString("\n")
-	b.WriteString("  " + strings.Repeat("─", 17))
+	b.WriteString(shared.RenderSectionHeader("PROPOSED CHANGE"))
 	b.WriteString("\n")
 	b.WriteString(shared.IndentBlock(RenderDiff(p.Change, p.FlaggedEntry, p.Type, m.contentWidth), 2))
 	b.WriteString("\n\n")
 
 	// RATIONALE section.
-	b.WriteString(shared.AccentBoldStyle.Render("  RATIONALE"))
-	b.WriteString("\n")
-	b.WriteString("  " + strings.Repeat("─", 17))
+	b.WriteString(shared.RenderSectionHeader("RATIONALE"))
 	b.WriteString("\n")
 	b.WriteString(shared.WrapIndent(p.Rationale, m.contentWidth, 2))
 	b.WriteString("\n\n")
 
 	// CITATION CHAIN.
 	if len(m.citations) > 0 {
-		b.WriteString(shared.AccentBoldStyle.Render(fmt.Sprintf("  CITATION CHAIN (%d entries)", len(m.citations))))
-		b.WriteString("\n")
-		b.WriteString("  " + strings.Repeat("─", 17))
+		b.WriteString(shared.RenderSectionHeader(fmt.Sprintf("CITATION CHAIN (%d entries)", len(m.citations))))
 		b.WriteString("\n")
 		b.WriteString(renderCitations(m.citations, m.citationCursor, m.width))
 		b.WriteString("\n")
@@ -145,7 +139,7 @@ func (m Model) renderBodyContent() string {
 	case ApplyReviewing:
 		if m.blendResult != nil {
 			b.WriteString("\n")
-			b.WriteString(shared.AccentBoldStyle.Render("  BLENDED RESULT"))
+			b.WriteString(shared.RenderSectionHeader("BLENDED RESULT"))
 			b.WriteString("\n")
 			b.WriteString(shared.IndentBlock(*m.blendResult, 2))
 			b.WriteString("\n\n")

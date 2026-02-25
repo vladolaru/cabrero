@@ -128,7 +128,7 @@ func TestModelViewNarrowLayout(t *testing.T) {
 
 func TestModelViewStandardLayout(t *testing.T) {
 	m := newTestModel()
-	m.SetSize(100, 40) // standard mode (80-119)
+	m.SetSize(100, 50) // standard mode (80-119)
 	view := ansi.Strip(m.View())
 
 	// All sections present, stacked (not side-by-side).
