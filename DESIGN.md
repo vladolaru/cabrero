@@ -1083,7 +1083,7 @@ with rollback support. Unset values display as "unknown" (ownership) or "not set
     before/after diff confirmation, rollback entry written ✓
 
 Phase 4a delivers the core value proposition: interactive proposal review with
-AI chat. Implemented with Bubble Tea v1.x, Bubbles v1.x, Lip Gloss v1.x,
+AI chat. Implemented with Bubble Tea v2, Bubbles v2, Lip Gloss v2 (charm.land),
 goldmark (markdown parsing).
 Configurable via `~/.cabrero/config.json` (arrow/vim navigation, theme,
 chat panel width, confirmation toggles). Context-aware help overlay (`?` key)
