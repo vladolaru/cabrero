@@ -73,10 +73,12 @@ func New(chips []string, cfg ChatConfig, width, height int) Model {
 	ta.CharLimit = 2000
 	ta.SetHeight(1)
 	ta.SetWidth(width - 4)
-	ta.FocusedStyle.Base = lipgloss.NewStyle()
-	ta.BlurredStyle.Base = lipgloss.NewStyle()
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
-	ta.BlurredStyle.CursorLine = lipgloss.NewStyle()
+	styles := ta.Styles()
+	styles.Focused.Base = lipgloss.NewStyle()
+	styles.Blurred.Base = lipgloss.NewStyle()
+	styles.Focused.CursorLine = lipgloss.NewStyle()
+	styles.Blurred.CursorLine = lipgloss.NewStyle()
+	ta.SetStyles(styles)
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
