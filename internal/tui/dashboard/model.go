@@ -210,7 +210,7 @@ func (m *Model) updateContent() {
 	m.viewport.SetHeight(m.viewportHeight())
 
 	if len(m.filtered) == 0 {
-		m.viewport.SetContent("\n" + mutedStyle.Render("  "+components.EmptyProposals()) + "\n")
+		m.viewport.SetContent("\n" + shared.MutedStyle.Render("  "+components.EmptyProposals()) + "\n")
 	} else {
 		m.viewport.SetContent(m.renderItemRows())
 	}

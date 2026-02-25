@@ -12,16 +12,6 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-var (
-	headerStyle   = shared.HeaderStyle
-	mutedStyle    = shared.MutedStyle
-	accentStyle   = shared.AccentStyle
-	warningStyle  = shared.WarningStyle
-	successStyle  = shared.SuccessStyle
-	errorStyle    = shared.ErrorStyle
-	selectedStyle = shared.SelectedStyle
-)
-
 // Type indicator characters.
 const (
 	indicatorProposal = "●"
@@ -48,7 +38,7 @@ func (m Model) View() string {
 
 	// Fixed chrome below viewport: sort indicator (only when items exist).
 	if len(m.filtered) > 0 {
-		b.WriteString(mutedStyle.Render(fmt.Sprintf("  Sort: %s", m.sortOrder)))
+		b.WriteString(shared.MutedStyle.Render(fmt.Sprintf("  Sort: %s", m.sortOrder)))
 		b.WriteString("\n")
 	}
 
@@ -67,37 +57,37 @@ func (m Model) View() string {
 func RenderHeader(stats message.DashboardStats, width int) string {
 	titleText := "  Cabrero"
 	if stats.Version != "" {
-		titleText += "  " + mutedStyle.Render(stats.Version)
+		titleText += "  " + shared.MutedStyle.Render(stats.Version)
 	}
-	tagline := mutedStyle.Render("  Shepherding AI pirate goats, one skill at a time")
-	title := headerStyle.Render(titleText) + "\n" + tagline
+	tagline := shared.MutedStyle.Render("  Shepherding AI pirate goats, one skill at a time")
+	title := shared.HeaderStyle.Render(titleText) + "\n" + tagline
 
 	var daemonStatus string
 	if stats.DaemonRunning {
-		daemonStatus = successStyle.Render("●") + fmt.Sprintf(" running (PID %d)", stats.DaemonPID)
+		daemonStatus = shared.SuccessStyle.Render("●") + fmt.Sprintf(" running (PID %d)", stats.DaemonPID)
 	} else {
-		daemonStatus = errorStyle.Render("●") + " stopped"
+		daemonStatus = shared.ErrorStyle.Render("●") + " stopped"
 	}
 
 	var lastCapture string
 	if stats.LastCaptureTime != nil {
-		lastCapture = mutedStyle.Render("Last capture:") + " " + shared.RelativeTime(*stats.LastCaptureTime)
+		lastCapture = shared.MutedStyle.Render("Last capture:") + " " + shared.RelativeTime(*stats.LastCaptureTime)
 	}
 
 	hookPre := shared.Checkmark(stats.HookPreCompact)
 	hookEnd := shared.Checkmark(stats.HookSessionEnd)
-	hooks := mutedStyle.Render("Hooks:") + fmt.Sprintf(" pre-compact %s  session-end %s", hookPre, hookEnd)
+	hooks := shared.MutedStyle.Render("Hooks:") + fmt.Sprintf(" pre-compact %s  session-end %s", hookPre, hookEnd)
 
 	debugIndicator := ""
 	if stats.DebugMode {
-		debugIndicator = "  " + mutedStyle.Render("│  Debug:") + " " + warningStyle.Render("enabled")
+		debugIndicator = "  " + shared.MutedStyle.Render("│  Debug:") + " " + shared.WarningStyle.Render("enabled")
 	}
 
 	if width >= 120 {
 		// Wide: title on left, daemon/hooks on right.
 		left := title
 		rightLines := []string{
-			mutedStyle.Render("Daemon:") + " " + daemonStatus,
+			shared.MutedStyle.Render("Daemon:") + " " + daemonStatus,
 			lastCapture,
 			hooks + debugIndicator,
 		}
@@ -105,9 +95,9 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 	}
 
 	// Standard/narrow: stacked header.
-	daemonLine := "  " + mutedStyle.Render("Daemon:") + " " + daemonStatus
+	daemonLine := "  " + shared.MutedStyle.Render("Daemon:") + " " + daemonStatus
 	if lastCapture != "" {
-		daemonLine += "  " + mutedStyle.Render("│") + "  " + lastCapture
+		daemonLine += "  " + shared.MutedStyle.Render("│") + "  " + lastCapture
 	}
 	return title + "\n" +
 		daemonLine + "\n" +
@@ -116,7 +106,7 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 
 // SubHeader returns the view title and stats line for the dashboard.
 func (m Model) SubHeader() string {
-	title := headerStyle.Render("  Proposals")
+	title := shared.HeaderStyle.Render("  Proposals")
 
 	statsLine := fmt.Sprintf("  %d awaiting review", m.stats.PendingCount)
 	if m.stats.ApprovedCount > 0 {
@@ -129,7 +119,7 @@ func (m Model) SubHeader() string {
 		statsLine += fmt.Sprintf("  ·  %d fitness reports", m.stats.FitnessReportCount)
 	}
 
-	return title + "\n" + mutedStyle.Render(statsLine)
+	return title + "\n" + shared.MutedStyle.Render(statsLine)
 }
 
 func (m Model) renderColumnHeaders() string {
@@ -141,7 +131,7 @@ func (m Model) renderColumnHeaders() string {
 		"  " + shared.PadRight("TARGET", cols.targetWidth) +
 		"  " + "CONFIDENCE"
 
-	return mutedStyle.Render(header)
+	return shared.MutedStyle.Render(header)
 }
 
 func (m Model) renderItemRows() string {
@@ -157,19 +147,19 @@ func (m Model) renderItemRows() string {
 		// Choose indicator style based on item type.
 		var indicator string
 		if item.IsProposal() {
-			indicator = accentStyle.Render(indicatorProposal)
+			indicator = shared.AccentStyle.Render(indicatorProposal)
 		} else {
-			indicator = warningStyle.Render(indicatorFitness)
+			indicator = shared.WarningStyle.Render(indicatorFitness)
 		}
 
 		typeName := shared.PadRight(item.TypeName(), cols.typeWidth)
 		target := shared.TruncatePad(shared.ShortenHome(item.Target()), cols.targetWidth)
-		confidence := mutedStyle.Render(item.Confidence())
+		confidence := shared.MutedStyle.Render(item.Confidence())
 
 		line := fmt.Sprintf("%s %s %s  %s  %s", prefix, indicator, typeName, target, confidence)
 
 		if i == m.cursor {
-			line = selectedStyle.Render(line)
+			line = shared.SelectedStyle.Render(line)
 		}
 
 		b.WriteString(line)

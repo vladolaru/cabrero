@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/key"
-	"charm.land/lipgloss/v2"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/components"
@@ -25,15 +24,6 @@ const (
 	colHealth   = 16
 )
 
-var (
-	headerStyle        = shared.HeaderStyle
-	sectionHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
-	mutedStyle         = shared.MutedStyle
-	selectedStyle      = shared.SelectedStyle
-	successStyle       = shared.SuccessStyle
-	accentStyle        = shared.AccentStyle
-	errorStyle         = shared.ErrorStyle
-)
 
 // SubHeader returns the sub-header for the current source view (list or detail).
 func (m Model) SubHeader() string {
@@ -45,11 +35,11 @@ func (m Model) SubHeader() string {
 
 // detailSubHeader returns the sub-header for the source detail sub-view.
 func (m Model) detailSubHeader() string {
-	title := headerStyle.Render("  Source Detail")
+	title := shared.HeaderStyle.Render("  Source Detail")
 	if m.detailSource == nil {
 		return title
 	}
-	return title + "\n" + mutedStyle.Render("  "+m.detailSource.Name)
+	return title + "\n" + shared.MutedStyle.Render("  "+m.detailSource.Name)
 }
 
 // View renders the source manager.
@@ -84,7 +74,7 @@ func (m Model) View() string {
 	// Scrollable item list.
 	if len(m.groups) == 0 {
 		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  No sources tracked."))
+		b.WriteString(shared.MutedStyle.Render("  No sources tracked."))
 		b.WriteString("\n")
 		// Fill remaining space.
 		content := b.String()
@@ -106,7 +96,7 @@ func (m Model) View() string {
 func (m Model) renderHeader() string {
 	total, iterate, evaluate, unclassified := m.sourceCounts()
 
-	title := headerStyle.Render("  Source Manager")
+	title := shared.HeaderStyle.Render("  Source Manager")
 
 	stats := fmt.Sprintf("  %d sources", total)
 	if iterate > 0 {
@@ -119,7 +109,7 @@ func (m Model) renderHeader() string {
 		stats += fmt.Sprintf("  \u00b7  %d unclassified", unclassified)
 	}
 
-	return title + "\n" + mutedStyle.Render(stats)
+	return title + "\n" + shared.MutedStyle.Render(stats)
 }
 
 func (m Model) renderColumnHeaders() string {
@@ -136,7 +126,7 @@ func (m Model) renderColumnHeaders() string {
 		parts = append(parts, shared.PadRight("HEALTH", colHealth))
 	}
 
-	return mutedStyle.Render(strings.Join(parts, "  "))
+	return shared.MutedStyle.Render(strings.Join(parts, "  "))
 }
 
 func (m Model) renderFlatList() string {
@@ -154,7 +144,7 @@ func (m Model) renderFlatList() string {
 		}
 
 		if isCursor {
-			line = selectedStyle.Render(line)
+			line = shared.SelectedStyle.Render(line)
 		}
 
 		b.WriteString(line)
@@ -179,7 +169,7 @@ func (m Model) renderGroupHeader(gi int, isCursor bool) string {
 
 	count := fmt.Sprintf("(%d)", len(g.Sources))
 
-	return fmt.Sprintf("%s%s %s %s", prefix, chevron, headerStyle.Render(g.Label), mutedStyle.Render(count))
+	return fmt.Sprintf("%s%s %s %s", prefix, chevron, shared.HeaderStyle.Render(g.Label), shared.MutedStyle.Render(count))
 }
 
 func (m Model) renderSourceRow(gi, si int, isCursor bool, cols columnSpec) string {
@@ -270,7 +260,7 @@ func renderHealth(s fitness.Source) string {
 	}
 
 	if s.HealthScore < 0 {
-		return mutedStyle.Render("n/a")
+		return shared.MutedStyle.Render("n/a")
 	}
 
 	c := healthColor(s.HealthScore, s.Approach)
@@ -315,38 +305,38 @@ func (m Model) renderDetail() string {
 	var b strings.Builder
 
 	// Source info.
-	b.WriteString("  " + sectionHeaderStyle.Render("INFO") + "\n\n")
-	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Origin:"), renderOrigin(src.Origin)))
-	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Ownership:"), renderOwnership(src.Ownership)))
-	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Approach:"), renderApproach(src.Approach)))
-	b.WriteString(fmt.Sprintf("  %-12s %d\n", mutedStyle.Render("Sessions:"), src.SessionCount))
-	b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Health:"), renderHealthText(src)))
+	b.WriteString("  " + shared.AccentBoldStyle.Render("INFO") + "\n\n")
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Origin:"), renderOrigin(src.Origin)))
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Ownership:"), renderOwnership(src.Ownership)))
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Approach:"), renderApproach(src.Approach)))
+	b.WriteString(fmt.Sprintf("  %-12s %d\n", shared.MutedStyle.Render("Sessions:"), src.SessionCount))
+	b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Health:"), renderHealthText(src)))
 	if src.ClassifiedAt != nil {
-		b.WriteString(fmt.Sprintf("  %-12s %s\n", mutedStyle.Render("Classified:"), src.ClassifiedAt.Format("2006-01-02 15:04")))
+		b.WriteString(fmt.Sprintf("  %-12s %s\n", shared.MutedStyle.Render("Classified:"), src.ClassifiedAt.Format("2006-01-02 15:04")))
 	}
 	b.WriteString("\n")
 
 	// Recent changes.
-	b.WriteString("  " + sectionHeaderStyle.Render("RECENT CHANGES") + "\n\n")
+	b.WriteString("  " + shared.AccentBoldStyle.Render("RECENT CHANGES") + "\n\n")
 
 	if len(m.changes) == 0 {
-		b.WriteString(mutedStyle.Render("  No changes recorded.") + "\n")
+		b.WriteString(shared.MutedStyle.Render("  No changes recorded.") + "\n")
 	} else {
 		for _, c := range m.changes {
-			status := accentStyle.Render(c.Status)
+			status := shared.AccentStyle.Render(c.Status)
 			if c.Status == "approved" {
-				status = successStyle.Render(c.Status)
+				status = shared.SuccessStyle.Render(c.Status)
 			} else if c.Status == "rejected" {
-				status = errorStyle.Render(c.Status)
+				status = shared.ErrorStyle.Render(c.Status)
 			}
 			b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
-				mutedStyle.Render(c.Timestamp.Format("2006-01-02 15:04")),
+				shared.MutedStyle.Render(c.Timestamp.Format("2006-01-02 15:04")),
 				status,
 				c.Description,
 			))
 		}
 		b.WriteString("\n")
-		b.WriteString(mutedStyle.Render("  Press z to rollback the most recent change.") + "\n")
+		b.WriteString(shared.MutedStyle.Render("  Press z to rollback the most recent change.") + "\n")
 	}
 
 	// Fill remaining space.

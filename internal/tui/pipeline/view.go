@@ -13,14 +13,7 @@ import (
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
-var (
-	titleStyle         = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
-	sectionHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorAccent)
-	successStyle       = shared.SuccessStyle
-	warningStyle       = shared.WarningStyle
-	errorStyle         = shared.ErrorStyle
-	mutedStyle         = shared.MutedStyle
-)
+var titleStyle = lipgloss.NewStyle().Bold(true).Foreground(shared.ColorFgBold)
 
 type layout int
 
@@ -46,7 +39,7 @@ func (m Model) SubHeader() string {
 	title := "  " + titleStyle.Render("Pipeline Monitor")
 	statsLine := fmt.Sprintf("  captured: %d  ·  processed: %d  ·  queued: %d",
 		m.stats.SessionsCaptured, m.stats.SessionsProcessed, m.stats.SessionsQueued)
-	return title + "\n" + mutedStyle.Render(statsLine)
+	return title + "\n" + shared.MutedStyle.Render(statsLine)
 }
 
 // View renders the pipeline monitor.
@@ -69,15 +62,15 @@ func (m Model) renderDaemonHeader() string {
 
 	// Build left column: DAEMON section.
 	var left strings.Builder
-	left.WriteString("  " + sectionHeaderStyle.Render("DAEMON"))
+	left.WriteString("  " + shared.AccentBoldStyle.Render("DAEMON"))
 	left.WriteString("\n")
 	if m.dashStats.DaemonRunning {
-		left.WriteString(fmt.Sprintf("  Status:  %s (PID %d)\n", successStyle.Render("● running"), m.dashStats.DaemonPID))
+		left.WriteString(fmt.Sprintf("  Status:  %s (PID %d)\n", shared.SuccessStyle.Render("● running"), m.dashStats.DaemonPID))
 		if m.dashStats.DaemonStartTime != nil {
 			left.WriteString(fmt.Sprintf("  Uptime:  %s\n", formatUptime(time.Since(*m.dashStats.DaemonStartTime))))
 		}
 	} else {
-		left.WriteString(fmt.Sprintf("  Status:  %s\n", errorStyle.Render("● stopped")))
+		left.WriteString(fmt.Sprintf("  Status:  %s\n", shared.ErrorStyle.Render("● stopped")))
 	}
 	// Intervals and timeouts: shown in standard and wide, omitted in narrow.
 	if mode != layoutNarrow && m.dashStats.PollInterval > 0 {
@@ -89,19 +82,19 @@ func (m Model) renderDaemonHeader() string {
 			formatInterval(m.dashStats.EvaluatorTimeout)))
 	}
 	if m.dashStats.DebugMode {
-		left.WriteString(fmt.Sprintf("\n  Debug:   %s", warningStyle.Render("enabled")))
+		left.WriteString(fmt.Sprintf("\n  Debug:   %s", shared.WarningStyle.Render("enabled")))
 	}
 
 	// Build right column: HOOKS + STORE (store hidden in narrow).
 	var right strings.Builder
-	right.WriteString("  " + sectionHeaderStyle.Render("HOOKS"))
+	right.WriteString("  " + shared.AccentBoldStyle.Render("HOOKS"))
 	right.WriteString("\n")
 	right.WriteString(fmt.Sprintf("  pre-compact:  %s\n", shared.Checkmark(m.dashStats.HookPreCompact)))
 	right.WriteString(fmt.Sprintf("  session-end:  %s", shared.Checkmark(m.dashStats.HookSessionEnd)))
 
 	if mode != layoutNarrow {
 		right.WriteString("\n\n")
-		right.WriteString("  " + sectionHeaderStyle.Render("STORE"))
+		right.WriteString("  " + shared.AccentBoldStyle.Render("STORE"))
 		right.WriteString("\n")
 		right.WriteString(fmt.Sprintf("  Path: %s\n", m.dashStats.StorePath))
 		right.WriteString(fmt.Sprintf("  Raw:  %d sessions\n", m.dashStats.SessionCount))
@@ -167,7 +160,7 @@ func (m Model) renderActivityStats() string {
 	mode := m.layoutMode()
 	var b strings.Builder
 	days := m.config.Pipeline.SparklineDays
-	b.WriteString("  " + sectionHeaderStyle.Render(fmt.Sprintf("PIPELINE ACTIVITY (last %d days)", days)))
+	b.WriteString("  " + shared.AccentBoldStyle.Render(fmt.Sprintf("PIPELINE ACTIVITY (last %d days)", days)))
 	b.WriteString("\n")
 
 	if mode == layoutNarrow {
@@ -242,7 +235,7 @@ func (m Model) runLayout() (idLen int, projectMax int) {
 
 func (m Model) renderRecentRuns() string {
 	var b strings.Builder
-	b.WriteString("  " + sectionHeaderStyle.Render("RECENT RUNS"))
+	b.WriteString("  " + shared.AccentBoldStyle.Render("RECENT RUNS"))
 	b.WriteString("\n")
 
 	idLen, projectMax := m.runLayout()
@@ -293,25 +286,25 @@ func (m Model) renderRunDetail(run pl.PipelineRun) string {
 
 func (m Model) renderModels() string {
 	var b strings.Builder
-	b.WriteString("  " + sectionHeaderStyle.Render("MODELS"))
+	b.WriteString("  " + shared.AccentBoldStyle.Render("MODELS"))
 	b.WriteString("\n")
 
 	cfg := pl.DefaultPipelineConfig()
 	b.WriteString(fmt.Sprintf("  Classifier:  %s", cfg.ClassifierModel))
 	if cfg.ClassifierModel != pl.DefaultClassifierModel {
-		b.WriteString(warningStyle.Render("  (override)"))
+		b.WriteString(shared.WarningStyle.Render("  (override)"))
 	}
 	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("  Evaluator:   %s", cfg.EvaluatorModel))
 	if cfg.EvaluatorModel != pl.DefaultEvaluatorModel {
-		b.WriteString(warningStyle.Render("  (override)"))
+		b.WriteString(shared.WarningStyle.Render("  (override)"))
 	}
 	return b.String()
 }
 
 func (m Model) renderPrompts() string {
 	var b strings.Builder
-	b.WriteString("  " + sectionHeaderStyle.Render("PROMPTS"))
+	b.WriteString("  " + shared.AccentBoldStyle.Render("PROMPTS"))
 	b.WriteString("\n")
 	for i, p := range m.prompts {
 		age := shared.RelativeTime(p.UpdatedAt)
@@ -326,11 +319,11 @@ func (m Model) renderPrompts() string {
 func statusIndicator(status string) string {
 	switch status {
 	case "processed":
-		return successStyle.Render("✓")
+		return shared.SuccessStyle.Render("✓")
 	case "error":
-		return errorStyle.Render("✗")
+		return shared.ErrorStyle.Render("✗")
 	case "queued":
-		return mutedStyle.Render("○")
+		return shared.MutedStyle.Render("○")
 	default:
 		return "?"
 	}
@@ -343,7 +336,7 @@ func statusIndicator(status string) string {
 func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 	if mode == layoutNarrow {
 		if run.Status == "queued" {
-			return mutedStyle.Render("(queued)")
+			return shared.MutedStyle.Render("(queued)")
 		}
 		total := run.ParseDuration + run.ClassifierDuration + run.EvaluatorDuration
 		if total == 0 {
@@ -361,7 +354,7 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 	)
 
 	if run.Status == "queued" {
-		return mutedStyle.Render("(queued)")
+		return shared.MutedStyle.Render("(queued)")
 	}
 
 	// Parse column — always reserves its width.
@@ -377,16 +370,16 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 			clsCol = fmt.Sprintf("%5.1fs cls  ", run.ClassifierDuration.Seconds())
 		} else if run.Status == "error" && run.HasDigest {
 			// Pad before styling so ANSI codes don't affect width.
-			clsCol = errorStyle.Render(fmt.Sprintf("%-*s", clsW, "✗ cls failed"))
+			clsCol = shared.ErrorStyle.Render(fmt.Sprintf("%-*s", clsW, "✗ cls failed"))
 		}
 
 		evalCol := ""
 		if run.HasEvaluator {
 			evalCol = fmt.Sprintf("%6.0fs eval", run.EvaluatorDuration.Seconds())
 		} else if run.Status == "error" && run.HasClassifier {
-			evalCol = errorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
+			evalCol = shared.ErrorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
 		} else if run.Status == "processed" && run.HasClassifier {
-			evalCol = mutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
+			evalCol = shared.MutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
 		}
 
 		return parseCol + clsCol + evalCol
@@ -397,9 +390,9 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 	if run.HasEvaluator {
 		evalCol = fmt.Sprintf("%6.0fs eval", run.EvaluatorDuration.Seconds())
 	} else if run.Status == "error" && run.HasClassifier {
-		evalCol = errorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
+		evalCol = shared.ErrorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
 	} else if run.Status == "processed" && run.HasClassifier {
-		evalCol = mutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
+		evalCol = shared.MutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
 	}
 
 	return parseCol + evalCol
