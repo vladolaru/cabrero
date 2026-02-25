@@ -75,32 +75,32 @@ func (m Model) View() string {
 
 	var b strings.Builder
 
-	// Column headers.
-	b.WriteString(m.renderColumnHeaders())
-	b.WriteString("\n")
+	// Fixed chrome: column headers (only when items exist).
+	if len(m.groups) > 0 {
+		b.WriteString(m.renderColumnHeaders())
+		b.WriteString("\n")
+	}
 
-	// Content.
+	// Scrollable item list.
 	if len(m.groups) == 0 {
 		b.WriteString("\n")
 		b.WriteString(mutedStyle.Render("  No sources tracked."))
 		b.WriteString("\n")
-	} else {
-		b.WriteString(m.renderFlatList())
+		// Fill remaining space.
+		content := b.String()
+		lines := strings.Count(content, "\n")
+		remaining := m.height - lines - 1
+		if remaining > 0 {
+			content += strings.Repeat("\n", remaining)
+		}
+		return content + m.renderStatusBar()
 	}
 
-	// Fill remaining space.
-	content := b.String()
-	lines := strings.Count(content, "\n")
-	statusBarHeight := 1
-	remaining := m.height - lines - statusBarHeight
-	if remaining > 0 {
-		content += strings.Repeat("\n", remaining)
-	}
+	b.WriteString(m.viewport.View())
+	b.WriteString("\n")
 
 	// Status bar.
-	content += m.renderStatusBar()
-
-	return content
+	return b.String() + m.renderStatusBar()
 }
 
 func (m Model) renderHeader() string {

@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -734,6 +735,45 @@ func TestSources_StatusMessage_Shown(t *testing.T) {
 	view := ansi.Strip(m.View())
 	if !strings.Contains(view, "Rollback complete.") {
 		t.Error("View() should show status message in status bar")
+	}
+}
+
+func TestSources_Viewport_ScrollsOnOverflow(t *testing.T) {
+	// Build a model with many sources to force overflow.
+	keys := shared.NewKeyMap("arrows")
+	cfg := shared.DefaultConfig()
+
+	groups := make([]fitness.SourceGroup, 1)
+	groups[0].Label = "User-level"
+	groups[0].Origin = "user"
+	groups[0].Sources = make([]fitness.Source, 30)
+	for i := range groups[0].Sources {
+		groups[0].Sources[i] = fitness.Source{
+			Name:         fmt.Sprintf("source-%02d", i),
+			Origin:       "user",
+			Ownership:    "mine",
+			Approach:     "iterate",
+			SessionCount: i,
+			HealthScore:  float64(i) * 3,
+		}
+	}
+
+	m := New(groups, &keys, cfg)
+	m.SetSize(120, 20) // 20 lines total; 31 items won't fit
+
+	// Viewport height = 20 - 2 (column header + status bar) = 18.
+	if m.viewport.Height != 18 {
+		t.Fatalf("viewport.Height = %d, want 18", m.viewport.Height)
+	}
+
+	// Navigate down past the viewport height — cursor should remain visible.
+	for i := 0; i < 25; i++ {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	cursorLine := m.cursor
+	if cursorLine < m.viewport.YOffset || cursorLine >= m.viewport.YOffset+m.viewport.Height {
+		t.Errorf("cursor line %d not visible: YOffset=%d Height=%d",
+			cursorLine, m.viewport.YOffset, m.viewport.Height)
 	}
 }
 

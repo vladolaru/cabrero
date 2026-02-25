@@ -6,6 +6,8 @@ package sources
 import (
 	"time"
 
+	"github.com/charmbracelet/bubbles/viewport"
+
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
@@ -26,6 +28,7 @@ type Model struct {
 	statusExpiry    time.Time
 	width           int
 	height          int
+	viewport        viewport.Model
 	keys            *shared.KeyMap
 	config          *shared.Config
 }
@@ -77,6 +80,36 @@ func (m Model) HasActivePrompt() bool {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
+	vpH := height - 2 // column header (1) + status bar (1)
+	if vpH < 1 {
+		vpH = 1
+	}
+	m.viewport = viewport.New(width, vpH)
+	m.refreshViewport()
+}
+
+// refreshViewport rebuilds the viewport content from the current flat list.
+// Call whenever flatItems, cursor, or group state changes.
+func (m *Model) refreshViewport() {
+	if m.width == 0 {
+		return
+	}
+	m.viewport.SetContent(m.renderFlatList())
+	m.ensureCursorVisible()
+}
+
+// ensureCursorVisible adjusts the viewport offset so the cursor row is visible.
+func (m *Model) ensureCursorVisible() {
+	if len(m.flatItems) == 0 {
+		return
+	}
+	yOff := m.viewport.YOffset
+	h := m.viewport.Height
+	if m.cursor < yOff {
+		m.viewport.YOffset = m.cursor
+	} else if m.cursor >= yOff+h {
+		m.viewport.YOffset = m.cursor - h + 1
+	}
 }
 
 // SelectedSource returns the source at the current cursor position,
@@ -151,6 +184,7 @@ func (m *Model) rebuildFlatItems() {
 	if m.cursor >= len(m.flatItems) {
 		m.cursor = max(0, len(m.flatItems)-1)
 	}
+	m.refreshViewport()
 }
 
 // sourceCounts returns total, iterate, evaluate, and unclassified source counts.
