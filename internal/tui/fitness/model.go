@@ -6,7 +6,6 @@ package fitness
 import (
 	"time"
 
-	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
@@ -30,7 +29,6 @@ type Model struct {
 	focus            Focus
 	statusMsg        string
 	statusExpiry     time.Time
-	spinner          spinner.Model
 	width            int
 	height           int
 	keys             *shared.KeyMap
@@ -39,9 +37,6 @@ type Model struct {
 
 // New creates a fitness detail model for the given report.
 func New(report *fitness.Report, keys *shared.KeyMap, cfg *shared.Config) Model {
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-
 	// Copy evidence groups so toggling Expanded doesn't mutate the original.
 	var evidence []fitness.EvidenceGroup
 	if report != nil {
@@ -61,7 +56,6 @@ func New(report *fitness.Report, keys *shared.KeyMap, cfg *shared.Config) Model 
 		report:   report,
 		evidence: evidence,
 		focus:    FocusReport,
-		spinner:  s,
 		keys:     keys,
 		config:   cfg,
 	}
