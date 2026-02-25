@@ -5,6 +5,36 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.1] - 2026-02-25
+
+### Fixed
+- **Path traversal guard in apply** — `validateTarget` was checking for `..`
+  after `filepath.Clean` had already resolved all traversal components, making
+  the check permanently false. Replaced with a home-directory prefix guard so
+  proposals can only write `.md` files inside the user's home directory.
+- **Log viewer search bar overflow** — the `[N/M matches]` prefix was appended
+  after `RenderStatusBar` had already clamped the output to terminal width,
+  producing a string 12–16 chars wider than the terminal. Now routed through the
+  existing `timedMsg` parameter so the width constraint applies to the full bar.
+- **macOS notification with newlines** — `escapeAppleScript` did not escape `\n`
+  or `\r`, causing `osascript` to silently fail when notification text contained
+  a newline. Both control characters are now escaped.
+- **Hook SESSION_ID path traversal** — hook scripts now reject SESSION_ID values
+  containing `/` or `..` before using them to construct filesystem paths.
+
+### Changed
+- **Config reads reduced on pipeline monitor** — the pipeline config
+  (`ClassifierTimeout`, `EvaluatorTimeout`) was re-read from `config.json` on
+  every 5-second tick while the pipeline monitor was open. Now resolved once at
+  startup and cached for the TUI session lifetime.
+- **Status bar trimming is O(N)** — `RenderStatusBar` now pre-computes
+  per-binding widths and uses a cumulative sum to find the cutoff index, avoiding
+  the previous O(N²) re-join loop.
+- **`SaveConfigTo` uses `store.AtomicWrite`** — was the only write site in the
+  codebase that inlined the `CreateTemp + chmod + rename` pattern manually.
+  Unified with the shared helper; also fixes file permissions (now explicit
+  `0644` instead of umask-dependent).
+
 ## [0.20.0] - 2026-02-25
 
 ### Added
@@ -733,6 +763,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.20.1]: https://github.com/vladolaru/cabrero/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/vladolaru/cabrero/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/vladolaru/cabrero/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vladolaru/cabrero/compare/v0.17.0...v0.18.0
