@@ -26,6 +26,11 @@ if [ -z "$SESSION_ID" ] || [ -z "$TRANSCRIPT_PATH" ]; then
   exit 0
 fi
 
+# Reject SESSION_ID values that contain path components (traversal guard).
+case "$SESSION_ID" in
+  */* | *..*) echo "cabrero: invalid session_id, skipping" >&2; exit 0 ;;
+esac
+
 CABRERO_ROOT="${HOME}/.cabrero"
 BLOCKLIST="${CABRERO_ROOT}/blocklist.json"
 

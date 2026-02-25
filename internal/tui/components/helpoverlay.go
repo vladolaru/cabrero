@@ -68,8 +68,8 @@ func RenderHelpContent(hc shared.HelpContent, width int) string {
 	return b.String()
 }
 
-// RenderHelpOverlay is kept for backward compatibility. Use a viewport for
+// RenderHelpOverlay renders the help overlay content. Use a viewport for
 // proper scroll support — see appModel.helpViewport.
-func RenderHelpOverlay(hc shared.HelpContent, width, height int) string {
+func RenderHelpOverlay(hc shared.HelpContent, width int) string {
 	return RenderHelpContent(hc, width)
 }

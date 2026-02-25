@@ -580,7 +580,7 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 		idx := indexByID[s.SessionID]
 		rec := records[s.SessionID]
 
-		prefix := "prop-" + shortID(s.SessionID) + "-"
+		prefix := "prop-" + store.ShortSessionID(s.SessionID) + "-"
 		filtered := filterProposals(evaluatorOutput, prefix)
 		filtered.SessionID = s.SessionID
 		totalMatched += len(filtered.Proposals)

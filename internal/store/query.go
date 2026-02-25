@@ -1,6 +1,7 @@
 package store
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -50,9 +51,7 @@ func QuerySessions(filter SessionFilter) ([]Metadata, error) {
 	}
 
 	// ListSessions returns newest-first; reverse for oldest-first.
-	for i, j := 0, len(matched)-1; i < j; i, j = i+1, j-1 {
-		matched[i], matched[j] = matched[j], matched[i]
-	}
+	slices.Reverse(matched)
 
 	return matched, nil
 }

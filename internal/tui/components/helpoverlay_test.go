@@ -29,7 +29,7 @@ func TestRenderHelpOverlay_ContainsSectionTitles(t *testing.T) {
 		},
 	}
 
-	output := RenderHelpOverlay(hc, 120, 40)
+	output := RenderHelpOverlay(hc, 120)
 
 	for _, s := range hc.Sections {
 		if !strings.Contains(output, s.Title) {
@@ -53,7 +53,7 @@ func TestRenderHelpOverlay_ContainsKeys(t *testing.T) {
 		},
 	}
 
-	output := RenderHelpOverlay(hc, 120, 40)
+	output := RenderHelpOverlay(hc, 120)
 
 	// Keys are rendered through lipgloss styles, but the raw text should appear.
 	if !strings.Contains(output, "ctrl+c") {
@@ -66,7 +66,7 @@ func TestRenderHelpOverlay_ContainsKeys(t *testing.T) {
 
 func TestRenderHelpOverlay_Empty(t *testing.T) {
 	// Empty HelpContent should not panic and return minimal output.
-	output := RenderHelpOverlay(shared.HelpContent{}, 120, 40)
+	output := RenderHelpOverlay(shared.HelpContent{}, 120)
 	if output == "" {
 		t.Error("expected non-empty output (at least top padding)")
 	}
@@ -125,7 +125,7 @@ func TestRenderHelpOverlay_DescriptionAndSections(t *testing.T) {
 		},
 	}
 
-	output := RenderHelpOverlay(hc, 120, 40)
+	output := RenderHelpOverlay(hc, 120)
 
 	// Title should NOT be in the output (it's in the sub-header).
 	if strings.Contains(output, "Dashboard Help") {

@@ -24,9 +24,9 @@ func TestShortID(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := shortID(tc.input)
+			got := store.ShortSessionID(tc.input)
 			if got != tc.want {
-				t.Errorf("shortID(%q) = %q, want %q", tc.input, got, tc.want)
+				t.Errorf("store.ShortSessionID(%q) = %q, want %q", tc.input, got, tc.want)
 			}
 		})
 	}
@@ -165,7 +165,7 @@ func fakeEvalWithProposals(n int) func(string, *parser.Digest, *ClassifierOutput
 		proposals := make([]Proposal, n)
 		for i := range proposals {
 			proposals[i] = Proposal{
-				ID:         fmt.Sprintf("prop-%s-%d", shortID(sessionID), i),
+				ID:         fmt.Sprintf("prop-%s-%d", store.ShortSessionID(sessionID), i),
 				Type:       "skill_improvement",
 				Confidence: "high",
 				Rationale:  "test",

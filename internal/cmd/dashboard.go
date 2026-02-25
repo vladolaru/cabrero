@@ -5,6 +5,6 @@ import (
 )
 
 // Dashboard launches the interactive dashboard TUI.
-func Dashboard(args []string, version string) error {
+func Dashboard(version string) error {
 	return tui.Run(version)
 }

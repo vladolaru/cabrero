@@ -555,8 +555,8 @@ func TestRunOne_Evaluate_WritesHistory(t *testing.T) {
 			SessionID:     sessionID,
 			PromptVersion: "evaluator-v3",
 			Proposals: []Proposal{
-				{ID: fmt.Sprintf("prop-%s-0", shortID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
-				{ID: fmt.Sprintf("prop-%s-1", shortID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				{ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				{ID: fmt.Sprintf("prop-%s-1", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
 			},
 		}, nil, nil
 	}
@@ -730,7 +730,7 @@ func TestRunGroup_WritesHistoryWithBatchContext(t *testing.T) {
 		var proposals []Proposal
 		for _, s := range sessions {
 			proposals = append(proposals, Proposal{
-				ID: fmt.Sprintf("prop-%s-0", shortID(s.SessionID)),
+				ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(s.SessionID)),
 				Type: "skill_improvement", Confidence: "high", Rationale: "test",
 			})
 		}
@@ -953,7 +953,7 @@ func TestRunOne_UsageTrackedInHistory(t *testing.T) {
 		return &EvaluatorOutput{
 			SessionID: sessionID,
 			Proposals: []Proposal{
-				{ID: fmt.Sprintf("prop-%s-0", shortID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				{ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(sessionID)), Type: "skill_improvement", Confidence: "high", Rationale: "test"},
 			},
 		}, &ClaudeResult{
 			SessionID:           "cc-eval-sess",
@@ -1143,7 +1143,7 @@ func TestRunGroup_BatchEval_UsageSplitAcrossSessions(t *testing.T) {
 		var proposals []Proposal
 		for _, s := range sessions {
 			proposals = append(proposals, Proposal{
-				ID: fmt.Sprintf("prop-%s-0", shortID(s.SessionID)),
+				ID: fmt.Sprintf("prop-%s-0", store.ShortSessionID(s.SessionID)),
 				Type: "skill_improvement", Confidence: "high", Rationale: "test",
 			})
 		}

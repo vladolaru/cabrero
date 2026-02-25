@@ -301,7 +301,7 @@ func renderLogViewer(w, h int) (string, error) {
 }
 
 func renderHelpOverlay(w, h int, nav string) (string, error) {
-	w, h = defaults(w, h)
+	w, _ = defaults(w, h)
 	stats := testdata.TestDashboardStats()
 
 	cfg := testdata.TestConfig()
@@ -311,10 +311,10 @@ func renderHelpOverlay(w, h int, nav string) (string, error) {
 	proposals := testdata.TestProposals()
 	reports := testdata.TestFitnessReports()
 	m := dashboard.New(proposals, reports, stats, &keys, cfg)
-	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	prefix, _ := renderWithSubHeader(stats, m.SubHeader(), w)
 
 	hc := shared.HelpForView(message.ViewDashboard, keys)
-	helpContent := components.RenderHelpOverlay(hc, w, h-th)
+	helpContent := components.RenderHelpOverlay(hc, w)
 
 	return prefix + helpContent, nil
 }

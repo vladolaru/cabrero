@@ -97,8 +97,8 @@ func printHelp() {
 	fmt.Println("Run 'cabrero help' for this message.")
 }
 
-func cmdDashboard(args []string) error {
-	return cmd.Dashboard(args, version)
+func cmdDashboard(_ []string) error {
+	return cmd.Dashboard(version)
 }
 
 func cmdSetup(args []string) error {

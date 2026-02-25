@@ -2,8 +2,6 @@ package pipeline
 
 import (
 	"strings"
-
-	"github.com/vladolaru/cabrero/internal/store"
 )
 
 // DefaultMaxBatchSize is the maximum number of sessions per Evaluator invocation.
@@ -59,8 +57,3 @@ func filterProposals(output *EvaluatorOutput, prefix string) *EvaluatorOutput {
 	return &filtered
 }
 
-// shortID returns the short form of a session ID for proposal ID prefixes.
-// Must match the evaluator prompt format: "prop-{first 8 chars of sessionId}-{index}".
-func shortID(id string) string {
-	return store.ShortSessionID(id)
-}
