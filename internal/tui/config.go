@@ -88,28 +88,5 @@ func SaveConfigTo(cfg *Config, path string) error {
 	}
 	out = append(out, '\n')
 
-	// Atomic write: temp file + rename.
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, "config-*.json")
-	if err != nil {
-		return fmt.Errorf("creating temp file: %w", err)
-	}
-	tmpName := tmp.Name()
-
-	if _, err := tmp.Write(out); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return fmt.Errorf("writing temp file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("closing temp file: %w", err)
-	}
-
-	if err := os.Rename(tmpName, path); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("renaming config: %w", err)
-	}
-
-	return nil
+	return store.AtomicWrite(path, out, 0o644)
 }
