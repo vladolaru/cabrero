@@ -207,7 +207,7 @@ func (m *Model) updateContent() {
 		return
 	}
 
-	m.viewport.Height = m.viewportHeight()
+	m.viewport.SetHeight(m.viewportHeight())
 
 	if len(m.filtered) == 0 {
 		m.viewport.SetContent("\n" + mutedStyle.Render("  "+components.EmptyProposals()) + "\n")
@@ -224,13 +224,13 @@ func (m *Model) ensureCursorVisible() {
 		return
 	}
 	cursorLine := m.cursor
-	yOff := m.viewport.YOffset
-	h := m.viewport.Height
+	yOff := m.viewport.YOffset()
+	h := m.viewport.Height()
 
 	if cursorLine < yOff {
-		m.viewport.YOffset = cursorLine
+		m.viewport.SetYOffset(cursorLine)
 	} else if cursorLine >= yOff+h {
-		m.viewport.YOffset = cursorLine - h + 1
+		m.viewport.SetYOffset(cursorLine - h + 1)
 	}
 }
 

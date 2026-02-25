@@ -84,7 +84,7 @@ func (m *Model) SetSize(width, height int) {
 	if vpH < 1 {
 		vpH = 1
 	}
-	m.viewport = viewport.New(width, vpH)
+	m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(vpH))
 	m.refreshViewport()
 }
 
@@ -103,12 +103,12 @@ func (m *Model) ensureCursorVisible() {
 	if len(m.flatItems) == 0 {
 		return
 	}
-	yOff := m.viewport.YOffset
-	h := m.viewport.Height
+	yOff := m.viewport.YOffset()
+	h := m.viewport.Height()
 	if m.cursor < yOff {
-		m.viewport.YOffset = m.cursor
+		m.viewport.SetYOffset(m.cursor)
 	} else if m.cursor >= yOff+h {
-		m.viewport.YOffset = m.cursor - h + 1
+		m.viewport.SetYOffset(m.cursor - h + 1)
 	}
 }
 

@@ -93,7 +93,7 @@ func New(chips []string, cfg ChatConfig, width, height int) Model {
 	}
 
 	vpH := m.viewportHeight()
-	m.viewport = viewport.New(width-2, vpH)
+	m.viewport = viewport.New(viewport.WithWidth(width-2), viewport.WithHeight(vpH))
 	return m
 }
 
@@ -101,8 +101,8 @@ func New(chips []string, cfg ChatConfig, width, height int) Model {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	m.viewport.Width = width - 2
-	m.viewport.Height = m.viewportHeight()
+	m.viewport.SetWidth(width - 2)
+	m.viewport.SetHeight(m.viewportHeight())
 	m.input.SetWidth(width - 4)
 	m.rerenderMessages()
 	m.updateViewportContent()

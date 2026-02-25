@@ -87,7 +87,7 @@ func (m Model) renderViewportContent() string {
 	b.WriteString("\n")
 	b.WriteString("  " + strings.Repeat("\u2500", 17))
 	b.WriteString("\n")
-	b.WriteString(shared.WrapIndent(m.report.Verdict, m.viewport.Width, 2))
+	b.WriteString(shared.WrapIndent(m.report.Verdict, m.viewport.Width(), 2))
 	b.WriteString("\n\n")
 
 	// SESSION EVIDENCE section.

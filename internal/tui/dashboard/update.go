@@ -36,8 +36,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.viewport.Width = msg.Width
-		m.viewport.Height = m.viewportHeight()
+		m.viewport.SetWidth(msg.Width)
+		m.viewport.SetHeight(m.viewportHeight())
 		m.updateContent()
 		return m, nil
 
@@ -65,7 +65,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.HalfPageDown):
-		jump := m.viewport.Height / 2
+		jump := m.viewport.Height() / 2
 		m.cursor += jump
 		if m.cursor >= len(m.filtered) {
 			m.cursor = max(0, len(m.filtered)-1)
@@ -74,7 +74,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.HalfPageUp):
-		jump := m.viewport.Height / 2
+		jump := m.viewport.Height() / 2
 		m.cursor -= jump
 		if m.cursor < 0 {
 			m.cursor = 0

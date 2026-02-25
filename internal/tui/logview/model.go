@@ -124,7 +124,7 @@ func (m *Model) SetSize(width, height int) {
 		viewHeight = 1
 	}
 
-	m.viewport = viewport.New(width, viewHeight)
+	m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(viewHeight))
 
 	// Always start at the latest entry.
 	m.cursor = max(0, len(m.entries)-1)

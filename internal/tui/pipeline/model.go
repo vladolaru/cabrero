@@ -58,7 +58,7 @@ func (m *Model) SetSize(width, height int) {
 	if vpH < 1 {
 		vpH = 1
 	}
-	m.viewport = viewport.New(width, vpH)
+	m.viewport = viewport.New(viewport.WithWidth(width), viewport.WithHeight(vpH))
 	m.refreshViewport()
 }
 

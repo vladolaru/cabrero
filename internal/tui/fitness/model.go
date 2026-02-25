@@ -85,7 +85,7 @@ func (m *Model) SetSize(width, height int) {
 		contentWidth = 10
 	}
 
-	m.viewport = viewport.New(contentWidth, contentHeight)
+	m.viewport = viewport.New(viewport.WithWidth(contentWidth), viewport.WithHeight(contentHeight))
 	m.viewport.SetContent(m.renderViewportContent())
 }
 
