@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
@@ -68,6 +69,43 @@ func TestRenderHelpOverlay_Empty(t *testing.T) {
 	output := RenderHelpOverlay(shared.HelpContent{}, 120, 40)
 	if output == "" {
 		t.Error("expected non-empty output (at least top padding)")
+	}
+}
+
+func TestRenderHelpContent_ContainsAllSections(t *testing.T) {
+	hc := shared.HelpContent{
+		Description: "This is the description.",
+		Sections: []shared.HelpSection{
+			{
+				Title: "Navigation",
+				Entries: []shared.HelpEntry{
+					{Key: "j", Desc: "move down"},
+					{Key: "k", Desc: "move up"},
+				},
+			},
+			{
+				Title: "Actions",
+				Entries: []shared.HelpEntry{
+					{Key: "a", Desc: "approve"},
+				},
+			},
+		},
+	}
+
+	content := RenderHelpContent(hc, 80)
+	stripped := ansi.Strip(content)
+
+	if !strings.Contains(stripped, "description") {
+		t.Error("content should contain description")
+	}
+	if !strings.Contains(stripped, "Navigation") {
+		t.Error("content should contain Navigation section")
+	}
+	if !strings.Contains(stripped, "Actions") {
+		t.Error("content should contain Actions section")
+	}
+	if !strings.Contains(stripped, "approve") {
+		t.Error("content should contain key descriptions")
 	}
 }
 

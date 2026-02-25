@@ -27,8 +27,9 @@ var (
 			PaddingLeft(2)
 )
 
-// RenderHelpOverlay renders the help overlay with description and key binding sections.
-func RenderHelpOverlay(hc shared.HelpContent, width, height int) string {
+// RenderHelpContent renders the help content as a scrollable-friendly string
+// (no viewport sizing — suitable for use as viewport content).
+func RenderHelpContent(hc shared.HelpContent, width int) string {
 	var b strings.Builder
 
 	b.WriteString("\n") // top padding
@@ -65,4 +66,10 @@ func RenderHelpOverlay(hc shared.HelpContent, width, height int) string {
 	}
 
 	return b.String()
+}
+
+// RenderHelpOverlay is kept for backward compatibility. Use a viewport for
+// proper scroll support — see appModel.helpViewport.
+func RenderHelpOverlay(hc shared.HelpContent, width, height int) string {
+	return RenderHelpContent(hc, width)
 }
