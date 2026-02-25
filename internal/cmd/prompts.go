@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -28,7 +29,7 @@ func Prompts(args []string) error {
 	promptsDir := filepath.Join(store.Root(), "prompts")
 
 	for _, v := range versions {
-		age := formatAge(v.UpdatedAt)
+		age := cli.RelativeTime(v.UpdatedAt)
 
 		filename := v.Name
 		if v.Version != "" {

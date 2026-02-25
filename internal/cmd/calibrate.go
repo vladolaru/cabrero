@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -99,7 +100,7 @@ func calibrateList(_ []string) error {
 			sid = sid[:18]
 		}
 
-		age := formatAge(e.TaggedAt)
+		age := cli.RelativeTime(e.TaggedAt)
 
 		note := e.Note
 		if len(note) > 40 {

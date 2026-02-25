@@ -83,9 +83,8 @@ func (u *uninstallRunner) run() error {
 	}
 
 	// PATH reminder.
-	home, _ := os.UserHomeDir()
 	binDir := filepath.Join(store.Root(), "bin")
-	display := strings.Replace(binDir, home, "~", 1)
+	display := cli.ShortenHome(binDir)
 
 	shell := filepath.Base(os.Getenv("SHELL"))
 	var profile string
@@ -172,7 +171,7 @@ func (u *uninstallRunner) stepRemoveLaunchAgent(step, total int) error {
 		return nil
 	}
 
-	display := strings.Replace(plistPath, home, "~", 1)
+	display := cli.ShortenHome(plistPath)
 
 	if u.dryRun {
 		fmt.Printf("  %s Would remove %s\n", cli.Accent("→"), display)
@@ -330,8 +329,7 @@ func (u *uninstallRunner) stepRemoveHookScripts(step, total int) error {
 		return nil
 	}
 
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(hooksDir, home, "~", 1)
+	display := cli.ShortenHome(hooksDir)
 
 	if u.dryRun {
 		fmt.Printf("  %s Would remove %s/\n", cli.Accent("→"), display)
@@ -355,8 +353,7 @@ func (u *uninstallRunner) stepRemoveBinary(step, total int) error {
 		return nil
 	}
 
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(binDir, home, "~", 1)
+	display := cli.ShortenHome(binDir)
 
 	if u.dryRun {
 		fmt.Printf("  %s Would remove %s/\n", cli.Accent("→"), display)
@@ -374,8 +371,7 @@ func (u *uninstallRunner) stepRemoveBinary(step, total int) error {
 // Step 7: Data directory prompt.
 func (u *uninstallRunner) stepDataDirectory(step, total int) error {
 	root := store.Root()
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(root, home, "~", 1)
+	display := cli.ShortenHome(root)
 
 	if _, err := os.Stat(root); os.IsNotExist(err) {
 		fmt.Printf("  %s %s not present (already removed)\n", cli.Success("✓"), display)

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -65,9 +66,9 @@ func TestFormatAge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatAge(tt.t)
+			got := cli.RelativeTime(tt.t)
 			if got != tt.want {
-				t.Errorf("formatAge() = %q, want %q", got, tt.want)
+				t.Errorf("cli.RelativeTime() = %q, want %q", got, tt.want)
 			}
 		})
 	}

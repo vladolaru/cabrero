@@ -22,8 +22,7 @@ func Status(args []string) error {
 	fmt.Println(cli.Accent(strings.Repeat("─", 30)))
 
 	// Store path and status.
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(root, home, "~", 1)
+	display := cli.ShortenHome(root)
 	if _, err := os.Stat(root); err == nil {
 		fmt.Printf("  %s  %s %s\n", cli.Bold("Store:"), display, cli.Success("(initialized)"))
 	} else {

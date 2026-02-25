@@ -338,8 +338,7 @@ func (d *doctorRunner) checkStore() []checkResult {
 		})
 	} else {
 		os.Remove(testFile)
-		home, _ := os.UserHomeDir()
-		display := strings.Replace(root, home, "~", 1)
+		display := cli.ShortenHome(root)
 		results = append(results, checkResult{
 			name:     "Store directory exists",
 			category: "Store",
@@ -973,8 +972,7 @@ func (d *doctorRunner) checkPath() []checkResult {
 	}
 
 	// Check cabrero is reachable on PATH (covers symlinks like /usr/local/bin).
-	home, _ := os.UserHomeDir()
-	display := strings.Replace(binDir, home, "~", 1)
+	display := cli.ShortenHome(binDir)
 
 	if _, err := exec.LookPath("cabrero"); err == nil {
 		results = append(results, checkResult{
