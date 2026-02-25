@@ -203,7 +203,7 @@ func TestRunOne_CleanTriage_SkipsEvaluator(t *testing.T) {
 		t.Fatalf("RunOne: %v", err)
 	}
 	if evalCalled {
-		t.Error("EvalFunc called for clean session")
+		t.Error("EvalOneFunc called for clean session")
 	}
 	if result.ClassifierOutput.Triage != "clean" {
 		t.Errorf("Triage = %q, want 'clean'", result.ClassifierOutput.Triage)
@@ -309,7 +309,7 @@ func TestRunGroup_AllClean(t *testing.T) {
 	}
 }
 
-func TestRunGroup_SingleEvalUsesEvalFunc(t *testing.T) {
+func TestRunGroup_SingleEvalUsesEvalOneFunc(t *testing.T) {
 	setupBatchStore(t)
 	s := createBatchSession(t, "rg-single000001")
 
