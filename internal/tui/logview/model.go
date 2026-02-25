@@ -11,7 +11,6 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
-	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 
@@ -283,38 +282,14 @@ func (m *Model) scrollToCursor() {
 	m.viewport.SetYOffset(lineNum)
 }
 
-// Color helper functions that read the adaptive colors.
-func mutedColor() string {
-	if compat.HasDarkBackground {
-		return "#9E9E9E" // ColorMuted.Dark
-	}
-	return "#757575" // ColorMuted.Light
-}
-
-func errorColor() string {
-	if compat.HasDarkBackground {
-		return "#EF5350" // ColorError.Dark
-	}
-	return "#C62828" // ColorError.Light
-}
-
-func accentColor() string {
-	if compat.HasDarkBackground {
-		return "#CE93D8" // ColorAccent.Dark
-	}
-	return "#6A1B9A" // ColorAccent.Light
-}
-
 // renderLevel returns a colored level badge.
 func renderLevel(level string) string {
-	var color string
 	switch level {
 	case "ERROR":
-		color = errorColor()
+		return shared.ErrorStyle.Render(level)
 	default:
-		color = accentColor()
+		return shared.AccentStyle.Render(level)
 	}
-	return highlightOutput.String(level).Foreground(highlightOutput.Color(color)).String()
 }
 
 // renderEntries builds the styled viewport content from parsed entries.
@@ -334,8 +309,7 @@ func (m *Model) renderEntries() string {
 		// Timestamp (muted).
 		ts := ""
 		if entry.Timestamp != "" {
-			ts = highlightOutput.String(entry.Timestamp).
-				Foreground(highlightOutput.Color(mutedColor())).String() + "  "
+			ts = shared.MutedStyle.Render(entry.Timestamp) + "  "
 		}
 
 		// Level badge (colored).
@@ -354,13 +328,10 @@ func (m *Model) renderEntries() string {
 		if entry.IsMultiLine() {
 			if entry.Expanded {
 				b.WriteString(" ")
-				b.WriteString(highlightOutput.String("[-]").
-					Foreground(highlightOutput.Color(mutedColor())).String())
+				b.WriteString(shared.MutedStyle.Render("[-]"))
 			} else {
 				b.WriteString(" ")
-				indicator := fmt.Sprintf("[+%d]", len(entry.Extra))
-				b.WriteString(highlightOutput.String(indicator).
-					Foreground(highlightOutput.Color(mutedColor())).String())
+				b.WriteString(shared.MutedStyle.Render(fmt.Sprintf("[+%d]", len(entry.Extra))))
 			}
 		}
 		b.WriteString("\n")
