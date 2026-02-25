@@ -35,7 +35,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
-	return m, nil
+	// Forward to viewport for scroll events.
+	var cmd tea.Cmd
+	m.viewport, cmd = m.viewport.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
@@ -43,12 +46,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Down):
 		if m.cursor < len(m.runs)-1 {
 			m.cursor++
+			m.refreshViewport()
 		}
 		return m, nil
 
 	case key.Matches(msg, m.keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
+			m.refreshViewport()
 		}
 		return m, nil
 
@@ -59,6 +64,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		} else {
 			m.expandedIdx = m.cursor
 		}
+		m.refreshViewport()
 		return m, nil
 
 	case key.Matches(msg, m.keys.Retry):

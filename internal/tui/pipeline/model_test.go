@@ -300,6 +300,35 @@ func TestLayoutMode(t *testing.T) {
 	}
 }
 
+func TestPipeline_Viewport_ExistsAfterSetSize(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 24)
+
+	// Viewport height = 24 - 1 (status bar).
+	if m.viewport.Height != 23 {
+		t.Fatalf("viewport.Height = %d, want 23", m.viewport.Height)
+	}
+	if m.viewport.Width != 120 {
+		t.Fatalf("viewport.Width = %d, want 120", m.viewport.Width)
+	}
+}
+
+func TestPipeline_Viewport_ContentRendered(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "DAEMON") {
+		t.Error("View should contain DAEMON section")
+	}
+	if !strings.Contains(view, "PIPELINE ACTIVITY") {
+		t.Error("View should contain PIPELINE ACTIVITY section")
+	}
+	if !strings.Contains(view, "RECENT RUNS") {
+		t.Error("View should contain RECENT RUNS section")
+	}
+}
+
 func TestModelPipelineKeyEmitsPushLogView(t *testing.T) {
 	m := newTestModel()
 	m.SetSize(120, 40)

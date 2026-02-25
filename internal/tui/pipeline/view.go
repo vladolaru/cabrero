@@ -55,46 +55,13 @@ func (m Model) View() string {
 		return ""
 	}
 
-	var sections []string
-
-	// Daemon header.
-	sections = append(sections, m.renderDaemonHeader())
-
-	// Activity stats.
-	sections = append(sections, m.renderActivityStats())
-
-	// Recent runs.
-	sections = append(sections, m.renderRecentRuns())
-
-	// Models: hidden in narrow mode.
-	if m.layoutMode() != layoutNarrow {
-		sections = append(sections, m.renderModels())
-	}
-
-	// Prompts: hidden in narrow mode.
-	if len(m.prompts) > 0 && m.layoutMode() != layoutNarrow {
-		sections = append(sections, m.renderPrompts())
-	}
-
-	// Confirmation prompt overlay — exclusive return, matching sources pattern.
+	// Confirmation prompt overlay.
 	if m.confirm.Active {
 		return m.confirm.View()
 	}
 
-	content := strings.Join(sections, "\n\n")
-
-	// Fill remaining space to anchor status bar to bottom.
-	lines := strings.Count(content, "\n")
-	statusBarHeight := 1
-	remaining := m.height - lines - statusBarHeight
-	if remaining > 0 {
-		content += strings.Repeat("\n", remaining)
-	}
-
-	// Status bar — 3 args: bindings, timedMsg, width.
 	statusBar := components.RenderStatusBar(m.keys.PipelineShortHelp(), m.statusMsg, m.width)
-
-	return content + statusBar
+	return m.viewport.View() + "\n" + statusBar
 }
 
 func (m Model) renderDaemonHeader() string {

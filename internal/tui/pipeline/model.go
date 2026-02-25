@@ -4,8 +4,10 @@
 package pipeline
 
 import (
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
 	pl "github.com/vladolaru/cabrero/internal/pipeline"
@@ -30,6 +32,7 @@ type Model struct {
 	statusMsg   string // timed status bar message (e.g. "Refreshing…")
 	width       int
 	height      int
+	viewport    viewport.Model
 	keys        *shared.KeyMap
 	config      *shared.Config
 }
@@ -51,6 +54,35 @@ func New(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersi
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
+	vpH := height - 1 // reserve 1 line for status bar
+	if vpH < 1 {
+		vpH = 1
+	}
+	m.viewport = viewport.New(width, vpH)
+	m.refreshViewport()
+}
+
+// refreshViewport rebuilds the viewport content from all pipeline sections.
+// Call after data refresh, resize, or cursor/expand state changes.
+func (m *Model) refreshViewport() {
+	if m.width == 0 {
+		return
+	}
+	// Don't render into viewport when confirm is active (View() returns early).
+	if m.confirm.Active {
+		return
+	}
+	var sections []string
+	sections = append(sections, m.renderDaemonHeader())
+	sections = append(sections, m.renderActivityStats())
+	sections = append(sections, m.renderRecentRuns())
+	if m.layoutMode() != layoutNarrow {
+		sections = append(sections, m.renderModels())
+	}
+	if len(m.prompts) > 0 && m.layoutMode() != layoutNarrow {
+		sections = append(sections, m.renderPrompts())
+	}
+	m.viewport.SetContent(strings.Join(sections, "\n\n"))
 }
 
 // Refresh updates the pipeline data while preserving cursor and expansion state.
@@ -67,6 +99,7 @@ func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts [
 	if m.expandedIdx >= len(m.runs) {
 		m.expandedIdx = -1
 	}
+	m.refreshViewport()
 	// Show confirmation only after a manual refresh.
 	if m.statusMsg != "" {
 		m.statusMsg = "Data refreshed."
