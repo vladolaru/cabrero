@@ -4,27 +4,31 @@
 package cli
 
 import (
+	"os"
+
 	"charm.land/lipgloss/v2"
-	"charm.land/lipgloss/v2/compat"
-)
-
-// Adaptive color pairs for light and dark terminals.
-var (
-	colorSuccess = compat.AdaptiveColor{Light: lipgloss.Color("#2E7D32"), Dark: lipgloss.Color("#66BB6A")}
-	colorError   = compat.AdaptiveColor{Light: lipgloss.Color("#C62828"), Dark: lipgloss.Color("#EF5350")}
-	colorWarning = compat.AdaptiveColor{Light: lipgloss.Color("#E65100"), Dark: lipgloss.Color("#FFA726")}
-	colorAccent  = compat.AdaptiveColor{Light: lipgloss.Color("#6A1B9A"), Dark: lipgloss.Color("#CE93D8")}
-	colorMuted   = compat.AdaptiveColor{Light: lipgloss.Color("#757575"), Dark: lipgloss.Color("#9E9E9E")}
+	"github.com/muesli/termenv"
 )
 
 var (
-	styleSuccess = lipgloss.NewStyle().Foreground(colorSuccess)
-	styleError   = lipgloss.NewStyle().Foreground(colorError)
-	styleWarning = lipgloss.NewStyle().Foreground(colorWarning)
-	styleAccent  = lipgloss.NewStyle().Foreground(colorAccent)
-	styleMuted   = lipgloss.NewStyle().Foreground(colorMuted)
+	styleSuccess lipgloss.Style
+	styleError   lipgloss.Style
+	styleWarning lipgloss.Style
+	styleAccent  lipgloss.Style
+	styleMuted   lipgloss.Style
 	styleBold    = lipgloss.NewStyle().Bold(true)
 )
+
+func init() {
+	out := termenv.NewOutput(os.Stdout)
+	ld := lipgloss.LightDark(out.HasDarkBackground())
+
+	styleSuccess = lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#2E7D32"), lipgloss.Color("#66BB6A")))
+	styleError = lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#C62828"), lipgloss.Color("#EF5350")))
+	styleWarning = lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#E65100"), lipgloss.Color("#FFA726")))
+	styleAccent = lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#6A1B9A"), lipgloss.Color("#CE93D8")))
+	styleMuted = lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#757575"), lipgloss.Color("#9E9E9E")))
+}
 
 // Success renders text in green (pass/done).
 func Success(s string) string { return styleSuccess.Render(s) }
