@@ -624,6 +624,36 @@ func TestSearchExpandsAllMultiLineEntries(t *testing.T) {
 	}
 }
 
+func TestLogModelView_SearchMatchBarFitsTerminalWidth(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(80, 20)
+
+	// Simulate a completed search with matches.
+	m.searchActive = false
+	m.searchTerm = "daemon"
+	m.matches = []lineMatch{{entryIdx: 0}, {entryIdx: 2}, {entryIdx: 4}}
+	m.matchIdx = 0
+
+	view := m.View()
+	lines := strings.Split(strings.TrimRight(view, "\n"), "\n")
+	if len(lines) == 0 {
+		t.Fatal("View() returned empty string")
+	}
+	last := lines[len(lines)-1]
+
+	// Status bar must fit within terminal width.
+	width := ansi.StringWidth(last)
+	if width > 80 {
+		t.Errorf("status bar width = %d, want ≤ 80\ngot: %q", width, last)
+	}
+
+	// Match count must be visible in the bar.
+	stripped := ansi.Strip(last)
+	if !strings.Contains(stripped, "1/3 matches") {
+		t.Errorf("status bar missing match count\ngot: %q", stripped)
+	}
+}
+
 func TestSearchJumpsToLastMatch(t *testing.T) {
 	m := newTestLogModel()
 	m.SetSize(120, 40)
