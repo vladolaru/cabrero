@@ -5,6 +5,33 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-02-26
+
+### Added
+- **Proposals Curator stage** — daily automated cleanup of the proposal backlog via a
+  third daemon ticker (24h interval). Two-stage pipeline:
+  - **Stage 1 (Haiku batch check):** single-proposal file-target proposals are sent to
+    `claude-haiku-4-5` in one non-agentic batch call. Proposals whose changes are already
+    present in the target file are auto-rejected.
+  - **Stage 2 (Sonnet group curator):** multi-proposal targets (2+ proposals for the same
+    file) each get an agentic `claude-sonnet-4-6` session with `Read,Grep` access.
+    The Curator identifies concern clusters, synthesizes one new proposal per cluster for
+    `claude_addition`, and rank-culls `skill_improvement`/`claude_review` proposals.
+    `skill_scaffold` proposals are always preserved.
+- **`cleanup_history.jsonl`** — append-only JSONL audit log of every cleanup run, stored
+  at `~/.cabrero/cleanup_history.jsonl`. Each record captures timestamp, duration, before/after
+  proposal counts, per-proposal decisions, and LLM usage for Sonnet Curator and Haiku check
+  calls. Rotated on daemon startup (90-day retention, same as `run_history.jsonl`).
+- **Curator prompt files** — `~/.cabrero/prompts/curator-v1.txt` and
+  `~/.cabrero/prompts/curator-check-v1.txt` written on first curator run if absent.
+- **`PipelineRun.Source` field** — pipeline run records now carry a `Source` string
+  (`"daemon"`, `"cli-run"`, `"cli-backfill"`, `"cleanup"`). Cleanup runs surface in the
+  TUI Pipeline Activity section as `CLEANUP` rows with archived-count and cost.
+- **`cleanLLMJSON` array support** — the JSON extractor now handles `[...]` array output
+  in addition to `{...}` objects, required for the Haiku batch check response format.
+- **`store.RootOverrideForTest` / `ResetRootOverrideForTest`** — test helpers for
+  redirecting the store root in unit tests without environment variables.
+
 ## [0.20.3] - 2026-02-26
 
 ### Fixed
@@ -832,6 +859,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.21.0]: https://github.com/vladolaru/cabrero/compare/v0.20.3...v0.21.0
 [0.20.3]: https://github.com/vladolaru/cabrero/compare/v0.20.2...v0.20.3
 [0.20.2]: https://github.com/vladolaru/cabrero/compare/v0.20.1...v0.20.2
 [0.20.1]: https://github.com/vladolaru/cabrero/compare/v0.20.0...v0.20.1

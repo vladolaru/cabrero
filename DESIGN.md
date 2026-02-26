@@ -164,6 +164,8 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
   prompts/
     classifier-v3.txt        # Classifier stage prompt (v3: agentic with Read/Grep, triage, turn budget)
     evaluator-v3.txt         # Evaluator stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
+    curator-v1.txt           # Curator stage prompt (cluster synthesis + rank-and-cull)
+    curator-check-v1.txt     # Curator batch-check prompt (Haiku "already applied?" check)
   replays/
     {replayId}/
       meta.json              # replay metadata (session, stage, prompt, original decision)
@@ -173,6 +175,7 @@ Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessio
   config.json                # TUI and daemon settings (debug toggle, navigation, theme, model overrides, etc.)
   blocklist.json             # session IDs to never process (loop prevention)
   run_history.jsonl          # append-only pipeline run history (one JSON object per line)
+  cleanup_history.jsonl      # append-only curator cleanup run history (one JSON object per line)
   daemon.log                 # background daemon log (rotated, 2MB × 3)
   daemon.pid                 # PID file for single-instance enforcement
 ```
@@ -223,6 +226,11 @@ search/fetch requests), usage totals (`total_cost_usd`, `total_input_tokens`,
 and token usage; falls back to mtime-based estimation for sessions predating the
 history file. Token counts (input/output) and cost flow from `HistoryRecord` through
 `PipelineRun` and `PipelineStats` to the Pipeline Activity section of the TUI.
+
+`PipelineRun.Source` distinguishes run origin: `"daemon"`, `"cli-run"`, `"cli-backfill"`,
+or `"cleanup"`. Cleanup runs are loaded separately from `cleanup_history.jsonl` via
+`ListCleanupRunsFromHistory` and prepended to session runs before display. The TUI renders
+them as `CLEANUP` rows with archived-count and cost instead of session ID and project.
 
 ### Store Write Invariants
 
@@ -300,6 +308,19 @@ macOS notification if proposals generated
 Human approval gate
         ↓
 claude --model sonnet --print (blends approved change into SKILL.md via writing skill)
+
+Daily curator ticker (every 24h, independent of session pipeline):
+        ↓
+Curator Stage 1 — Haiku batch check (non-agentic --print)
+  → checks all single-proposal file-target proposals for "already applied" status
+  → auto-rejects proposals whose changes are already present in the target file
+        ↓
+Curator Stage 2 — Sonnet agentic Curator (one session per multi-proposal target, parallelized)
+  → reads target file, identifies concern clusters, synthesizes one proposal per cluster
+  → rank-culls skill_improvement/claude_review; preserves skill_scaffold
+  → archives culled/synthesized originals; writes synthesized proposals to proposals/
+        ↓
+Cleanup record appended to cleanup_history.jsonl + macOS notification
 ```
 
 All LLM calls are mediated by the `claude` CLI. No API keys in the app — CC's existing
@@ -411,6 +432,15 @@ tool access. Apply and chat stages remain non-agentic.
   Runs on approval only — infrequent, quality-critical. Non-agentic (`--print`).
 - **Evaluator** — chat: interactive proposal interrogation in the TUI. Latency-
   sensitive; fast enough to feel conversational. Non-agentic (`--print`).
+- **Curator** (`claude-sonnet-4-6`) — agentic curator with `Read,Grep` access, isolated
+  via `SettingSources: ""` (no user plugins or MCP servers). Runs once per multi-proposal
+  target group in the daily cleanup. Receives the full proposal list for that target as its
+  user prompt. Identifies concern clusters, produces a `CuratorManifest` with per-proposal
+  decisions and synthesized proposals. Max 15 turns, 5-minute timeout.
+- **Curator check** (`claude-haiku-4-5`) — non-agentic (`--print`) batch check. Receives
+  all single-proposal file-target proposals as a JSON array with full file content embedded.
+  Returns a `CheckDecision` array indicating which proposals are already applied. One call
+  covers all eligible proposals regardless of count. 2-minute timeout.
 
 ### Cross-Session Pattern Aggregation
 
@@ -529,6 +559,10 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Polling** — checks for queued sessions every 2 minutes (configurable via `--poll`)
 - **Stale recovery** — scans `~/.claude/projects/` every 30 minutes for sessions where
   hooks never fired (crashes). Imports sessions idle >24h with trigger `"stale-recovery"`
+- **Daily cleanup** — runs the Curator stage every 24 hours (`Config.CleanupInterval`).
+  Stage 1: Haiku batch check for single-proposal file-target proposals. Stage 2: parallelized
+  Sonnet Curator per multi-proposal target. Results logged to `cleanup_history.jsonl`.
+  `RotateCleanupHistory` runs on startup (90-day retention)
 - **Single instance** — PID file at `~/.cabrero/daemon.pid` prevents concurrent daemons
 - **Rate limiting** — 30-second delay between processing sessions (configurable via `--delay`)
 - **Error isolation** — failed sessions marked `status: "error"` to prevent infinite retry;
@@ -562,6 +596,43 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 
 LaunchAgent plist template at `launchd/com.cabrero.daemon.plist` with `KeepAlive`,
 `RunAtLoad`, low-priority I/O, and `Nice: 10`.
+
+### Curator Stage (daily proposal cleanup)
+
+The Curator runs on a 24-hour ticker independent of the session pipeline. Its job is to
+prevent the proposal backlog from growing stale — synthesizing duplicates, culling
+low-signal redundancy, and auto-rejecting proposals that have already been applied.
+
+**Two-stage design:**
+
+**Stage 1 — Haiku batch check** (non-agentic, one call):
+- Collects all single-proposal file-target proposals.
+- Builds a `CheckItem` array with each proposal's ID, target, current file content, and
+  proposed change. File content is read directly by the Go code (not by the LLM).
+- Sends the array to `claude-haiku-4-5` via `--print`. The model returns a `CheckDecision`
+  array indicating which proposals are already applied.
+- Already-applied proposals are archived immediately. The rest are left for the next cycle.
+
+**Stage 2 — Sonnet Curator** (agentic, one session per multi-proposal target):
+- Groups proposals by target. Targets with 2+ non-scaffold proposals get a Curator session.
+- Scaffold proposals are never sent to the Curator — they bypass grouping into the check list.
+- Each Curator session receives the proposal list as its user prompt. The Curator reads the
+  target file using its `Read` tool, identifies concern clusters, and returns a `CuratorManifest`.
+- The daemon's `applyManifest` interprets decisions: `cull`/`auto-reject` → archive original;
+  `synthesize` → archive original, write new synthesized proposal; `keep` → no action.
+- All Curator sessions run in parallel (goroutines), sharing the existing invoke semaphore
+  for backpressure.
+
+**Isolation:** Curator sessions use `SettingSources: ""` to prevent loading user skills,
+plugins, or MCP servers. The Curator should not be influenced by the same skill infrastructure
+it is evaluating.
+
+**Audit trail:** Every cleanup run appends a `CleanupRecord` to `cleanup_history.jsonl`:
+timestamp, duration, before/after proposal counts, all `CuratorDecision` entries, and per-call
+`InvocationUsage` for the Haiku check and each Sonnet Curator session.
+
+**TUI surfacing:** Cleanup runs appear in the Pipeline Activity section as `CLEANUP` rows
+alongside session runs, showing archived count and cost.
 
 ---
 
