@@ -24,11 +24,58 @@ func TestBuildClaudeArgs_AgenticBaseline(t *testing.T) {
 	assertContains(t, args, "--system-prompt", "You are a classifier.")
 	assertContains(t, args, "--output-format", "json")
 	assertHasFlag(t, args, "--disable-slash-commands")
-	assertHasFlag(t, args, "--no-session-persistence")
+	// Agentic mode never uses --no-session-persistence; session is always persisted.
+	assertNotHasFlag(t, args, "--no-session-persistence")
 
 	// Should NOT have print-mode flags.
 	assertNotHasFlag(t, args, "--print")
 	assertNotHasFlag(t, args, "--tools")
+}
+
+func TestBuildClaudeArgs_AgenticAlwaysHasSessionID(t *testing.T) {
+	// With Debug=false, agentic mode must still generate --session-id
+	// and must NOT include --no-session-persistence.
+	cfg := claudeConfig{
+		Model:   "claude-haiku-4-5",
+		Agentic: true,
+		Prompt:  "test prompt",
+		Debug:   false,
+	}
+	args := buildClaudeArgs(cfg, "some-uuid")
+	hasSessionID := false
+	hasPersistFlag := false
+	for i, a := range args {
+		if a == "--session-id" && i+1 < len(args) {
+			hasSessionID = true
+		}
+		if a == "--no-session-persistence" {
+			hasPersistFlag = true
+		}
+	}
+	if !hasSessionID {
+		t.Error("agentic mode must include --session-id even when Debug=false")
+	}
+	if hasPersistFlag {
+		t.Error("agentic mode must not include --no-session-persistence")
+	}
+}
+
+func TestBuildClaudeArgs_PrintModeKeepsNoPersistence(t *testing.T) {
+	cfg := claudeConfig{
+		Model:   "claude-sonnet-4-6",
+		Agentic: false,
+		Debug:   false,
+	}
+	args := buildClaudeArgs(cfg, "")
+	hasNoPersist := false
+	for _, a := range args {
+		if a == "--no-session-persistence" {
+			hasNoPersist = true
+		}
+	}
+	if !hasNoPersist {
+		t.Error("print mode must keep --no-session-persistence")
+	}
 }
 
 func TestBuildClaudeArgs_PrintBaseline(t *testing.T) {
@@ -241,7 +288,8 @@ func TestBuildClaudeArgs_FullIsolation(t *testing.T) {
 	assertContains(t, args, "--allowedTools", "Read(//home/.cabrero/**),Grep(//home/.cabrero/**)")
 	assertContains(t, args, "--permission-mode", "dontAsk")
 	assertContains(t, args, "--setting-sources", "")
-	assertHasFlag(t, args, "--no-session-persistence")
+	// Agentic mode never uses --no-session-persistence.
+	assertNotHasFlag(t, args, "--no-session-persistence")
 }
 
 // --- cleanLLMJSON tests ---
