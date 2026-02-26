@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -110,5 +111,15 @@ func TestNewWiresPipelineLogger(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "wiring test ok") {
 		t.Errorf("expected 'wiring test ok' in daemon log, got:\n%s", string(data))
+	}
+}
+
+func TestDefaultConfigHasCleanupInterval(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.CleanupInterval == 0 {
+		t.Error("CleanupInterval should not be zero")
+	}
+	if cfg.CleanupInterval != 24*time.Hour {
+		t.Errorf("CleanupInterval: got %v, want 24h", cfg.CleanupInterval)
 	}
 }

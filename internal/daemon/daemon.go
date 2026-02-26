@@ -18,6 +18,7 @@ type Config struct {
 	PollInterval      time.Duration           // how often to check for pending sessions (default 2m)
 	StaleInterval     time.Duration           // how often to scan for stale sessions (default 30m)
 	InterSessionDelay time.Duration           // pause between processing sessions (default 30s)
+	CleanupInterval   time.Duration           // how often to run proposal cleanup (default 24h)
 	LogPath           string                  // path to daemon log file
 	LogMaxSize        int64                   // max log file size before rotation (default 5MB)
 	Pipeline          pipeline.PipelineConfig // LLM invocation parameters
@@ -29,6 +30,7 @@ func DefaultConfig() Config {
 		PollInterval:      2 * time.Minute,
 		StaleInterval:     30 * time.Minute,
 		InterSessionDelay: 30 * time.Second,
+		CleanupInterval:   24 * time.Hour,
 		LogPath:           filepath.Join(store.Root(), "daemon.log"),
 		LogMaxSize:        0, // use logger default (5 MB)
 		Pipeline:          pipeline.DefaultPipelineConfig(),
@@ -98,6 +100,13 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.log.Info("rotated %d old history records", removed)
 	}
 
+	// Rotate old cleanup history records on startup.
+	if removed, err := pipeline.RotateCleanupHistory(90 * 24 * time.Hour); err != nil {
+		d.log.Info("cleanup history rotation failed: %v", err)
+	} else if removed > 0 {
+		d.log.Info("rotated %d old cleanup history records", removed)
+	}
+
 	// Run an immediate scan on startup.
 	d.processQueued(ctx)
 
@@ -106,6 +115,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 
 	staleTicker := time.NewTicker(d.config.StaleInterval)
 	defer staleTicker.Stop()
+
+	cleanupTicker := time.NewTicker(d.config.CleanupInterval)
+	defer cleanupTicker.Stop()
 
 	for {
 		select {
@@ -116,6 +128,8 @@ func (d *Daemon) Run(ctx context.Context) error {
 			d.processQueued(ctx)
 		case <-staleTicker.C:
 			d.scanStale()
+		case <-cleanupTicker.C:
+			d.performCleanup(ctx)
 		}
 	}
 }
