@@ -876,7 +876,8 @@ throughout to ensure consistency.
 
 Target paths (skill file locations) replace the user's home directory prefix with `~`
 in both the dashboard list and detail header, keeping the meaningful suffix visible
-within the column width. A canonical `shared.ShortenHome()` function handles this.
+within the column width. A canonical `cli.ShortenHome()` function handles this;
+`tui/shared` imports it directly rather than maintaining a duplicate implementation.
 
 ### AI Chat Integration
 
@@ -1146,6 +1147,10 @@ uppercase (e.g. "PROPOSED CHANGE", "RATIONALE", "INFO", "RECENT CHANGES").
     `LogAppended` or `LogReplaced` messages that `logview.Update()` handles directly.
     The root model fires the command and schedules the next tick — it never touches
     file sizes or raw bytes.
+    Initial log content is loaded asynchronously: `pushView` initialises the log viewer
+    with empty content and dispatches a background `tea.Cmd` that reads the file and
+    returns `LogViewerContentLoaded`. This keeps the Bubble Tea event loop unblocked
+    while the file loads.
 
 **Phase 5 — Iteration tooling** ✓
 
@@ -1172,3 +1177,41 @@ uppercase (e.g. "PROPOSED CHANGE", "RATIONALE", "INFO", "RECENT CHANGES").
 - **Performance:** Pipeline config resolved once at TUI startup instead of on every
   5-second pipeline monitor tick. `RenderStatusBar` trimming is now O(N) via
   pre-computed widths.
+
+**Patch v0.20.3 — correctness, performance, and code health** ✓
+
+- **Correctness:** Dashboard proposal list and `PendingCount` now reload from disk after
+  every approve/reject/defer/dismiss action. Previously `m.proposals` was set at startup
+  and never updated, leaving acted-on items in the list until restart. The
+  `PipelineTickMsg` goroutine also captured `m.proposals` at scheduling time; it now
+  calls `pipeline.ListProposals()` inside the goroutine. A new `ProposalsRefreshed`
+  message type carries the reloaded list; `dashboard.Reload()` rebuilds the item list
+  in place without resetting cursor, sort order, or filter state. Reject and defer
+  operations sequence archive-then-reload in a single `tea.Cmd` to prevent a race where
+  the reload could read before archiving completes.
+- **Correctness:** `buildChatConfig` now propagates the `store.BlockSession` error
+  rather than discarding it with `_`. On failure the view transition is rolled back
+  (both `m.state` and `m.viewStack`) and a status bar message is shown; the daemon
+  safety guarantee (chat sessions not processed as proposals) is no longer silently
+  voided on disk errors.
+- **Performance:** `pipeline.Model` now caches `pipelineCfg` as a field, eliminating
+  the per-render-frame `DefaultPipelineConfig()` call (a `config.json` disk read) in
+  `renderModels()`. The cached value is threaded from `appModel` via `PipelineDataRefreshed`.
+- **Performance:** `store.ReadDebugFlag` and `store.ReadPipelineOverrides` now share a
+  single `readConfig()` helper that parses `config.json` once per call rather than each
+  function reading and parsing independently.
+- **Concurrency:** `storeDiskBytes` adds a `sync.Mutex` around the `cachedDiskBytes` /
+  `cachedDiskBytesTime` package-level vars to prevent a data race with background tick
+  goroutines. The lock is held through the `walkDiskBytes` call to prevent concurrent
+  redundant walks on cache miss.
+- **Architecture:** `internal/tui/shared` no longer duplicates `RelativeTime` and
+  `ShortenHome`; all TUI call sites now use `cli.RelativeTime` / `cli.ShortenHome`
+  directly. This also fixes a zero-time divergence bug where `shared.RelativeTime` would
+  produce `"471580d ago"` instead of `"unknown"` for a zero `time.Time`.
+- **Reliability:** Log viewer initial load is async (see log viewer section above).
+  `chatLog` uses `store.Root()` instead of a hardcoded `~/.cabrero` path. `cabrero proposals`
+  session ID display uses the canonical `store.ShortSessionID` (8 chars) to match all
+  other display sites.
+- **Tests:** `TestClassifierSignalsLocalSchema` in `internal/store` unmarshals a fixture
+  directly into the production `classifierSignals` type, catching JSON tag renames in
+  the store's local classifier struct projection.
