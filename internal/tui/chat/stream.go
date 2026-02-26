@@ -15,6 +15,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 )
 
@@ -264,11 +265,7 @@ func parseRevision(response string) *string {
 
 // chatLog appends a timestamped line to daemon.log for debug tracing.
 func chatLog(msg string) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-	logPath := filepath.Join(home, ".cabrero", "daemon.log")
+	logPath := filepath.Join(store.Root(), "daemon.log")
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return
