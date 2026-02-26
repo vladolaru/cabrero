@@ -5,6 +5,47 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Blocklist rotation** — `BlocklistEntry` records `blockedAt` timestamp per entry.
+  `RotateBlocklist(90d)` is called on daemon startup to prune stale records.
+  Old `[]string` JSON format is auto-migrated to the new `map[string]BlocklistEntry` format.
+- **Always-on session persistence** — CC session IDs are now generated and blocklisted for
+  ALL agentic pipeline invocations (not just debug mode). Debug mode is now verbosity-only.
+- **Format drift detection** — `Runner.parseSession` logs a warning whenever the CC transcript
+  contains unrecognised entry types, surfacing protocol changes immediately in `daemon.log`.
+- **Complete model config** — `PipelineConfig` now has named fields for every LLM-invoking
+  entity: `CuratorCheckModel`, `ApplyModel`, `ChatModel`, `MetaModel`. Hardcoded model strings
+  removed from `curator.go`, `apply.go`, `chat/stream.go`, and `tui/model.go`.
+- **Meta-pipeline thresholds** — `PipelineConfig` gains `MetaRejectionRateThreshold`,
+  `MetaClassifierFPRThreshold`, `MetaMinSamples`, `MetaCooldownDays`, `MetaMaxTurns`,
+  `MetaTimeout`. Configurable without rebuild.
+- **Typed `ArchiveOutcome` enum** — `Archive` writes `"outcome"` (approved/rejected/culled/
+  auto-rejected/deferred) and `"archivedAt"` instead of the old free-text `archiveReason`.
+  Old records are migrated on read.
+- **Archived outcome counting** — `GatherPipelineStatsFromSessions` now reads the archived
+  directory and populates `ProposalsApproved` and `ProposalsRejected` in the stats.
+- **Acceptance rate tracking** — `AcceptanceStats` type and `ListAcceptanceRateByPromptVersion`
+  join run history with archived proposals to compute per-prompt-version acceptance rates.
+- **New proposal types** — `TypePromptImprovement` (`"prompt_improvement"`) and
+  `TypePipelineInsight` (`"pipeline_insight"`). Both bypass curation/synthesis.
+  `[META]` badge shown in the proposal detail sub-header for these types.
+- **Meta-analyst prompt** — `EnsureMetaPrompts()` writes `~/.cabrero/prompts/meta-v1.txt`
+  on first meta-pipeline run. `MetaInterval` daemon config (default 24h).
+- **`ComputePipelineMetrics`** — reads run history and archived proposals to compute
+  classifier FPR, median turns per stage, and acceptance rates. No LLM calls.
+- **`RunMetaAnalysis`** — Opus-powered meta-analyst that identifies rejection patterns,
+  validates CC session transcripts, and writes a `prompt_improvement` proposal to the queue
+  when rejection rate exceeds the configured threshold.
+- **`performMetaRun` / `metaTicker`** — daily daemon stage that runs `ComputePipelineMetrics`
+  and fires `RunMetaAnalysis` per version when thresholds are exceeded. Respects a
+  `MetaCooldownDays` window to avoid spamming proposals for the same version.
+- **MODELS section expanded** — Pipeline Monitor TUI now shows all 7 model fields with
+  `(override)` indicators when a field differs from its compile-time default.
+- **METRICS section** — Pipeline Monitor TUI gains a new METRICS section showing classifier
+  FPR, per-version acceptance rate (most recent), and last meta-run timestamp.
+
 ## [0.21.0] - 2026-02-26
 
 ### Added

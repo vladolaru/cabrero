@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -395,9 +397,70 @@ func GatherPipelineStatsFromSessions(sessions []store.Metadata, runs []PipelineR
 		}
 	}
 
+	// Count archived proposal outcomes within the time window.
+	archivedDir := store.ArchivedProposalsDir()
+	if entries, err := os.ReadDir(archivedDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(archivedDir, entry.Name()))
+			if err != nil {
+				continue
+			}
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal(data, &raw); err != nil {
+				continue
+			}
+			// Check archivedAt is within window.
+			if atRaw, ok := raw["archivedAt"]; ok {
+				var at time.Time
+				if err := json.Unmarshal(atRaw, &at); err == nil && at.Before(cutoff) {
+					continue
+				}
+			}
+			// Determine outcome (new field, or migrate from archiveReason).
+			outcome := readArchivedOutcome(raw)
+			switch outcome {
+			case "approved":
+				stats.ProposalsApproved++
+			case "rejected", "culled", "auto-rejected":
+				stats.ProposalsRejected++
+			}
+		}
+	}
+
 	stats.SessionsPerDay = bucketSessionsByDay(timestamps, days, time.Now())
 
 	return stats, nil
+}
+
+// readArchivedOutcome reads the outcome from an archived proposal's raw JSON.
+// Falls back to migrating the old archiveReason field.
+func readArchivedOutcome(raw map[string]json.RawMessage) string {
+	if outcomeRaw, ok := raw["outcome"]; ok {
+		var o string
+		json.Unmarshal(outcomeRaw, &o)
+		if o != "" {
+			return o
+		}
+	}
+	// Migration: read old archiveReason.
+	if reasonRaw, ok := raw["archiveReason"]; ok {
+		var reason string
+		json.Unmarshal(reasonRaw, &reason)
+		switch {
+		case reason == "approved":
+			return "approved"
+		case strings.HasPrefix(reason, "rejected"):
+			return "rejected"
+		case strings.HasPrefix(reason, "auto-culled"):
+			return "culled"
+		case reason == "deferred":
+			return "deferred"
+		}
+	}
+	return ""
 }
 
 // bucketSessionsByDay groups timestamps into daily buckets relative to refTime.
@@ -508,4 +571,111 @@ func ListCleanupRunsFromHistory(limit int) ([]PipelineRun, error) {
 		runs = append(runs, run)
 	}
 	return runs, nil
+}
+
+// AcceptanceStats holds acceptance rate data for one evaluator prompt version.
+type AcceptanceStats struct {
+	PromptVersion  string
+	Generated      int
+	Approved       int
+	Rejected       int
+	AcceptanceRate float64 // Approved/(Approved+Rejected); math.NaN() if SampleSize==0
+	SampleSize     int     // Approved + Rejected (excludes culled/deferred)
+}
+
+// ListAcceptanceRateByPromptVersion joins run history with archived proposals
+// to compute acceptance rates per evaluator prompt version.
+// Returns one entry per version with ≥1 archived proposal, sorted most-recently-active first.
+func ListAcceptanceRateByPromptVersion() ([]AcceptanceStats, error) {
+	records, err := ReadHistory()
+	if err != nil {
+		return nil, err
+	}
+
+	type versionData struct {
+		lastSeen  time.Time
+		generated int
+		approved  int
+		rejected  int
+	}
+	byVersion := make(map[string]*versionData)
+	sessionToVersion := make(map[string]string)
+	for _, r := range records {
+		if r.EvaluatorPromptVersion == "" {
+			continue
+		}
+		sessionToVersion[r.SessionID] = r.EvaluatorPromptVersion
+		vd := byVersion[r.EvaluatorPromptVersion]
+		if vd == nil {
+			vd = &versionData{}
+			byVersion[r.EvaluatorPromptVersion] = vd
+		}
+		vd.generated += r.ProposalCount
+		if r.Timestamp.After(vd.lastSeen) {
+			vd.lastSeen = r.Timestamp
+		}
+	}
+
+	// Scan archived proposals, join on sessionId.
+	archivedDir := store.ArchivedProposalsDir()
+	entries, _ := os.ReadDir(archivedDir)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(archivedDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		var raw map[string]json.RawMessage
+		if json.Unmarshal(data, &raw) != nil {
+			continue
+		}
+		var sessionID string
+		json.Unmarshal(raw["sessionId"], &sessionID)
+		version := sessionToVersion[sessionID]
+		if version == "" {
+			continue
+		}
+		vd := byVersion[version]
+		if vd == nil {
+			continue
+		}
+		outcome := readArchivedOutcome(raw)
+		switch outcome {
+		case "approved":
+			vd.approved++
+		case "rejected":
+			vd.rejected++
+		// culled/auto-rejected/deferred excluded from SampleSize
+		}
+	}
+
+	// Build results, filter to versions with ≥1 archived proposal.
+	var result []AcceptanceStats
+	for version, vd := range byVersion {
+		sampleSize := vd.approved + vd.rejected
+		if sampleSize == 0 {
+			continue
+		}
+		rate := math.NaN()
+		if sampleSize > 0 {
+			rate = float64(vd.approved) / float64(sampleSize)
+		}
+		result = append(result, AcceptanceStats{
+			PromptVersion:  version,
+			Generated:      vd.generated,
+			Approved:       vd.approved,
+			Rejected:       vd.rejected,
+			AcceptanceRate: rate,
+			SampleSize:     sampleSize,
+		})
+	}
+	// Sort by lastSeen descending (most recently active version first).
+	sort.Slice(result, func(i, j int) bool {
+		vi := byVersion[result[i].PromptVersion]
+		vj := byVersion[result[j].PromptVersion]
+		return vi.lastSeen.After(vj.lastSeen)
+	})
+	return result, nil
 }

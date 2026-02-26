@@ -19,6 +19,7 @@ type Config struct {
 	StaleInterval     time.Duration           // how often to scan for stale sessions (default 30m)
 	InterSessionDelay time.Duration           // pause between processing sessions (default 30s)
 	CleanupInterval   time.Duration           // how often to run proposal cleanup (default 24h)
+	MetaInterval      time.Duration           // how often to run the meta-pipeline (default 24h)
 	LogPath           string                  // path to daemon log file
 	LogMaxSize        int64                   // max log file size before rotation (default 5MB)
 	Pipeline          pipeline.PipelineConfig // LLM invocation parameters
@@ -31,6 +32,7 @@ func DefaultConfig() Config {
 		StaleInterval:     30 * time.Minute,
 		InterSessionDelay: 30 * time.Second,
 		CleanupInterval:   24 * time.Hour,
+		MetaInterval:      24 * time.Hour,
 		LogPath:           filepath.Join(store.Root(), "daemon.log"),
 		LogMaxSize:        0, // use logger default (5 MB)
 		Pipeline:          pipeline.DefaultPipelineConfig(),
@@ -126,6 +128,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 	cleanupTicker := time.NewTicker(d.config.CleanupInterval)
 	defer cleanupTicker.Stop()
 
+	metaTicker := time.NewTicker(d.config.MetaInterval)
+	defer metaTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -137,6 +142,8 @@ func (d *Daemon) Run(ctx context.Context) error {
 			d.scanStale()
 		case <-cleanupTicker.C:
 			d.performCleanup(ctx)
+		case <-metaTicker.C:
+			d.performMetaRun(ctx)
 		}
 	}
 }

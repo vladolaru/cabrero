@@ -97,8 +97,15 @@ type EvaluatorOutput struct {
 	NoProposalReason        *string    `json:"noProposalReason"`
 }
 
+// Proposal type constants.
+const (
+	TypePromptImprovement = "prompt_improvement" // meta-pipeline: prompt file edits
+	TypePipelineInsight   = "pipeline_insight"   // pure-code observation, no change field
+)
+
 // Proposal describes a suggested improvement from the Evaluator.
-// Types: skill_improvement, claude_review, claude_addition, skill_scaffold.
+// Types: skill_improvement, claude_review, claude_addition, skill_scaffold,
+// prompt_improvement, pipeline_insight.
 type Proposal struct {
 	ID                   string   `json:"id"`
 	Type                 string   `json:"type"`

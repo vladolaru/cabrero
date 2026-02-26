@@ -99,8 +99,44 @@ func Commit(proposal *pipeline.Proposal, blendedContent string) error {
 	return nil
 }
 
-// Archive moves a proposal from proposals/ to proposals/archived/.
-func Archive(proposalID string, reason string) error {
+// ArchiveOutcome is the typed outcome of a proposal archival.
+type ArchiveOutcome string
+
+const (
+	OutcomeApproved     ArchiveOutcome = "approved"
+	OutcomeRejected     ArchiveOutcome = "rejected"
+	OutcomeCulled       ArchiveOutcome = "culled"        // curator rank-cull
+	OutcomeAutoRejected ArchiveOutcome = "auto-rejected" // curator already-applied
+	OutcomeDeferred     ArchiveOutcome = "deferred"
+)
+
+// readArchiveOutcome migrates old free-text archiveReason strings to ArchiveOutcome.
+// Returns OutcomeRejected for unrecognised strings (safe default).
+func readArchiveOutcome(raw map[string]json.RawMessage) ArchiveOutcome {
+	reasonRaw, ok := raw["archiveReason"]
+	if !ok {
+		return OutcomeRejected // unknown
+	}
+	var reason string
+	json.Unmarshal(reasonRaw, &reason)
+	switch {
+	case reason == "approved":
+		return OutcomeApproved
+	case reason == "deferred":
+		return OutcomeDeferred
+	case strings.HasPrefix(reason, "rejected"):
+		return OutcomeRejected
+	case strings.HasPrefix(reason, "auto-culled"):
+		return OutcomeCulled
+	default:
+		return OutcomeRejected
+	}
+}
+
+// Archive moves a proposal to proposals/archived/ with a typed outcome.
+// note is an optional human-written reason (empty string for curator calls).
+// archiveReason is NOT written; outcome + archivedAt replace it.
+func Archive(proposalID string, outcome ArchiveOutcome, note string) error {
 	if err := pipeline.ValidateProposalID(proposalID); err != nil {
 		return err
 	}
@@ -115,7 +151,7 @@ func Archive(proposalID string, reason string) error {
 	src := filepath.Join(srcDir, proposalID+".json")
 	dst := filepath.Join(dstDir, proposalID+".json")
 
-	// Read, annotate with reason, write to archive.
+	// Read, annotate with outcome, write to archive.
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("reading proposal: %w", err)
@@ -126,10 +162,14 @@ func Archive(proposalID string, reason string) error {
 		return fmt.Errorf("parsing proposal: %w", err)
 	}
 
-	if reason != "" {
-		reasonJSON, _ := json.Marshal(reason)
-		raw["archiveReason"] = reasonJSON
-	}
+	outcomeJSON, _ := json.Marshal(string(outcome))
+	raw["outcome"] = outcomeJSON
+
+	archivedAtJSON, _ := json.Marshal(time.Now())
+	raw["archivedAt"] = archivedAtJSON
+
+	// Do NOT write "archiveReason" — reads use readArchiveOutcome for migration.
+	delete(raw, "archiveReason") // remove if present from old data
 
 	annotated, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {

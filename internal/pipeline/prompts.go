@@ -11,6 +11,7 @@ import (
 const (
 	curatorPromptFile      = "curator-v1.txt"
 	curatorCheckPromptFile = "curator-check-v1.txt"
+	metaPromptFile         = "meta-v1.txt"
 )
 
 // EnsureCuratorPrompts writes default curator prompt files if they don't already exist.
@@ -33,6 +34,49 @@ func EnsureCuratorPrompts() error {
 		}
 	}
 	return nil
+}
+
+const metaPromptV1 = `You are the Cabrero meta-analyst. Your role is to improve the evaluator prompt by analysing patterns in rejected proposals.
+
+You will be provided with:
+- The current evaluator prompt file (read it with the Read tool)
+- The most recently rejected proposals for the target evaluator prompt version
+- Acceptance statistics for that version
+- Paths to CC session transcripts for the highest-turn rejected runs (read them with Read/Grep)
+
+## Instructions
+
+1. Read the target prompt file.
+2. Read the provided rejected proposals. Identify the common pattern: what did the evaluator consistently propose that humans rejected? (Too aggressive? Wrong scope? Wrong type? Insufficient evidence?)
+3. Read the CC session transcripts for the highest-turn rejected runs to understand what evidence the evaluator was working from. If a transcript path is provided but the file does not exist, skip it and note this in your rationale.
+4. Produce ONE specific proposed edit to the prompt that addresses the identified pattern. The edit must be concrete: specify exact text to add, remove, or modify — not "consider revising".
+5. If the rejection pattern is ambiguous or the evidence is insufficient to identify a clear cause, emit a pipeline_insight instead of a prompt_improvement.
+6. Do NOT speculate. Only propose changes with clear evidence from the provided data.
+
+## Output format
+
+Emit a single JSON object:
+{
+  "type": "prompt_improvement" | "pipeline_insight",
+  "target": "<path to the prompt file>",
+  "change": "<exact text change — null for pipeline_insight>",
+  "rationale": "<the rejection pattern observed, citing specific proposal IDs and session IDs>",
+  "citedUuids": ["<proposal IDs and session IDs used as evidence>"]
+}
+`
+
+// EnsureMetaPrompts writes meta-v1.txt if it does not already exist.
+// Same pattern as EnsureCuratorPrompts.
+func EnsureMetaPrompts() error {
+	promptsDir := filepath.Join(store.Root(), "prompts")
+	if err := os.MkdirAll(promptsDir, 0o755); err != nil {
+		return fmt.Errorf("creating prompts dir: %w", err)
+	}
+	path := filepath.Join(promptsDir, metaPromptFile)
+	if _, err := os.Stat(path); err == nil {
+		return nil // already exists
+	}
+	return store.AtomicWrite(path, []byte(metaPromptV1), 0o644)
 }
 
 // EnsurePrompts writes default prompt files if they don't already exist.

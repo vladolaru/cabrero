@@ -47,12 +47,7 @@ func Reject(args []string) error {
 		}
 	}
 
-	archiveReason := "rejected"
-	if *reason != "" {
-		archiveReason = "rejected: " + *reason
-	}
-
-	if err := apply.Archive(p.ID, archiveReason); err != nil {
+	if err := apply.Archive(p.ID, apply.OutcomeRejected, *reason); err != nil {
 		return fmt.Errorf("archive failed: %w", err)
 	}
 

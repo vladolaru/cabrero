@@ -129,7 +129,7 @@ func TestModelViewNarrowLayout(t *testing.T) {
 
 func TestModelViewStandardLayout(t *testing.T) {
 	m := newTestModel()
-	m.SetSize(100, 50) // standard mode (80-119)
+	m.SetSize(100, 80) // standard mode (80-119), tall enough for all sections
 	view := ansi.Strip(m.View())
 
 	// All sections present, stacked (not side-by-side).
@@ -357,5 +357,17 @@ func TestRenderModels_ShowsAllFields(t *testing.T) {
 		if !strings.Contains(rendered, want) {
 			t.Errorf("MODELS section missing %q line", want)
 		}
+	}
+}
+
+func TestRenderMetrics_ShowsHeader(t *testing.T) {
+	m := newTestModel()
+	rendered := ansi.Strip(m.renderMetrics())
+
+	if !strings.Contains(rendered, "METRICS") {
+		t.Error("missing METRICS section header")
+	}
+	if !strings.Contains(rendered, "Classifier FPR") {
+		t.Error("missing Classifier FPR line")
 	}
 }

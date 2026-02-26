@@ -167,3 +167,13 @@ func TestCleanLLMJSONArray(t *testing.T) {
 		t.Errorf("unmarshal failed: %v", err)
 	}
 }
+
+func TestNewProposalTypes_Defined(t *testing.T) {
+	// Verify string values match what the design specifies.
+	if TypePromptImprovement != "prompt_improvement" {
+		t.Errorf("TypePromptImprovement = %q", TypePromptImprovement)
+	}
+	if TypePipelineInsight != "pipeline_insight" {
+		t.Errorf("TypePipelineInsight = %q", TypePipelineInsight)
+	}
+}

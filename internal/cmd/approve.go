@@ -64,7 +64,7 @@ func Approve(args []string) error {
 	}
 
 	// Archive proposal.
-	if err := apply.Archive(p.ID, "approved"); err != nil {
+	if err := apply.Archive(p.ID, apply.OutcomeApproved, ""); err != nil {
 		return fmt.Errorf("archive failed: %w", err)
 	}
 

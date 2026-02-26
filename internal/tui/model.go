@@ -177,7 +177,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return message.ApplyFinished{ProposalID: proposalID, Err: err}
 					}
 				}
-				if err := apply.Archive(proposalID, "approved"); err != nil {
+				if err := apply.Archive(proposalID, apply.OutcomeApproved, ""); err != nil {
 					return message.ApplyFinished{ProposalID: proposalID, Err: err}
 				}
 				return message.ApplyFinished{ProposalID: proposalID}
@@ -197,7 +197,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return message.StatusMessage{Text: actionStatusText(msg), Duration: 3 * time.Second}
 		})
 		cmds = append(cmds, func() tea.Msg {
-			if err := apply.Archive(proposalID, "rejected"); err != nil {
+			if err := apply.Archive(proposalID, apply.OutcomeRejected, ""); err != nil {
 				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
 			}
 			proposals, _ := pipeline.ListProposals()
@@ -217,7 +217,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return message.StatusMessage{Text: actionStatusText(msg), Duration: 3 * time.Second}
 		})
 		cmds = append(cmds, func() tea.Msg {
-			if err := apply.Archive(proposalID, "deferred"); err != nil {
+			if err := apply.Archive(proposalID, apply.OutcomeDeferred, ""); err != nil {
 				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
 			}
 			proposals, _ := pipeline.ListProposals()

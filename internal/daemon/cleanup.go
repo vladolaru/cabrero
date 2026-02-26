@@ -12,9 +12,22 @@ import (
 
 // groupProposalsByTarget separates proposals into:
 //   - multi: targets with 2+ proposals (map from target → proposals)
+// preservedTypes lists proposal types that are never synthesised or culled by
+// the curator. They always bypass curation and are treated as single proposals.
+var preservedTypes = map[string]bool{
+	"skill_scaffold":              true,
+	pipeline.TypePromptImprovement: true,
+	pipeline.TypePipelineInsight:   true,
+}
+
+// isPreservedType returns true if the proposal type bypasses curation.
+func isPreservedType(t string) bool {
+	return preservedTypes[t]
+}
+
 //   - single: file-target proposals that are the only proposal for their target
 //
-// Scaffolds in multi targets are moved to single (they are never curated).
+// Preserved types in multi targets are moved to single (they are never curated).
 // Non-file targets are excluded from single (no "already applied?" check possible).
 func groupProposalsByTarget(proposals []pipeline.ProposalWithSession) (
 	multi map[string][]pipeline.ProposalWithSession,
@@ -30,13 +43,13 @@ func groupProposalsByTarget(proposals []pipeline.ProposalWithSession) (
 		// Split scaffolds out regardless of group size.
 		var nonScaffold, scaffold []pipeline.ProposalWithSession
 		for _, pw := range group {
-			if pw.Proposal.Type == "skill_scaffold" {
+			if isPreservedType(pw.Proposal.Type) {
 				scaffold = append(scaffold, pw)
 			} else {
 				nonScaffold = append(nonScaffold, pw)
 			}
 		}
-		// Scaffolds always go to single (kept as-is, no curation).
+		// Preserved types always go to single (kept as-is, no curation).
 		for _, pw := range scaffold {
 			if pipeline.IsFileTarget(pw.Proposal.Target) {
 				single = append(single, pw)
@@ -95,7 +108,7 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 			for _, cd := range checkDecisions {
 				if cd.AlreadyApplied {
 					reason := "auto-culled: already applied to target"
-					if archErr := apply.Archive(cd.ProposalID, reason); archErr != nil {
+					if archErr := apply.Archive(cd.ProposalID, apply.OutcomeAutoRejected, reason); archErr != nil {
 						d.log.Error("cleanup: archiving %s: %v", cd.ProposalID, archErr)
 						continue
 					}
@@ -212,17 +225,17 @@ func (d *Daemon) applyManifest(manifest *pipeline.CuratorManifest) error {
 		switch dec.Action {
 		case "cull":
 			reason := "auto-culled: " + dec.Reason
-			if err := apply.Archive(dec.ProposalID, reason); err != nil {
+			if err := apply.Archive(dec.ProposalID, apply.OutcomeCulled, reason); err != nil {
 				d.log.Error("cleanup: archiving %s: %v", dec.ProposalID, err)
 			}
 		case "auto-reject":
 			reason := "auto-culled: " + dec.Reason
-			if err := apply.Archive(dec.ProposalID, reason); err != nil {
+			if err := apply.Archive(dec.ProposalID, apply.OutcomeAutoRejected, reason); err != nil {
 				d.log.Error("cleanup: archiving %s: %v", dec.ProposalID, err)
 			}
 		case "synthesize":
 			reason := "auto-culled: synthesized into " + dec.SupersededBy
-			if err := apply.Archive(dec.ProposalID, reason); err != nil {
+			if err := apply.Archive(dec.ProposalID, apply.OutcomeCulled, reason); err != nil {
 				d.log.Error("cleanup: archiving %s: %v", dec.ProposalID, err)
 			}
 		case "keep":

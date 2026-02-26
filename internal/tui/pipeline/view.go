@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -330,6 +331,39 @@ func (m Model) renderPrompts() string {
 			b.WriteString("\n")
 		}
 	}
+	return b.String()
+}
+
+func (m Model) renderMetrics() string {
+	var b strings.Builder
+	b.WriteString(shared.RenderSectionHeader("METRICS"))
+	b.WriteString("\n")
+
+	pm := m.pipelineMetrics
+
+	fprStr := "n/a"
+	if !math.IsNaN(pm.ClassifierFPR) {
+		fprStr = fmt.Sprintf("%.0f%%", pm.ClassifierFPR*100)
+	}
+	b.WriteString(fmt.Sprintf("  Classifier FPR: %s  (last %dd)\n", fprStr, pm.ClassifierFPRWindow))
+
+	if len(pm.AcceptanceByVersion) > 0 {
+		// Show the most recently active version.
+		latest := pm.AcceptanceByVersion[0]
+		rateStr := "n/a"
+		if !math.IsNaN(latest.AcceptanceRate) {
+			rateStr = fmt.Sprintf("%.0f%%", latest.AcceptanceRate*100)
+		}
+		b.WriteString(fmt.Sprintf("  Acceptance (%s): %s  (%d samples)\n",
+			latest.PromptVersion, rateStr, latest.SampleSize))
+	} else {
+		b.WriteString("  Acceptance: no data yet\n")
+	}
+
+	if !pm.ComputedAt.IsZero() {
+		b.WriteString(fmt.Sprintf("  Last meta run: %s", cli.RelativeTime(pm.ComputedAt)))
+	}
+
 	return b.String()
 }
 

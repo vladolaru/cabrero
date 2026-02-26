@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/vladolaru/cabrero/internal/cli"
+	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
@@ -15,7 +16,11 @@ func (m Model) SubHeader() string {
 		return shared.RenderSubHeader("  Proposal Detail", "")
 	}
 	p := &m.proposal.Proposal
-	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s", p.Type, cli.ShortenHome(p.Target), p.Confidence)
+	badge := ""
+	if p.Type == pipeline.TypePromptImprovement || p.Type == pipeline.TypePipelineInsight {
+		badge = "  [META]"
+	}
+	statsLine := fmt.Sprintf("  %s%s  ·  %s  ·  %s", p.Type, badge, cli.ShortenHome(p.Target), p.Confidence)
 	return shared.RenderSubHeader("  Proposal Detail", statsLine)
 }
 

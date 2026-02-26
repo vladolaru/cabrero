@@ -21,21 +21,22 @@ type statusClearMsg struct{}
 
 // Model is the pipeline monitor view model.
 type Model struct {
-	runs        []pl.PipelineRun
-	stats       pl.PipelineStats
-	prompts     []pl.PromptVersion
-	dashStats   message.DashboardStats
-	pipelineCfg pl.PipelineConfig
-	cursor      int
-	expandedIdx int // -1 means no run expanded
-	confirm     components.ConfirmModel
-	retrying    string // session ID being retried, "" if none
-	statusMsg   string // timed status bar message (e.g. "Refreshing…")
-	width       int
-	height      int
-	viewport    viewport.Model
-	keys        *shared.KeyMap
-	config      *shared.Config
+	runs            []pl.PipelineRun
+	stats           pl.PipelineStats
+	prompts         []pl.PromptVersion
+	dashStats       message.DashboardStats
+	pipelineCfg     pl.PipelineConfig
+	pipelineMetrics pl.PipelineMetrics
+	cursor          int
+	expandedIdx     int // -1 means no run expanded
+	confirm         components.ConfirmModel
+	retrying        string // session ID being retried, "" if none
+	statusMsg       string // timed status bar message (e.g. "Refreshing…")
+	width           int
+	height          int
+	viewport        viewport.Model
+	keys            *shared.KeyMap
+	config          *shared.Config
 }
 
 // New creates a pipeline monitor model with loaded data.
@@ -80,6 +81,7 @@ func (m *Model) refreshViewport() {
 	sections = append(sections, m.renderRecentRuns())
 	if m.layoutMode() != layoutNarrow {
 		sections = append(sections, m.renderModels())
+		sections = append(sections, m.renderMetrics())
 	}
 	if len(m.prompts) > 0 && m.layoutMode() != layoutNarrow {
 		sections = append(sections, m.renderPrompts())

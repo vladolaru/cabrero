@@ -1,9 +1,14 @@
 package pipeline
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/vladolaru/cabrero/internal/store"
 )
 
 func TestPromptVersionParsing(t *testing.T) {
@@ -222,5 +227,89 @@ func TestListCleanupRunsFromHistory(t *testing.T) {
 	}
 	if run.ProposalCount != 52 { // 64 - 12 = 52 archived
 		t.Errorf("ProposalCount: got %d, want 52", run.ProposalCount)
+	}
+}
+
+func TestGatherPipelineStatsFromSessions_CountsArchivedOutcomes(t *testing.T) {
+	tmp := t.TempDir()
+	old := store.RootOverrideForTest(tmp)
+	defer store.ResetRootOverrideForTest(old)
+	store.Init()
+
+	archivedDir := filepath.Join(tmp, "proposals", "archived")
+	os.MkdirAll(archivedDir, 0o755)
+
+	now := time.Now()
+	// Write two archived proposals: one approved, one rejected.
+	writeArchivedProp := func(id, outcome string) {
+		data := fmt.Sprintf(`{"sessionId":"sess-1","outcome":%q,"archivedAt":%q}`,
+			outcome, now.Format(time.RFC3339))
+		os.WriteFile(filepath.Join(archivedDir, id+".json"), []byte(data), 0o644)
+	}
+	writeArchivedProp("prop-aaa-1", "approved")
+	writeArchivedProp("prop-bbb-1", "rejected")
+
+	stats, err := GatherPipelineStatsFromSessions(nil, nil, 30)
+	if err != nil {
+		t.Fatalf("GatherPipelineStatsFromSessions: %v", err)
+	}
+	if stats.ProposalsApproved != 1 {
+		t.Errorf("ProposalsApproved = %d, want 1", stats.ProposalsApproved)
+	}
+	if stats.ProposalsRejected != 1 {
+		t.Errorf("ProposalsRejected = %d, want 1", stats.ProposalsRejected)
+	}
+}
+
+func TestListAcceptanceRateByPromptVersion(t *testing.T) {
+	tmp := t.TempDir()
+	old := store.RootOverrideForTest(tmp)
+	defer store.ResetRootOverrideForTest(old)
+	store.Init()
+
+	// Write history: session sess-001 used evaluator-v3, generated 2 proposals.
+	histPath := filepath.Join(tmp, "run_history.jsonl")
+	now := time.Now()
+	rec := HistoryRecord{
+		SessionID:              "sess-001",
+		Timestamp:              now,
+		Status:                 "processed",
+		EvaluatorPromptVersion: "evaluator-v3",
+		ProposalCount:          2,
+	}
+	data, _ := json.Marshal(rec)
+	os.WriteFile(histPath, append(data, '\n'), 0o644)
+
+	// Write archived proposals for sess-001: 1 approved, 1 rejected.
+	archivedDir := filepath.Join(tmp, "proposals", "archived")
+	os.MkdirAll(archivedDir, 0o755)
+	writeArchived := func(id, outcome string) {
+		d := fmt.Sprintf(`{"sessionId":"sess-001","outcome":%q,"archivedAt":%q}`,
+			outcome, now.Format(time.RFC3339))
+		os.WriteFile(filepath.Join(archivedDir, id+".json"), []byte(d), 0o644)
+	}
+	writeArchived("prop-001-1", "approved")
+	writeArchived("prop-001-2", "rejected")
+
+	stats, err := ListAcceptanceRateByPromptVersion()
+	if err != nil {
+		t.Fatalf("ListAcceptanceRateByPromptVersion: %v", err)
+	}
+	if len(stats) != 1 {
+		t.Fatalf("len(stats) = %d, want 1", len(stats))
+	}
+	s := stats[0]
+	if s.PromptVersion != "evaluator-v3" {
+		t.Errorf("PromptVersion = %q", s.PromptVersion)
+	}
+	if s.Approved != 1 || s.Rejected != 1 {
+		t.Errorf("Approved=%d Rejected=%d, want 1/1", s.Approved, s.Rejected)
+	}
+	if s.SampleSize != 2 {
+		t.Errorf("SampleSize = %d, want 2", s.SampleSize)
+	}
+	// AcceptanceRate = 1/2 = 0.5
+	if s.AcceptanceRate < 0.49 || s.AcceptanceRate > 0.51 {
+		t.Errorf("AcceptanceRate = %f, want ~0.5", s.AcceptanceRate)
 	}
 }
