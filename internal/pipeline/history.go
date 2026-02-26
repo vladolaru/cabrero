@@ -30,7 +30,17 @@ func usageFromResult(cr *ClaudeResult) *InvocationUsage {
 	if cr == nil {
 		return nil
 	}
-	return &InvocationUsage{
+	u := InvocationUsageFromResult(cr)
+	return &u
+}
+
+// InvocationUsageFromResult converts a ClaudeResult into an InvocationUsage.
+// Returns zero value if cr is nil.
+func InvocationUsageFromResult(cr *ClaudeResult) InvocationUsage {
+	if cr == nil {
+		return InvocationUsage{}
+	}
+	return InvocationUsage{
 		CCSessionID:         cr.SessionID,
 		NumTurns:            cr.NumTurns,
 		InputTokens:         cr.InputTokens,
