@@ -1,5 +1,115 @@
 package pipeline
 
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// IsFileTarget returns true if target looks like a filesystem path
+// (starts with "/" or "~/" or contains a path separator) rather than
+// a source name like "local-environment" or "pirategoat-tools:foo".
+func IsFileTarget(target string) bool {
+	if target == "" {
+		return false
+	}
+	if strings.HasPrefix(target, "/") || strings.HasPrefix(target, "~/") {
+		return true
+	}
+	// Contains path separator — likely a relative path.
+	if strings.Contains(target, string(filepath.Separator)) {
+		return true
+	}
+	return false
+}
+
+// CheckItem is one entry in the Haiku batch check prompt.
+type CheckItem struct {
+	ProposalID         string `json:"proposalId"`
+	Target             string `json:"target"`
+	CurrentFileContent string `json:"currentFileContent"`
+	ProposedChange     string `json:"proposedChange"`
+}
+
+// RunCuratorCheck sends all single-proposal file-target proposals to Haiku
+// in one non-agentic --print call to check if their changes are already applied.
+// Returns a slice of CheckDecision (same length and order as items) and usage.
+// proposals must only contain file-target proposals (IsFileTarget == true).
+func RunCuratorCheck(proposals []ProposalWithSession, cfg PipelineConfig) ([]CheckDecision, *ClaudeResult, error) {
+	if len(proposals) == 0 {
+		return nil, nil, nil
+	}
+
+	if err := EnsureCuratorPrompts(); err != nil {
+		return nil, nil, fmt.Errorf("ensuring curator prompts: %w", err)
+	}
+
+	systemPrompt, err := readPromptTemplate(curatorCheckPromptFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading curator check prompt: %w", err)
+	}
+
+	// Build check items — read each target file.
+	items := make([]CheckItem, 0, len(proposals))
+	for _, pw := range proposals {
+		p := pw.Proposal
+		change := ""
+		if p.Change != nil {
+			change = *p.Change
+		} else if p.FlaggedEntry != nil {
+			change = *p.FlaggedEntry
+		}
+		content := readFileOrEmpty(p.Target)
+		items = append(items, CheckItem{
+			ProposalID:         p.ID,
+			Target:             p.Target,
+			CurrentFileContent: content,
+			ProposedChange:     change,
+		})
+	}
+
+	inputJSON, err := json.Marshal(items)
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshaling check items: %w", err)
+	}
+
+	cr, err := invokeClaude(claudeConfig{
+		Model:        cfg.ClassifierModel, // Haiku
+		SystemPrompt: systemPrompt,
+		Agentic:      false,
+		Stdin:        strings.NewReader(string(inputJSON)),
+		Timeout:      cfg.CuratorCheckTimeout,
+	})
+	if err != nil {
+		return nil, cr, fmt.Errorf("curator check invocation failed: %w", err)
+	}
+
+	cleaned := cleanLLMJSON(cr.Result)
+	var decisions []CheckDecision
+	if err := json.Unmarshal([]byte(cleaned), &decisions); err != nil {
+		return nil, cr, fmt.Errorf("parsing curator check output: %w", err)
+	}
+	return decisions, cr, nil
+}
+
+// readFileOrEmpty reads a file, expanding "~/" prefix, returning "" on error.
+func readFileOrEmpty(target string) string {
+	path := target
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			path = filepath.Join(home, path[2:])
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
 // CuratorDecision is one per-proposal action from the Curator.
 type CuratorDecision struct {
 	ProposalID   string `json:"proposalId"`

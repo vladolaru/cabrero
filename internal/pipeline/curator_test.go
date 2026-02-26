@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -89,5 +90,37 @@ func TestCheckDecisionRoundtrip(t *testing.T) {
 	}
 	if got != d {
 		t.Errorf("got %+v, want %+v", got, d)
+	}
+}
+
+func TestIsFileTarget(t *testing.T) {
+	cases := []struct {
+		target string
+		want   bool
+	}{
+		{"/Users/foo/.claude/CLAUDE.md", true},
+		{"~/claude/skills/foo.md", true},
+		{"local-environment", false},
+		{"write-moltres-snap", false},
+		{"pirategoat-tools:ingest-code-review", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		got := IsFileTarget(c.target)
+		if got != c.want {
+			t.Errorf("IsFileTarget(%q) = %v, want %v", c.target, got, c.want)
+		}
+	}
+}
+
+func TestCleanLLMJSONArray(t *testing.T) {
+	input := "```json\n[{\"proposalId\": \"p1\", \"alreadyApplied\": false}]\n```"
+	got := cleanLLMJSON(input)
+	if !strings.HasPrefix(got, "[") {
+		t.Errorf("expected array, got: %s", got)
+	}
+	var out []CheckDecision
+	if err := json.Unmarshal([]byte(got), &out); err != nil {
+		t.Errorf("unmarshal failed: %v", err)
 	}
 }

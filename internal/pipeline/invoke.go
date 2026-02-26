@@ -387,14 +387,14 @@ func cleanLLMJSON(raw string) string {
 		s = strings.TrimSpace(s)
 	}
 
-	// If it already starts with '{', we're done.
-	if strings.HasPrefix(s, "{") {
+	// If it already starts with '{' or '[', we're done.
+	if strings.HasPrefix(s, "{") || strings.HasPrefix(s, "[") {
 		return s
 	}
 
 	// LLMs sometimes emit prose before the JSON object (e.g. "Based on my
 	// analysis, here is the classification:"). Look for a markdown fence
-	// embedded in the prose, or failing that, the first '{'.
+	// embedded in the prose, or failing that, the first '{' or '['.
 
 	// Check for an embedded ```json ... ``` block within the prose.
 	if fenceStart := strings.Index(s, "```json"); fenceStart != -1 {
@@ -406,7 +406,7 @@ func cleanLLMJSON(raw string) string {
 			inner = inner[:fenceEnd]
 		}
 		inner = strings.TrimSpace(inner)
-		if strings.HasPrefix(inner, "{") {
+		if strings.HasPrefix(inner, "{") || strings.HasPrefix(inner, "[") {
 			return inner
 		}
 	}
@@ -416,17 +416,22 @@ func cleanLLMJSON(raw string) string {
 			inner = inner[:fenceEnd]
 		}
 		inner = strings.TrimSpace(inner)
-		if strings.HasPrefix(inner, "{") {
+		if strings.HasPrefix(inner, "{") || strings.HasPrefix(inner, "[") {
 			return inner
 		}
 	}
 
-	// Last resort: find the first '{' and match to the last '}'.
-	braceStart := strings.Index(s, "{")
+	// Last resort: find the first JSON value start: '{' (object) or '[' (array).
+	braceStart := strings.IndexAny(s, "{[")
 	if braceStart == -1 {
-		return s // no JSON object found; return as-is for the caller to report
+		return s // no JSON found; return as-is for the caller to report
 	}
-	braceEnd := strings.LastIndex(s, "}")
+	openChar := s[braceStart]
+	closeChar := byte('}')
+	if openChar == '[' {
+		closeChar = ']'
+	}
+	braceEnd := strings.LastIndexByte(s, closeChar)
 	if braceEnd == -1 || braceEnd < braceStart {
 		return s
 	}
