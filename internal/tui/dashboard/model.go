@@ -91,6 +91,7 @@ type Model struct {
 	sortOrder    string
 	keys         *shared.KeyMap
 	config       *shared.Config
+	reports      []fitness.Report // kept for Reload after proposal-only refreshes
 }
 
 // New creates a dashboard model with loaded data.
@@ -115,6 +116,7 @@ func New(proposals []pipeline.ProposalWithSession, reports []fitness.Report,
 		sortOrder: sortOrder,
 		keys:      keys,
 		config:    cfg,
+		reports:   reports,
 	}
 }
 
@@ -267,4 +269,17 @@ func (m *Model) CycleSortOrder() tea.Cmd {
 func (m *Model) applySort() tea.Cmd {
 	sorted := sortItems(m.items, m.sortOrder)
 	return m.list.SetItems(toListItems(sorted))
+}
+
+// Reload replaces the proposal list and header stats without resetting cursor, sort order, or filter.
+// The existing fitness reports stored on the model are preserved.
+// Returns the updated model and any cmd from SetItems (non-nil when a filter is active).
+func (m Model) Reload(proposals []pipeline.ProposalWithSession, stats message.DashboardStats) (Model, tea.Cmd) {
+	m.stats = stats
+	// m.reports is preserved — fitness reports are not reloaded here.
+	items := buildItems(proposals, m.reports)
+	m.items = items
+	sorted := sortItems(items, m.sortOrder)
+	cmd := m.list.SetItems(toListItems(sorted))
+	return m, cmd
 }

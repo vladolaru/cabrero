@@ -200,7 +200,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := apply.Archive(proposalID, "rejected"); err != nil {
 				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
 			}
-			return nil
+			proposals, _ := pipeline.ListProposals()
+			return message.ProposalsRefreshed{Proposals: proposals}
 		})
 		return m, tea.Batch(cmds...)
 
@@ -219,7 +220,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := apply.Archive(proposalID, "deferred"); err != nil {
 				return message.StatusMessage{Text: "Archive failed: " + err.Error(), Duration: 3 * time.Second}
 			}
-			return nil
+			proposals, _ := pipeline.ListProposals()
+			return message.ProposalsRefreshed{Proposals: proposals}
 		})
 		return m, tea.Batch(cmds...)
 
@@ -238,6 +240,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, func() tea.Msg {
 			return message.StatusMessage{Text: statusText, Duration: 3 * time.Second}
 		})
+		cmds = append(cmds, reloadProposalsCmd())
 		return m, tea.Batch(cmds...)
 
 	case message.DismissFinished:
@@ -255,7 +258,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, func() tea.Msg {
 			return message.StatusMessage{Text: statusText, Duration: 3 * time.Second}
 		})
+		cmds = append(cmds, reloadProposalsCmd())
 		return m, tea.Batch(cmds...)
+
+	case message.ProposalsRefreshed:
+		m.proposals = msg.Proposals
+		m.stats.PendingCount = len(msg.Proposals)
+		var reloadCmd tea.Cmd
+		m.dashboard, reloadCmd = m.dashboard.Reload(msg.Proposals, m.stats)
+		return m, reloadCmd
 
 	case message.JumpToSources:
 		// Push the source manager view with a pre-selected source.
@@ -273,10 +284,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pipelineRefreshing = true
 			recentRunsLimit := m.config.Pipeline.RecentRunsLimit
 			sparklineDays := m.config.Pipeline.SparklineDays
-			proposals := m.proposals
 			pipelineCfg := m.pipelineCfg
 			return m, func() tea.Msg {
 				sessions, _ := store.ListSessions()
+				proposals, _ := pipeline.ListProposals() // reload fresh, not from stale m.proposals
 				runs, _ := pipeline.ListPipelineRunsFromHistory(sessions, recentRunsLimit)
 				stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, sparklineDays)
 				prompts, _ := pipeline.ListPromptVersions()
@@ -287,6 +298,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					Prompts:     prompts,
 					DashStats:   dashStats,
 					PipelineCfg: pipelineCfg,
+					Proposals:   proposals,
 				}
 			}
 		}
@@ -295,10 +307,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case message.PipelineDataRefreshed:
 		m.pipelineRefreshing = false
 		statusCmd := m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats, msg.PipelineCfg)
+		// Update proposals if the tick returned a fresh list.
+		var reloadCmd tea.Cmd
+		if msg.Proposals != nil {
+			m.proposals = msg.Proposals
+			m.stats.PendingCount = len(msg.Proposals)
+			m.dashboard, reloadCmd = m.dashboard.Reload(msg.Proposals, m.stats)
+		}
 		nextTick := tea.Tick(5*time.Second, func(time.Time) tea.Msg {
 			return message.PipelineTickMsg{}
 		})
-		return m, tea.Batch(statusCmd, nextTick)
+		return m, tea.Batch(statusCmd, nextTick, reloadCmd)
 
 	case message.LogTickMsg:
 		if m.state == message.ViewLogViewer {
@@ -967,5 +986,14 @@ func actionStatusText(msg tea.Msg) string {
 		return components.ConfirmDefer()
 	default:
 		return ""
+	}
+}
+
+// reloadProposalsCmd returns a tea.Cmd that reloads proposals from disk
+// and returns a ProposalsRefreshed message.
+func reloadProposalsCmd() tea.Cmd {
+	return func() tea.Msg {
+		proposals, _ := pipeline.ListProposals()
+		return message.ProposalsRefreshed{Proposals: proposals}
 	}
 }

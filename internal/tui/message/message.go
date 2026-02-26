@@ -128,6 +128,11 @@ type StatusMessage struct {
 // StatusMessageExpired signals that the timed status message should be cleared.
 type StatusMessageExpired struct{}
 
+// ProposalsRefreshed carries a freshly-loaded proposal list after a user action.
+type ProposalsRefreshed struct {
+	Proposals []pipeline.ProposalWithSession
+}
+
 // Fitness report messages.
 
 // DismissFinished carries the result of dismissing a fitness report.
@@ -182,6 +187,7 @@ type PipelineDataRefreshed struct {
 	Prompts     []pipeline.PromptVersion
 	DashStats   DashboardStats
 	PipelineCfg pipeline.PipelineConfig
+	Proposals   []pipeline.ProposalWithSession
 }
 
 // LogTickMsg triggers log viewer follow-mode refresh.
