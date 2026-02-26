@@ -170,7 +170,7 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 			return nil, fmt.Errorf("generating debug session ID: %w", err)
 		}
 		debugSessionID = id
-		if err := store.BlockSession(debugSessionID); err != nil {
+		if err := store.BlockSession(debugSessionID, time.Now()); err != nil {
 			return nil, fmt.Errorf("blocklisting debug session: %w", err)
 		}
 	}

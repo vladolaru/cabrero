@@ -896,7 +896,7 @@ func buildChatConfig(p *pipeline.ProposalWithSession, debug bool) (chat.ChatConf
 	}
 
 	// Blocklist immediately so the pipeline never processes this session.
-	if err := store.BlockSession(sessionID); err != nil {
+	if err := store.BlockSession(sessionID, time.Now()); err != nil {
 		return chat.ChatConfig{}, fmt.Errorf("blocklisting chat session: %w", err)
 	}
 

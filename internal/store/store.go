@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 )
 
 // testRootOverride is set by RootOverrideForTest to redirect store access in tests.
@@ -126,6 +128,11 @@ func blocklistPath() string {
 	return filepath.Join(Root(), "blocklist.json")
 }
 
+// BlocklistEntry records when a session was blocked.
+type BlocklistEntry struct {
+	BlockedAt time.Time `json:"blockedAt"`
+}
+
 // ReadBlocklist returns the set of blocked session IDs.
 // Callers can use the returned map to batch-check multiple sessions without
 // repeated disk reads.
@@ -141,42 +148,80 @@ func readBlocklist() (map[string]bool, error) {
 		}
 		return nil, err
 	}
-
-	var ids []string
-	if err := json.Unmarshal(data, &ids); err != nil {
+	// Migration: if root is a JSON array, it's the old []string format.
+	trimmed := strings.TrimSpace(string(data))
+	if strings.HasPrefix(trimmed, "[") {
+		var ids []string
+		if err := json.Unmarshal(data, &ids); err != nil {
+			return nil, fmt.Errorf("parsing old-format blocklist: %w", err)
+		}
+		// Convert to new format with zero time; write back.
+		entries := make(map[string]BlocklistEntry, len(ids))
+		for _, id := range ids {
+			entries[id] = BlocklistEntry{} // zero BlockedAt
+		}
+		if err := writeBlocklistEntries(entries); err != nil {
+			return nil, fmt.Errorf("migrating blocklist: %w", err)
+		}
+		m := make(map[string]bool, len(ids))
+		for _, id := range ids {
+			m[id] = true
+		}
+		return m, nil
+	}
+	var entries map[string]BlocklistEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
 		return nil, fmt.Errorf("parsing blocklist: %w", err)
 	}
-	m := make(map[string]bool, len(ids))
-	for _, id := range ids {
+	m := make(map[string]bool, len(entries))
+	for id := range entries {
 		m[id] = true
 	}
 	return m, nil
 }
 
-func writeBlocklist(m map[string]bool) error {
-	ids := make([]string, 0, len(m))
-	for id := range m {
-		ids = append(ids, id)
-	}
-	data, err := json.MarshalIndent(ids, "", "  ")
+func writeBlocklistEntries(entries map[string]BlocklistEntry) error {
+	data, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
 		return err
 	}
 	return AtomicWrite(blocklistPath(), data, 0o644)
 }
 
-// BlockSession adds a session ID to the blocklist so Cabrero never
-// processes its own CLI sessions.
-func BlockSession(sessionID string) error {
+// writeBlocklist is kept for Init's nil seed (writes empty map).
+func writeBlocklist(m map[string]bool) error {
+	entries := make(map[string]BlocklistEntry, len(m))
+	for id := range m {
+		entries[id] = BlocklistEntry{}
+	}
+	return writeBlocklistEntries(entries)
+}
+
+// BlockSession adds a session ID to the blocklist with a timestamp.
+func BlockSession(sessionID string, blockedAt time.Time) error {
 	blocklistMu.Lock()
 	defer blocklistMu.Unlock()
 
-	m, err := readBlocklist()
+	data, err := os.ReadFile(blocklistPath())
+	var entries map[string]BlocklistEntry
 	if err != nil {
-		return err
+		if !os.IsNotExist(err) {
+			return err
+		}
+		entries = make(map[string]BlocklistEntry)
+	} else {
+		trimmed := strings.TrimSpace(string(data))
+		if strings.HasPrefix(trimmed, "[") {
+			// old format — read via migration path
+			entries = make(map[string]BlocklistEntry)
+		} else {
+			if err2 := json.Unmarshal(data, &entries); err2 != nil {
+				entries = make(map[string]BlocklistEntry)
+			}
+		}
 	}
-	m[sessionID] = true
-	return writeBlocklist(m)
+	entries[sessionID] = BlocklistEntry{BlockedAt: blockedAt}
+	return writeBlocklistEntries(entries)
 }
 
 // IsBlocked returns true if the given session ID is in the blocklist.
@@ -189,6 +234,57 @@ func IsBlocked(sessionID string) bool {
 		return false
 	}
 	return m[sessionID]
+}
+
+// RotateBlocklist removes blocklist entries older than maxAge.
+// Returns the number of entries removed and rewrites the file atomically.
+// Entries with a zero BlockedAt (migrated from old format) are treated as
+// maximally old and will always be removed.
+func RotateBlocklist(maxAge time.Duration) (int, error) {
+	blocklistMu.Lock()
+	defer blocklistMu.Unlock()
+
+	data, err := os.ReadFile(blocklistPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	trimmed := strings.TrimSpace(string(data))
+	if strings.HasPrefix(trimmed, "[") {
+		// Old format: all entries have zero time — all will be rotated.
+		var ids []string
+		json.Unmarshal(data, &ids) //nolint:errcheck
+		if err := writeBlocklistEntries(make(map[string]BlocklistEntry)); err != nil {
+			return 0, err
+		}
+		return len(ids), nil
+	}
+
+	var entries map[string]BlocklistEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return 0, fmt.Errorf("parsing blocklist for rotation: %w", err)
+	}
+
+	cutoff := time.Now().Add(-maxAge)
+	kept := make(map[string]BlocklistEntry, len(entries))
+	removed := 0
+	for id, entry := range entries {
+		// Zero time is treated as epoch — always older than any cutoff.
+		if !entry.BlockedAt.IsZero() && entry.BlockedAt.After(cutoff) {
+			kept[id] = entry
+		} else {
+			removed++
+		}
+	}
+	if removed == 0 {
+		return 0, nil
+	}
+	if err := writeBlocklistEntries(kept); err != nil {
+		return 0, err
+	}
+	return removed, nil
 }
 
 // --- config helpers ---------------------------------------------------

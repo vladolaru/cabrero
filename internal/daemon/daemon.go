@@ -107,6 +107,13 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.log.Info("rotated %d old cleanup history records", removed)
 	}
 
+	// Rotate old blocklist entries on startup.
+	if removed, err := store.RotateBlocklist(90 * 24 * time.Hour); err != nil {
+		d.log.Info("blocklist rotation failed: %v", err)
+	} else if removed > 0 {
+		d.log.Info("rotated %d old blocklist entries", removed)
+	}
+
 	// Run an immediate scan on startup.
 	d.processQueued(ctx)
 
