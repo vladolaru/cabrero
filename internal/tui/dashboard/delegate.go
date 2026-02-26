@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
@@ -40,7 +41,7 @@ func (d dashboardDelegate) Render(w io.Writer, m list.Model, index int, item lis
 	}
 
 	typeName := shared.PadRight(di.TypeName(), cols.typeWidth)
-	target := shared.TruncatePad(shared.ShortenHome(di.Target()), cols.targetWidth)
+	target := shared.TruncatePad(cli.ShortenHome(di.Target()), cols.targetWidth)
 
 	// When this item matches the active filter, highlight the type field.
 	confidence := shared.MutedStyle.Render(di.Confidence())

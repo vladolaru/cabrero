@@ -7,6 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	pl "github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
@@ -246,7 +247,7 @@ func (m Model) renderRecentRuns() string {
 
 		status := statusIndicator(run.Status)
 		shortID := store.ShortSessionID(run.SessionID)
-		age := shared.RelativeTime(run.Timestamp)
+		age := cli.RelativeTime(run.Timestamp)
 		project := shared.Truncate(run.Project, projectMax)
 		timing := formatTimingForMode(run, mode)
 
@@ -304,7 +305,7 @@ func (m Model) renderPrompts() string {
 	b.WriteString(shared.RenderSectionHeader("PROMPTS"))
 	b.WriteString("\n")
 	for i, p := range m.prompts {
-		age := shared.RelativeTime(p.UpdatedAt)
+		age := cli.RelativeTime(p.UpdatedAt)
 		b.WriteString(fmt.Sprintf("  %-20s %-4s  updated: %s", p.Name, p.Version, age))
 		if i < len(m.prompts)-1 {
 			b.WriteString("\n")

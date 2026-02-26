@@ -1,28 +1,10 @@
 package shared
 
 import (
-	"fmt"
-	"os"
 	"strings"
-	"time"
 
 	"charm.land/lipgloss/v2"
 )
-
-// homeDir is resolved once at init for ShortenHome.
-var homeDir string
-
-func init() {
-	homeDir, _ = os.UserHomeDir()
-}
-
-// ShortenHome replaces the current user's home directory prefix with "~".
-func ShortenHome(path string) string {
-	if homeDir != "" && strings.HasPrefix(path, homeDir) {
-		return "~" + path[len(homeDir):]
-	}
-	return path
-}
 
 // Checkmark renders a ✓ (success) or ✗ (error) with appropriate color.
 func Checkmark(ok bool) string {
@@ -101,22 +83,6 @@ func WrapIndent(s string, width, indent int) string {
 	}
 	wrapped := lipgloss.NewStyle().Width(textWidth).Render(s)
 	return IndentBlock(wrapped, indent)
-}
-
-// RelativeTime formats t as a human-readable relative age string.
-// Returns "just now" for durations under 1 minute.
-func RelativeTime(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
 }
 
 // WrapHangingIndent word-wraps s to fit within (width - indent) characters.

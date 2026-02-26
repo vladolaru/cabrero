@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
@@ -29,7 +30,7 @@ func RenderHeader(stats message.DashboardStats, width int) string {
 
 	var lastCapture string
 	if stats.LastCaptureTime != nil {
-		lastCapture = shared.MutedStyle.Render("Last capture:") + " " + shared.RelativeTime(*stats.LastCaptureTime)
+		lastCapture = shared.MutedStyle.Render("Last capture:") + " " + cli.RelativeTime(*stats.LastCaptureTime)
 	}
 
 	hookPre := shared.Checkmark(stats.HookPreCompact)

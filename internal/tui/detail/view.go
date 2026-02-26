@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 )
 
@@ -14,7 +15,7 @@ func (m Model) SubHeader() string {
 		return shared.RenderSubHeader("  Proposal Detail", "")
 	}
 	p := &m.proposal.Proposal
-	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s", p.Type, shared.ShortenHome(p.Target), p.Confidence)
+	statsLine := fmt.Sprintf("  %s  ·  %s  ·  %s", p.Type, cli.ShortenHome(p.Target), p.Confidence)
 	return shared.RenderSubHeader("  Proposal Detail", statsLine)
 }
 
