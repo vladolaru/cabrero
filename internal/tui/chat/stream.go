@@ -38,8 +38,12 @@ type streamMsg struct {
 // buildChatArgs constructs the claude CLI argument list for a chat invocation.
 // firstMessage=true creates a new session; firstMessage=false resumes it.
 func buildChatArgs(cfg ChatConfig, firstMessage bool) []string {
+	model := cfg.Model
+	if model == "" {
+		model = "claude-sonnet-4-6" // fallback if not set
+	}
 	args := []string{
-		"--model", "claude-sonnet-4-6",
+		"--model", model,
 		"--print",
 		"--verbose",
 		"--output-format", "stream-json",

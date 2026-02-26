@@ -21,7 +21,7 @@ const blendTimeout = 2 * time.Minute
 
 // Blend invokes Claude to blend the proposed change into the target file.
 // Returns a before/after diff string suitable for human review.
-func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
+func Blend(proposal *pipeline.Proposal, sessionID string, model string) (string, error) {
 	if proposal.Target == "" {
 		return "", fmt.Errorf("proposal has no target file")
 	}
@@ -53,7 +53,7 @@ func Blend(proposal *pipeline.Proposal, sessionID string) (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "claude",
-		"--model", "claude-sonnet-4-6",
+		"--model", model,
 		"--print",
 		"--no-session-persistence",
 		"--disable-slash-commands",

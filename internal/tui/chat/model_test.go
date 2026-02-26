@@ -289,6 +289,20 @@ func TestChat_MuteANSI_PreservesText(t *testing.T) {
 	}
 }
 
+func TestBuildChatArgs_UsesConfigModel(t *testing.T) {
+	cfg := ChatConfig{Model: "claude-haiku-4-5"}
+	args := buildChatArgs(cfg, true)
+	for i, a := range args {
+		if a == "--model" && i+1 < len(args) {
+			if args[i+1] != "claude-haiku-4-5" {
+				t.Errorf("--model = %q, want %q", args[i+1], "claude-haiku-4-5")
+			}
+			return
+		}
+	}
+	t.Error("--model flag not found in args")
+}
+
 func TestChat_MuteANSI_BlankLines(t *testing.T) {
 	// Blank lines should remain blank (not wrapped in a style).
 	input := "line1\n\nline3"

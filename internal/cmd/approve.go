@@ -42,7 +42,7 @@ func Approve(args []string) error {
 
 	// Blend.
 	fmt.Println("Blending change with Claude...")
-	blended, err := apply.Blend(p, pw.SessionID)
+	blended, err := apply.Blend(p, pw.SessionID, pipeline.DefaultPipelineConfig().ApplyModel)
 	if err != nil {
 		return fmt.Errorf("blend failed: %w", err)
 	}

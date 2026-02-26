@@ -76,7 +76,7 @@ func RunCuratorCheck(proposals []ProposalWithSession, cfg PipelineConfig) ([]Che
 	}
 
 	cr, err := invokeClaude(claudeConfig{
-		Model:        cfg.ClassifierModel, // Haiku
+		Model:        cfg.CuratorCheckModel, // Haiku
 		SystemPrompt: systemPrompt,
 		Agentic:      false,
 		Stdin:        strings.NewReader(string(inputJSON)),

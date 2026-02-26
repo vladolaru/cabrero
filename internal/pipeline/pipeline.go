@@ -91,6 +91,15 @@ type discardLogger struct{}
 func (discardLogger) Info(string, ...any)  {}
 func (discardLogger) Error(string, ...any) {}
 
+// Model name constants for each pipeline entity.
+const (
+	DefaultCuratorCheckModel = "claude-haiku-4-5"
+	DefaultApplyModel        = "claude-sonnet-4-6"
+	DefaultChatModel         = "claude-sonnet-4-6"
+	DefaultMetaModel         = "claude-opus-4-6"
+	DefaultCuratorModel      = "claude-sonnet-4-6"
+)
+
 // PipelineConfig controls LLM invocation parameters.
 type PipelineConfig struct {
 	ClassifierModel    string
@@ -109,6 +118,20 @@ type PipelineConfig struct {
 	CuratorMaxTurns     int
 	CuratorTimeout      time.Duration
 	CuratorCheckTimeout time.Duration // for the Haiku batch check
+
+	// Per-entity model config.
+	CuratorCheckModel string // default: DefaultCuratorCheckModel (Haiku)
+	ApplyModel        string // default: DefaultApplyModel (Sonnet)
+	ChatModel         string // default: DefaultChatModel (Sonnet)
+	MetaModel         string // default: DefaultMetaModel (Opus)
+
+	// Meta-pipeline thresholds.
+	MetaRejectionRateThreshold float64       // default 0.30
+	MetaClassifierFPRThreshold float64       // default 0.25
+	MetaMinSamples             int           // default 5
+	MetaCooldownDays           int           // default 14
+	MetaMaxTurns               int           // default 20
+	MetaTimeout                time.Duration // default 5 * time.Minute
 }
 
 // logger returns the configured Logger, falling back to stdLogger.
@@ -148,10 +171,20 @@ func DefaultPipelineConfig() PipelineConfig {
 		EvaluatorTimeout:         evaluatorTimeout,
 		MaxConcurrentInvocations: 3,
 		MaxLLMRetries:            1,
-		CuratorModel:             DefaultEvaluatorModel, // sonnet — same as evaluator
+		CuratorModel:             DefaultCuratorModel,
 		CuratorMaxTurns:          15,
 		CuratorTimeout:           5 * time.Minute,
 		CuratorCheckTimeout:      2 * time.Minute,
+		CuratorCheckModel:          DefaultCuratorCheckModel,
+		ApplyModel:                 DefaultApplyModel,
+		ChatModel:                  DefaultChatModel,
+		MetaModel:                  DefaultMetaModel,
+		MetaRejectionRateThreshold: 0.30,
+		MetaClassifierFPRThreshold: 0.25,
+		MetaMinSamples:             5,
+		MetaCooldownDays:           14,
+		MetaMaxTurns:               20,
+		MetaTimeout:                5 * time.Minute,
 	}
 }
 

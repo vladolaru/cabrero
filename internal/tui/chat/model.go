@@ -31,6 +31,7 @@ type ChatConfig struct {
 	SessionID    string // persistent CC session ID (pre-blocklisted by caller)
 	SystemPrompt string // rich context: proposal details, cited UUIDs, guidelines
 	AllowedTools string // comma-separated path-scoped tool specs for --allowedTools
+	Model        string // claude model to use (default: DefaultChatModel)
 	Debug        bool
 }
 
