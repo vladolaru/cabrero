@@ -81,3 +81,7 @@ cabrero status    # daemon running, hooks registered
 
 - Remote: `git@github.com:vladolaru/cabrero.git`
 - Main branch: `main`
+
+## Code Review
+
+- Always read the flagged file:line before adding any review finding to an action plan. AI review agents commonly misread control flow, miss existing fixes, and misidentify language constructs — producing false positives even on critical findings. Classify each finding as CONFIRMED / FALSE_POSITIVE / LIKELY_VALID before building the plan. Details: .claude/docs/patterns/2026-02-26-verify-review-findings.md
