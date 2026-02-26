@@ -280,7 +280,7 @@ func renderPipelineMonitor(w, h int) (string, error) {
 	stats := testdata.TestPipelineStats()
 	prompts := testdata.TestPromptVersions()
 
-	m := pipeline_tui.New(runs, stats, prompts, dashStats, &keys, cfg, pipeline.PipelineConfig{})
+	m := pipeline_tui.New(runs, stats, prompts, dashStats, &keys, cfg, pipeline.DefaultPipelineConfig())
 	prefix, th := renderWithSubHeader(dashStats, m.SubHeader(), w)
 	m.SetSize(w, h-th)
 	return prefix + m.View(), nil
