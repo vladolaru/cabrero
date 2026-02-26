@@ -576,7 +576,18 @@ func (m appModel) pushView(view message.ViewState, action string) (tea.Model, te
 
 			// Initialize chat for this proposal (dimensions set by resizeDetailChat).
 			chips := defaultChips()
-			chatCfg := buildChatConfig(p, m.config.Debug)
+			chatCfg, err := buildChatConfig(p, m.config.Debug)
+			if err != nil {
+				// Roll back the view transition that happened at the top of pushView.
+				m.state = m.viewStack[len(m.viewStack)-1]
+				m.viewStack = m.viewStack[:len(m.viewStack)-1]
+				return m, func() tea.Msg {
+					return message.StatusMessage{
+						Text:     "Chat unavailable: " + err.Error(),
+						Duration: 5 * time.Second,
+					}
+				}
+			}
 			m.chat = chat.New(chips, chatCfg, m.width, m.childHeight())
 			m.resizeDetailChat()
 
@@ -842,22 +853,25 @@ func formatTurnJSON(raw []byte) string {
 
 // buildChatConfig creates a ChatConfig for a proposal's AI chat session.
 // Generates a UUID, blocklists it, and builds the system prompt and tool access.
-func buildChatConfig(p *pipeline.ProposalWithSession, debug bool) chat.ChatConfig {
+func buildChatConfig(p *pipeline.ProposalWithSession, debug bool) (chat.ChatConfig, error) {
 	sessionID, err := pipeline.GenerateUUID()
 	if err != nil {
 		// Fallback: chat will work but won't have a persistent session.
-		return chat.ChatConfig{Debug: debug}
+		// No session ID means nothing to blocklist.
+		return chat.ChatConfig{Debug: debug}, nil
 	}
 
 	// Blocklist immediately so the pipeline never processes this session.
-	_ = store.BlockSession(sessionID)
+	if err := store.BlockSession(sessionID); err != nil {
+		return chat.ChatConfig{}, fmt.Errorf("blocklisting chat session: %w", err)
+	}
 
 	return chat.ChatConfig{
 		SessionID:    sessionID,
 		SystemPrompt: buildChatSystemPrompt(p),
 		AllowedTools: buildChatAllowedTools(p),
 		Debug:        debug,
-	}
+	}, nil
 }
 
 func buildChatSystemPrompt(p *pipeline.ProposalWithSession) string {
