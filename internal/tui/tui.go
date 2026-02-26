@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -131,14 +132,17 @@ func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.Pro
 
 // Disk bytes cache to avoid expensive directory walks on every tick.
 var (
-	cachedDiskBytes      int64
-	cachedDiskBytesTime  time.Time
-	diskBytesCacheTTL    = 60 * time.Second
+	diskBytesMu         sync.Mutex
+	cachedDiskBytes     int64
+	cachedDiskBytesTime time.Time
+	diskBytesCacheTTL   = 60 * time.Second
 )
 
 // storeDiskBytes returns the total size of all files under the given directory.
 // Results are cached for 60 seconds to avoid expensive walks on every tick.
 func storeDiskBytes(root string) int64 {
+	diskBytesMu.Lock()
+	defer diskBytesMu.Unlock()
 	if time.Since(cachedDiskBytesTime) < diskBytesCacheTTL {
 		return cachedDiskBytes
 	}
