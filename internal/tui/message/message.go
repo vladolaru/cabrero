@@ -177,10 +177,11 @@ type PipelineTickMsg struct{}
 
 // PipelineDataRefreshed carries refreshed pipeline data from a background I/O operation.
 type PipelineDataRefreshed struct {
-	Runs      []pipeline.PipelineRun
-	Stats     pipeline.PipelineStats
-	Prompts   []pipeline.PromptVersion
-	DashStats DashboardStats
+	Runs        []pipeline.PipelineRun
+	Stats       pipeline.PipelineStats
+	Prompts     []pipeline.PromptVersion
+	DashStats   DashboardStats
+	PipelineCfg pipeline.PipelineConfig
 }
 
 // LogTickMsg triggers log viewer follow-mode refresh.

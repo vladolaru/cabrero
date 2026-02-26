@@ -25,6 +25,7 @@ type Model struct {
 	stats       pl.PipelineStats
 	prompts     []pl.PromptVersion
 	dashStats   message.DashboardStats
+	pipelineCfg pl.PipelineConfig
 	cursor      int
 	expandedIdx int // -1 means no run expanded
 	confirm     components.ConfirmModel
@@ -38,12 +39,13 @@ type Model struct {
 }
 
 // New creates a pipeline monitor model with loaded data.
-func New(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats, keys *shared.KeyMap, cfg *shared.Config) Model {
+func New(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats, keys *shared.KeyMap, cfg *shared.Config, pipelineCfg pl.PipelineConfig) Model {
 	return Model{
 		runs:        runs,
 		stats:       stats,
 		prompts:     prompts,
 		dashStats:   dashStats,
+		pipelineCfg: pipelineCfg,
 		expandedIdx: -1,
 		keys:        keys,
 		config:      cfg,
@@ -87,11 +89,12 @@ func (m *Model) refreshViewport() {
 
 // Refresh updates the pipeline data while preserving cursor and expansion state.
 // Returns a tea.Cmd when a timed status clear is needed (manual refresh).
-func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats) tea.Cmd {
+func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats, pipelineCfg pl.PipelineConfig) tea.Cmd {
 	m.runs = runs
 	m.stats = stats
 	m.prompts = prompts
 	m.dashStats = dashStats
+	m.pipelineCfg = pipelineCfg
 	// Clamp cursor to the new data bounds.
 	if m.cursor >= len(m.runs) {
 		m.cursor = max(0, len(m.runs)-1)

@@ -90,7 +90,7 @@ func newAppModel(proposals []pipeline.ProposalWithSession, reports []fitness.Rep
 		isDark:          true, // matches shared.InitStyles(true) in tui.go; BackgroundColorMsg will update
 		pipelineCfg:     pipelineCfg,
 		dashboard:       dashboard.New(proposals, reports, stats, &keys, cfg),
-		pipelineMonitor: pipeline_tui.New(runs, pipelineStats, prompts, stats, &keys, cfg),
+		pipelineMonitor: pipeline_tui.New(runs, pipelineStats, prompts, stats, &keys, cfg, pipelineCfg),
 	}
 
 	return m
@@ -274,17 +274,19 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			recentRunsLimit := m.config.Pipeline.RecentRunsLimit
 			sparklineDays := m.config.Pipeline.SparklineDays
 			proposals := m.proposals
+			pipelineCfg := m.pipelineCfg
 			return m, func() tea.Msg {
 				sessions, _ := store.ListSessions()
 				runs, _ := pipeline.ListPipelineRunsFromHistory(sessions, recentRunsLimit)
 				stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, sparklineDays)
 				prompts, _ := pipeline.ListPromptVersions()
-				dashStats := gatherStatsFromSessions(sessions, proposals, m.pipelineCfg)
+				dashStats := gatherStatsFromSessions(sessions, proposals, pipelineCfg)
 				return message.PipelineDataRefreshed{
-					Runs:      runs,
-					Stats:     stats,
-					Prompts:   prompts,
-					DashStats: dashStats,
+					Runs:        runs,
+					Stats:       stats,
+					Prompts:     prompts,
+					DashStats:   dashStats,
+					PipelineCfg: pipelineCfg,
 				}
 			}
 		}
@@ -292,7 +294,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case message.PipelineDataRefreshed:
 		m.pipelineRefreshing = false
-		statusCmd := m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats)
+		statusCmd := m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats, msg.PipelineCfg)
 		nextTick := tea.Tick(5*time.Second, func(time.Time) tea.Msg {
 			return message.PipelineTickMsg{}
 		})

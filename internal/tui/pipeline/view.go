@@ -287,7 +287,7 @@ func (m Model) renderModels() string {
 	b.WriteString(shared.RenderSectionHeader("MODELS"))
 	b.WriteString("\n")
 
-	cfg := pl.DefaultPipelineConfig()
+	cfg := m.pipelineCfg
 	b.WriteString(fmt.Sprintf("  Classifier:  %s", cfg.ClassifierModel))
 	if cfg.ClassifierModel != pl.DefaultClassifierModel {
 		b.WriteString(shared.WarningStyle.Render("  (override)"))

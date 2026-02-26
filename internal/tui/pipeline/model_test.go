@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	pl "github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 	"github.com/vladolaru/cabrero/internal/tui/testdata"
@@ -19,7 +20,7 @@ func newTestModel() Model {
 	dashStats := testdata.TestDashboardStats()
 	cfg := testdata.TestConfig()
 	keys := shared.NewKeyMap(cfg.Navigation)
-	return New(runs, stats, prompts, dashStats, &keys, cfg)
+	return New(runs, stats, prompts, dashStats, &keys, cfg, pl.PipelineConfig{})
 }
 
 func TestNewModel(t *testing.T) {
