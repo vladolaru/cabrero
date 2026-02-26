@@ -141,3 +141,53 @@ type CheckDecision struct {
 	AlreadyApplied bool   `json:"alreadyApplied"`
 	Reason         string `json:"reason"`
 }
+
+// RunCuratorGroup invokes an agentic Sonnet Curator session for a single target group.
+// proposals must all target the same file.
+// Returns the CuratorManifest, LLM usage, and any error.
+func RunCuratorGroup(target string, proposals []ProposalWithSession, cfg PipelineConfig) (*CuratorManifest, *ClaudeResult, error) {
+	if len(proposals) == 0 {
+		return nil, nil, nil
+	}
+
+	if err := EnsureCuratorPrompts(); err != nil {
+		return nil, nil, fmt.Errorf("ensuring curator prompts: %w", err)
+	}
+
+	systemPrompt, err := readPromptTemplate(curatorPromptFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading curator prompt: %w", err)
+	}
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", fmt.Sprintf("%d", cfg.CuratorMaxTurns))
+
+	// Serialize proposals as the user prompt.
+	proposalData, err := json.MarshalIndent(proposals, "", "  ")
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshaling proposals: %w", err)
+	}
+	userPrompt := fmt.Sprintf("Target: %s\n\nProposals:\n%s", target, string(proposalData))
+
+	cr, err := invokeClaude(claudeConfig{
+		Model:          cfg.CuratorModel,
+		SystemPrompt:   systemPrompt,
+		Agentic:        true,
+		Prompt:         userPrompt,
+		AllowedTools:   "Read,Grep",
+		MaxTurns:       cfg.CuratorMaxTurns,
+		Timeout:        cfg.CuratorTimeout,
+		Logger:         cfg.Logger,
+		Debug:          cfg.Debug,
+		SettingSources: &emptyStr, // no user settings — curator is isolated
+	})
+	if err != nil {
+		return nil, cr, fmt.Errorf("curator invocation for %s: %w", target, err)
+	}
+
+	cleaned := cleanLLMJSON(cr.Result)
+	var manifest CuratorManifest
+	if err := json.Unmarshal([]byte(cleaned), &manifest); err != nil {
+		return nil, cr, fmt.Errorf("parsing curator manifest for %s: %w", target, err)
+	}
+	manifest.Target = target // ensure target is set even if LLM omitted it
+	return &manifest, cr, nil
+}

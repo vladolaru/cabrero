@@ -113,6 +113,49 @@ func TestIsFileTarget(t *testing.T) {
 	}
 }
 
+func TestParseCuratorManifest(t *testing.T) {
+	raw := `{
+      "target": "/Users/foo/.claude/CLAUDE.md",
+      "decisions": [
+        {"proposalId": "prop-abc-1", "action": "synthesize", "reason": "merged", "supersededBy": "prop-curator-a1b2-1"},
+        {"proposalId": "prop-abc-2", "action": "synthesize", "reason": "merged", "supersededBy": "prop-curator-a1b2-1"}
+      ],
+      "clusters": [
+        {
+          "clusterName": "Edit precondition failures",
+          "sourceIds": ["prop-abc-1", "prop-abc-2"],
+          "synthesis": {
+            "id": "prop-curator-a1b2-1",
+            "type": "claude_addition",
+            "confidence": "high",
+            "target": "/Users/foo/.claude/CLAUDE.md",
+            "change": "Always read a file before editing it.",
+            "rationale": "Synthesized from 2 proposals.",
+            "citedUuids": []
+          }
+        }
+      ]
+    }`
+
+	cleaned := cleanLLMJSON(raw)
+	var manifest CuratorManifest
+	if err := json.Unmarshal([]byte(cleaned), &manifest); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if manifest.Target != "/Users/foo/.claude/CLAUDE.md" {
+		t.Errorf("Target: got %q", manifest.Target)
+	}
+	if len(manifest.Clusters) != 1 {
+		t.Fatalf("Clusters: got %d, want 1", len(manifest.Clusters))
+	}
+	if manifest.Clusters[0].Synthesis == nil {
+		t.Fatal("Synthesis is nil")
+	}
+	if manifest.Clusters[0].Synthesis.ID != "prop-curator-a1b2-1" {
+		t.Errorf("Synthesis.ID: got %q", manifest.Clusters[0].Synthesis.ID)
+	}
+}
+
 func TestCleanLLMJSONArray(t *testing.T) {
 	input := "```json\n[{\"proposalId\": \"p1\", \"alreadyApplied\": false}]\n```"
 	got := cleanLLMJSON(input)
