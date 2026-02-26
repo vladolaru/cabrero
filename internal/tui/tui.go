@@ -48,10 +48,12 @@ func Run(version string) error {
 	mergedSources, _ := store.LoadAndMergeSources()
 	sourceGroups := store.GroupSources(mergedSources)
 
-	runs, err := pipeline.ListPipelineRunsFromHistory(sessions, cfg.Pipeline.RecentRunsLimit)
+	sessionRuns, err := pipeline.ListPipelineRunsFromHistory(sessions, cfg.Pipeline.RecentRunsLimit)
 	if err != nil {
-		runs = nil // non-fatal
+		sessionRuns = nil // non-fatal
 	}
+	cleanupRuns, _ := pipeline.ListCleanupRunsFromHistory(10)
+	runs := append(cleanupRuns, sessionRuns...)
 
 	pipelineStats, err := pipeline.GatherPipelineStatsFromSessions(sessions, runs, cfg.Pipeline.SparklineDays)
 	if err != nil {

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -188,5 +189,38 @@ func TestSparklineBuckets(t *testing.T) {
 	}
 	if buckets[2] != 1 {
 		t.Errorf("buckets[2] = %d, want 1", buckets[2])
+	}
+}
+
+func TestListCleanupRunsFromHistory(t *testing.T) {
+	dir := t.TempDir()
+	origPath := cleanupHistoryPath
+	cleanupHistoryPath = func() string { return filepath.Join(dir, "cleanup_history.jsonl") }
+	defer func() { cleanupHistoryPath = origPath }()
+
+	_ = AppendCleanupHistory(CleanupRecord{
+		Timestamp:       time.Now().Add(-1 * time.Hour),
+		DurationNs:      int64(47 * time.Second),
+		ProposalsBefore: 64,
+		ProposalsAfter:  12,
+		Decisions: []CuratorDecision{
+			{ProposalID: "p1", Action: "cull"},
+			{ProposalID: "p2", Action: "auto-reject"},
+		},
+	})
+
+	runs, err := ListCleanupRunsFromHistory(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("got %d runs, want 1", len(runs))
+	}
+	run := runs[0]
+	if run.Source != "cleanup" {
+		t.Errorf("Source: got %q, want cleanup", run.Source)
+	}
+	if run.ProposalCount != 52 { // 64 - 12 = 52 archived
+		t.Errorf("ProposalCount: got %d, want 52", run.ProposalCount)
 	}
 }

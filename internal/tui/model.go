@@ -288,7 +288,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg {
 				sessions, _ := store.ListSessions()
 				proposals, _ := pipeline.ListProposals() // reload fresh, not from stale m.proposals
-				runs, _ := pipeline.ListPipelineRunsFromHistory(sessions, recentRunsLimit)
+				sessionRuns, _ := pipeline.ListPipelineRunsFromHistory(sessions, recentRunsLimit)
+				cleanupRuns, _ := pipeline.ListCleanupRunsFromHistory(10)
+				runs := append(cleanupRuns, sessionRuns...)
 				stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, sparklineDays)
 				prompts, _ := pipeline.ListPromptVersions()
 				dashStats := gatherStatsFromSessions(sessions, proposals, pipelineCfg)

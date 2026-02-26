@@ -16,6 +16,7 @@ type PipelineRun struct {
 	Project   string
 	Timestamp time.Time
 	Status    string // "queued", "processed", "error"
+	Source    string // "daemon", "cli-run", "cli-backfill", "cleanup"
 
 	// Per-stage completion.
 	HasDigest     bool
@@ -456,4 +457,55 @@ func parsePromptFilename(filename string) (name, version string) {
 		return base, ""
 	}
 	return base[:idx], base[idx+1:]
+}
+
+// ListCleanupRunsFromHistory returns PipelineRun entries from cleanup_history.jsonl.
+// Each cleanup run is one PipelineRun with Source="cleanup".
+// Pass limit=0 for no limit.
+func ListCleanupRunsFromHistory(limit int) ([]PipelineRun, error) {
+	records, err := ReadCleanupHistory()
+	if err != nil || len(records) == 0 {
+		return nil, err
+	}
+
+	var runs []PipelineRun
+	for i, rec := range records {
+		if limit > 0 && i >= limit {
+			break
+		}
+		// ProposalCount = proposals archived (before - after).
+		archived := rec.ProposalsBefore - rec.ProposalsAfter
+		if archived < 0 {
+			archived = 0
+		}
+		// Sum curator LLM usage.
+		var inputTokens, outputTokens int
+		var costUSD float64
+		for _, u := range rec.CuratorUsage {
+			inputTokens += u.InputTokens
+			outputTokens += u.OutputTokens
+			costUSD += u.CostUSD
+		}
+		if rec.CheckUsage != nil {
+			inputTokens += rec.CheckUsage.InputTokens
+			outputTokens += rec.CheckUsage.OutputTokens
+			costUSD += rec.CheckUsage.CostUSD
+		}
+
+		run := PipelineRun{
+			Source:        "cleanup",
+			Timestamp:     rec.Timestamp,
+			Status:        "processed",
+			ProposalCount: archived,
+			InputTokens:   inputTokens,
+			OutputTokens:  outputTokens,
+			CostUSD:       costUSD,
+			ErrorDetail:   rec.Error,
+		}
+		if rec.Error != "" {
+			run.Status = "error"
+		}
+		runs = append(runs, run)
+	}
+	return runs, nil
 }

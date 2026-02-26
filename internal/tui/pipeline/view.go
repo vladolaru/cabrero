@@ -245,13 +245,22 @@ func (m Model) renderRecentRuns() string {
 			cursor = "> "
 		}
 
-		status := statusIndicator(run.Status)
-		shortID := store.ShortSessionID(run.SessionID)
-		age := cli.RelativeTime(run.Timestamp)
-		project := shared.Truncate(run.Project, projectMax)
-		timing := formatTimingForMode(run, mode)
-
-		line := fmt.Sprintf("%s%s %-*s  %-8s  %-*s  %s", cursor, status, idLen, shortID, age, projectMax, project, timing)
+		var line string
+		if run.Source == "cleanup" {
+			status := statusIndicator(run.Status)
+			age := cli.RelativeTime(run.Timestamp)
+			archived := run.ProposalCount
+			cost := formatCost(run.CostUSD)
+			line = fmt.Sprintf("%s%s %-*s  %-8s  %-*s  %d archived  %s",
+				cursor, status, idLen, "CLEANUP", age, projectMax, "", archived, cost)
+		} else {
+			status := statusIndicator(run.Status)
+			shortID := store.ShortSessionID(run.SessionID)
+			age := cli.RelativeTime(run.Timestamp)
+			project := shared.Truncate(run.Project, projectMax)
+			timing := formatTimingForMode(run, mode)
+			line = fmt.Sprintf("%s%s %-*s  %-8s  %-*s  %s", cursor, status, idLen, shortID, age, projectMax, project, timing)
+		}
 		b.WriteString(line)
 
 		// Inline expansion.
