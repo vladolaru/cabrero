@@ -96,3 +96,31 @@ func sourceNames(sources []fitness.Source) []string {
 	}
 	return names
 }
+
+// TestClassifierSignalsLocalSchema documents the JSON contract between store's
+// local types and pipeline.ClassifierOutput. If JSON tags in
+// classifierSignals/classifierSkillSignal/classifierClaudeMdSignal are
+// renamed, this test will fail.
+func TestClassifierSignalsLocalSchema(t *testing.T) {
+	const fixture = `{
+		"skillSignals": [{"skillName": "my-skill"}],
+		"claudeMdSignals": [{"path": "/home/user/CLAUDE.md"}]
+	}`
+
+	var out classifierSignals
+	if err := json.Unmarshal([]byte(fixture), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.SkillSignals) != 1 {
+		t.Fatalf("SkillSignals: got %d items, want 1", len(out.SkillSignals))
+	}
+	if out.SkillSignals[0].SkillName != "my-skill" {
+		t.Errorf("SkillName tag mismatch: got %q, want %q", out.SkillSignals[0].SkillName, "my-skill")
+	}
+	if len(out.ClaudeMdSignals) != 1 {
+		t.Fatalf("ClaudeMdSignals: got %d items, want 1", len(out.ClaudeMdSignals))
+	}
+	if out.ClaudeMdSignals[0].Path != "/home/user/CLAUDE.md" {
+		t.Errorf("Path tag mismatch: got %q, want %q", out.ClaudeMdSignals[0].Path, "/home/user/CLAUDE.md")
+	}
+}
