@@ -376,7 +376,7 @@ func (d *doctorRunner) checkStore() []checkResult {
 
 	// Blocklist.
 	blPath := filepath.Join(root, "blocklist.json")
-	blData, err := os.ReadFile(blPath)
+	_, err = os.ReadFile(blPath)
 	if err != nil {
 		results = append(results, checkResult{
 			name:     "Blocklist file exists",
@@ -388,8 +388,7 @@ func (d *doctorRunner) checkStore() []checkResult {
 			fix:      func() error { return store.Init() },
 		})
 	} else {
-		var ids []string
-		if err := json.Unmarshal(blData, &ids); err != nil {
+		if m, err := store.ReadBlocklist(); err != nil {
 			results = append(results, checkResult{
 				name:     "Blocklist valid",
 				category: "Store",
@@ -404,7 +403,7 @@ func (d *doctorRunner) checkStore() []checkResult {
 				name:     "Blocklist valid",
 				category: "Store",
 				status:   checkPass,
-				message:  fmt.Sprintf("%d entries", len(ids)),
+				message:  fmt.Sprintf("%d entries", len(m)),
 			})
 		}
 	}
