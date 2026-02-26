@@ -103,6 +103,12 @@ type PipelineConfig struct {
 	MaxLLMRetries           int    // max retries for retriable LLM failures (JSON parse errors); 0 = no retry
 	Logger                  Logger // nil defaults to stdLogger (stdout/stderr)
 	Debug                   bool   // persist CC sessions for classifier/evaluator
+
+	// Curator stage (daily cleanup).
+	CuratorModel        string
+	CuratorMaxTurns     int
+	CuratorTimeout      time.Duration
+	CuratorCheckTimeout time.Duration // for the Haiku batch check
 }
 
 // logger returns the configured Logger, falling back to stdLogger.
@@ -134,14 +140,18 @@ func DefaultPipelineConfig() PipelineConfig {
 		evaluatorTimeout = d
 	}
 	return PipelineConfig{
-		ClassifierModel:         classifierModel,
-		EvaluatorModel:          evaluatorModel,
-		ClassifierMaxTurns:      15,
-		EvaluatorMaxTurns:       20,
-		ClassifierTimeout:       classifierTimeout,
-		EvaluatorTimeout:        evaluatorTimeout,
+		ClassifierModel:          classifierModel,
+		EvaluatorModel:           evaluatorModel,
+		ClassifierMaxTurns:       15,
+		EvaluatorMaxTurns:        20,
+		ClassifierTimeout:        classifierTimeout,
+		EvaluatorTimeout:         evaluatorTimeout,
 		MaxConcurrentInvocations: 3,
-		MaxLLMRetries:           1,
+		MaxLLMRetries:            1,
+		CuratorModel:             DefaultEvaluatorModel, // sonnet — same as evaluator
+		CuratorMaxTurns:          15,
+		CuratorTimeout:           5 * time.Minute,
+		CuratorCheckTimeout:      2 * time.Minute,
 	}
 }
 

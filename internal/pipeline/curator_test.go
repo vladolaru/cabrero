@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func TestDefaultPipelineConfigHasCuratorFields(t *testing.T) {
+	cfg := DefaultPipelineConfig()
+	if cfg.CuratorModel == "" {
+		t.Error("CuratorModel should not be empty")
+	}
+	if cfg.CuratorTimeout == 0 {
+		t.Error("CuratorTimeout should not be zero")
+	}
+	if cfg.CuratorMaxTurns == 0 {
+		t.Error("CuratorMaxTurns should not be zero")
+	}
+}
+
 func TestCuratorDecisionRoundtrip(t *testing.T) {
 	d := CuratorDecision{
 		ProposalID:   "prop-abc123-1",
