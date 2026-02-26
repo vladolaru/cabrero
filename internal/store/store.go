@@ -172,20 +172,33 @@ func IsBlocked(sessionID string) bool {
 
 // --- config helpers ---------------------------------------------------
 
+// storeConfig is the minimal subset of config.json needed by store-level helpers.
+type storeConfig struct {
+	Debug             bool   `json:"debug"`
+	ClassifierModel   string `json:"classifierModel"`
+	EvaluatorModel    string `json:"evaluatorModel"`
+	ClassifierTimeout string `json:"classifierTimeout"`
+	EvaluatorTimeout  string `json:"evaluatorTimeout"`
+}
+
+// readConfig reads and parses config.json once.
+// Returns zero-value storeConfig if the file is missing or malformed.
+func readConfig() storeConfig {
+	data, err := os.ReadFile(filepath.Join(Root(), "config.json"))
+	if err != nil {
+		return storeConfig{}
+	}
+	var cfg storeConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return storeConfig{}
+	}
+	return cfg
+}
+
 // ReadDebugFlag reads the "debug" field from ~/.cabrero/config.json.
 // Returns false if the file is missing, malformed, or the field is absent.
 func ReadDebugFlag() bool {
-	data, err := os.ReadFile(filepath.Join(Root(), "config.json"))
-	if err != nil {
-		return false
-	}
-	var cfg struct {
-		Debug bool `json:"debug"`
-	}
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return false
-	}
-	return cfg.Debug
+	return readConfig().Debug
 }
 
 // PipelineOverrides holds optional pipeline overrides from config.json.
@@ -199,15 +212,13 @@ type PipelineOverrides struct {
 // ReadPipelineOverrides reads pipeline overrides from ~/.cabrero/config.json.
 // Returns zero-value fields for missing file, malformed JSON, or absent keys.
 func ReadPipelineOverrides() PipelineOverrides {
-	data, err := os.ReadFile(filepath.Join(Root(), "config.json"))
-	if err != nil {
-		return PipelineOverrides{}
+	cfg := readConfig()
+	return PipelineOverrides{
+		ClassifierModel:   cfg.ClassifierModel,
+		EvaluatorModel:    cfg.EvaluatorModel,
+		ClassifierTimeout: cfg.ClassifierTimeout,
+		EvaluatorTimeout:  cfg.EvaluatorTimeout,
 	}
-	var cfg PipelineOverrides
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return PipelineOverrides{}
-	}
-	return cfg
 }
 
 // BlocklistLen returns the number of entries in the blocklist.
