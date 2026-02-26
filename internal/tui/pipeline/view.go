@@ -297,14 +297,24 @@ func (m Model) renderModels() string {
 	b.WriteString("\n")
 
 	cfg := m.pipelineCfg
-	b.WriteString(fmt.Sprintf("  Classifier:  %s", cfg.ClassifierModel))
-	if cfg.ClassifierModel != pl.DefaultClassifierModel {
-		b.WriteString(shared.WarningStyle.Render("  (override)"))
+
+	rows := []struct{ label, model, def string }{
+		{"Classifier:  ", cfg.ClassifierModel, pl.DefaultClassifierModel},
+		{"Evaluator:   ", cfg.EvaluatorModel, pl.DefaultEvaluatorModel},
+		{"Curator:     ", cfg.CuratorModel, pl.DefaultCuratorModel},
+		{"Curator chk: ", cfg.CuratorCheckModel, pl.DefaultCuratorCheckModel},
+		{"Apply:       ", cfg.ApplyModel, pl.DefaultApplyModel},
+		{"Chat:        ", cfg.ChatModel, pl.DefaultChatModel},
+		{"Meta:        ", cfg.MetaModel, pl.DefaultMetaModel},
 	}
-	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Evaluator:   %s", cfg.EvaluatorModel))
-	if cfg.EvaluatorModel != pl.DefaultEvaluatorModel {
-		b.WriteString(shared.WarningStyle.Render("  (override)"))
+	for i, row := range rows {
+		b.WriteString(fmt.Sprintf("  %s%s", row.label, row.model))
+		if row.model != row.def {
+			b.WriteString(shared.WarningStyle.Render("  (override)"))
+		}
+		if i < len(rows)-1 {
+			b.WriteString("\n")
+		}
 	}
 	return b.String()
 }

@@ -348,3 +348,14 @@ func TestModelPipelineKeyEmitsPushLogView(t *testing.T) {
 		t.Errorf("push view = %d, want ViewLogViewer", push.View)
 	}
 }
+
+func TestRenderModels_ShowsAllFields(t *testing.T) {
+	m := newTestModel()
+	rendered := ansi.Strip(m.renderModels())
+
+	for _, want := range []string{"Curator:", "Apply:", "Chat:", "Meta:"} {
+		if !strings.Contains(rendered, want) {
+			t.Errorf("MODELS section missing %q line", want)
+		}
+	}
+}
