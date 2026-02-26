@@ -125,10 +125,33 @@ func (r *Runner) evalMany(sessions []BatchSession) (*EvaluatorOutput, *ClaudeRes
 func (r *Runner) parseSession(sessionID string) (*parser.Digest, error) {
 	if r.stages != nil {
 		if d, err := r.stages.ParseSession(sessionID); d != nil || err != nil {
+			if d != nil && len(d.RawUnknown) > 0 {
+				r.warnFormatDrift(sessionID, d.RawUnknown)
+			}
 			return d, err
 		}
 	}
-	return parser.ParseSession(sessionID)
+	d, err := parser.ParseSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if len(d.RawUnknown) > 0 {
+		r.warnFormatDrift(sessionID, d.RawUnknown)
+	}
+	return d, nil
+}
+
+func (r *Runner) warnFormatDrift(sessionID string, unknown []parser.RawUnknown) {
+	types := make(map[string]int)
+	for _, u := range unknown {
+		types[u.Type]++
+	}
+	typeList := make([]string, 0, len(types))
+	for t := range types {
+		typeList = append(typeList, t)
+	}
+	r.Config.logger().Error("WARN session %s: %d unrecognised transcript entries (types: %v) — CC format may have changed",
+		sessionID, len(unknown), typeList)
 }
 
 func (r *Runner) aggregate(sessionID, project string) (*patterns.AggregatorOutput, error) {
