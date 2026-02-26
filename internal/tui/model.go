@@ -319,6 +319,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		return m, tea.Batch(statusCmd, nextTick, reloadCmd)
 
+	case message.LogViewerContentLoaded:
+		m.logViewer = logview.New(msg.Content, &m.keys, m.config)
+		m.logViewer.SetFileSize(msg.FileSize)
+		m.logViewer.SetSize(m.width, m.childHeight())
+		return m, nil
+
 	case message.LogTickMsg:
 		if m.state == message.ViewLogViewer {
 			logPath := filepath.Join(store.Root(), "daemon.log")
@@ -654,11 +660,18 @@ func (m appModel) pushView(view message.ViewState, action string) (tea.Model, te
 		}))
 
 	case message.ViewLogViewer:
-		logPath := filepath.Join(store.Root(), "daemon.log")
-		content, _ := os.ReadFile(logPath)
-		m.logViewer = logview.New(string(content), &m.keys, m.config)
-		m.logViewer.SetFileSize(int64(len(content)))
+		// Initialize with empty content — LogViewerContentLoaded will fill it in.
+		m.logViewer = logview.New("", &m.keys, m.config)
 		m.logViewer.SetSize(m.width, m.childHeight())
+		// Load content asynchronously to avoid blocking the main goroutine.
+		cmds = append(cmds, func() tea.Msg {
+			logPath := filepath.Join(store.Root(), "daemon.log")
+			content, _ := os.ReadFile(logPath)
+			return message.LogViewerContentLoaded{
+				Content:  string(content),
+				FileSize: int64(len(content)),
+			}
+		})
 		// Always poll for new log content while the viewer is open.
 		cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg {
 			return message.LogTickMsg{}

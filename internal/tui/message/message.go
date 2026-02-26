@@ -192,3 +192,9 @@ type PipelineDataRefreshed struct {
 
 // LogTickMsg triggers log viewer follow-mode refresh.
 type LogTickMsg struct{}
+
+// LogViewerContentLoaded carries the initial log file content loaded asynchronously.
+type LogViewerContentLoaded struct {
+	Content  string
+	FileSize int64
+}
