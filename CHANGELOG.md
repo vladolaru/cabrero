@@ -5,6 +5,58 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.3] - 2026-02-26
+
+### Fixed
+- **Stale proposals after actions** — approve, reject, defer, and dismiss actions
+  no longer leave the acted-on item in the dashboard until restart. The proposal
+  list and `PendingCount` header now reload from disk after each action.
+  Reject/defer archive and reload are sequenced in a single command to avoid a
+  race where the reload could read before archiving completed.
+- **Frozen `PendingCount` on pipeline tick** — the `PipelineTickMsg` goroutine
+  was capturing `m.proposals` at scheduling time rather than reloading from
+  disk, so the header count never reflected post-action state. It now reloads
+  inside the goroutine.
+- **Silent `BlockSession` error in chat** — failure to blocklist a chat session
+  was silently discarded, allowing the daemon to process it as a real work
+  session and produce spurious proposals. The error is now surfaced as a status
+  bar message and the view transition is rolled back.
+- **Log viewer blocked main goroutine** — opening the log viewer triggered a
+  synchronous `os.ReadFile` on the Bubble Tea event loop. The initial load is
+  now dispatched as a background command; the viewer initialises with empty
+  content and fills in when the read completes.
+- **Data race on disk-usage cache** — `cachedDiskBytes` and `cachedDiskBytesTime`
+  were read and written from background tick goroutines without mutex protection.
+  A `sync.Mutex` now guards all accesses in `storeDiskBytes`.
+- **Hardcoded daemon log path in chat** — `chatLog` constructed
+  `~/.cabrero/daemon.log` manually instead of using `store.Root()`. Fixed to
+  follow the canonical store path.
+- **Session ID truncation inconsistency** — `cabrero proposals` was truncating
+  session IDs to 10 characters; all other display sites use the 8-character
+  `store.ShortSessionID`. Now consistent.
+
+### Performance
+- **Per-frame config.json read eliminated** — `renderModels()` in the pipeline
+  monitor called `DefaultPipelineConfig()` (a disk read) on every render frame.
+  The config is now cached in `pipeline.Model` and threaded from `appModel`
+  via `PipelineDataRefreshed`.
+
+### Refactored
+- **Duplicate format helpers removed** — `RelativeTime` and `ShortenHome` were
+  reimplemented in `internal/tui/shared`. Both functions now delegate to the
+  canonical implementations in `internal/cli`, fixing a zero-time divergence
+  bug where `shared.RelativeTime` would produce `"471580d ago"` instead of
+  `"unknown"` for a zero `time.Time`.
+- **`config.json` parsed once per call** — `ReadDebugFlag` and
+  `ReadPipelineOverrides` each opened and parsed `~/.cabrero/config.json`
+  independently. A shared `readConfig()` helper now parses the file once.
+
+### Tests
+- **Schema drift detection for classifier JSON tags** — added
+  `TestClassifierSignalsLocalSchema` to verify that the store's local
+  `classifierSignals` struct projection stays in sync with the pipeline
+  package's `ClassifierOutput` JSON tags.
+
 ## [0.20.2] - 2026-02-25
 
 ### Fixed
@@ -780,6 +832,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.20.3]: https://github.com/vladolaru/cabrero/compare/v0.20.2...v0.20.3
 [0.20.2]: https://github.com/vladolaru/cabrero/compare/v0.20.1...v0.20.2
 [0.20.1]: https://github.com/vladolaru/cabrero/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/vladolaru/cabrero/compare/v0.19.0...v0.20.0
