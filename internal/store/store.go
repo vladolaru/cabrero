@@ -10,14 +10,35 @@ import (
 	"sync"
 )
 
+// testRootOverride is set by RootOverrideForTest to redirect store access in tests.
+var testRootOverride string
+
 // Root returns the absolute path to the Cabrero data directory.
 func Root() string {
+	if testRootOverride != "" {
+		return testRootOverride
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		// This would only fail on truly broken systems.
 		panic(fmt.Sprintf("cannot determine home directory: %v", err))
 	}
 	return filepath.Join(home, ".cabrero")
+}
+
+// RootOverrideForTest sets a temporary root directory for tests.
+// Returns the previous override value for restoration with ResetRootOverrideForTest.
+// Not goroutine-safe — use only in single-threaded test setup/teardown.
+func RootOverrideForTest(dir string) string {
+	old := testRootOverride
+	testRootOverride = dir
+	return old
+}
+
+// ResetRootOverrideForTest restores the root directory to a previous value
+// returned by RootOverrideForTest.
+func ResetRootOverrideForTest(old string) {
+	testRootOverride = old
 }
 
 // subdirectories created by Init.

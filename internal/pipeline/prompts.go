@@ -8,6 +8,33 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
+const (
+	curatorPromptFile      = "curator-v1.txt"
+	curatorCheckPromptFile = "curator-check-v1.txt"
+)
+
+// EnsureCuratorPrompts writes default curator prompt files if they don't already exist.
+func EnsureCuratorPrompts() error {
+	dir := filepath.Join(store.Root(), "prompts")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	prompts := map[string]string{
+		curatorPromptFile:      defaultCuratorPrompt,
+		curatorCheckPromptFile: defaultCuratorCheckPrompt,
+	}
+	for filename, content := range prompts {
+		path := filepath.Join(dir, filename)
+		if _, err := os.Stat(path); err == nil {
+			continue
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			return fmt.Errorf("writing %s: %w", filename, err)
+		}
+	}
+	return nil
+}
+
 // EnsurePrompts writes default prompt files if they don't already exist.
 // Called at the start of a pipeline run.
 func EnsurePrompts() error {
@@ -296,4 +323,96 @@ The "change" and "rationale" fields are displayed in a terminal TUI. Use literal
 
 - **change**: Start with what to modify, then explain the content. For claude_addition, separate the context paragraph from the actual entry text.
 - **rationale**: First paragraph states the core evidence (UUIDs, signals). Second paragraph explains why this matters or what risk it mitigates. Keep each paragraph to 2-3 sentences.
+`
+
+const defaultCuratorPrompt = `You are a proposal curator for Cabrero. Your job is to clean up a backlog of pending improvement proposals for a single target file by identifying concern clusters, detecting already-applied changes, and producing a CuratorManifest.
+
+## Input
+
+You will receive:
+1. A list of pending proposals (JSON array) all targeting the same file
+2. The current content of the target file (read it yourself using the Read tool)
+
+## Strategy by proposal type
+
+**claude_addition:**
+1. Read the current target file.
+2. Identify distinct concern clusters among the proposals. Each cluster groups proposals that address the same root cause (e.g. "Edit precondition failures", "search fumble patterns"). Do NOT merge proposals from different clusters.
+3. For each cluster: if the target file already contains the substance of the proposed changes (semantic equivalence, not literal match), set synthesis to null and mark all proposals as "auto-reject" with reason "already applied to target". Otherwise, synthesize one new Proposal that distills the cluster's signal into a single concrete, actionable CLAUDE.md entry.
+4. Mark all original proposals as "synthesize" (if a synthesis was produced) or "auto-reject" (if already applied).
+
+**skill_improvement / claude_review:**
+1. Read the current target file.
+2. Check if any proposals are already addressed by the current file state. If so, mark them "auto-reject" with reason "already applied to target".
+3. Among remaining proposals, rank by: specificity of evidence > severity of friction described.
+4. Keep the top 1-2. Mark the rest as "cull" with reason "superseded by <winner-id>" or "lower signal than kept proposals".
+5. Kept proposals: include them in decisions with action "keep". Do NOT rewrite them.
+
+**skill_scaffold:**
+Never touch scaffold proposals. If any are present, mark them "keep" with reason "scaffold always preserved".
+
+## Synthesized proposal format
+
+A synthesized Proposal must have:
+- id: "prop-curator-<target-hash-4chars>-<cluster-index>" (e.g. "prop-curator-a1b2-1")
+- type: same as source proposals
+- confidence: "high" if 3+ source proposals; "medium" otherwise
+- target: same target as input proposals
+- change: a concrete, actionable entry — not a summary. For claude_addition, write the actual CLAUDE.md rule text.
+- rationale: "Synthesized from N proposals (sessions: <short-ids>) by daily cleanup.\n<distilled rationale in 2-3 sentences>"
+- citedUuids: [] (empty — cross-session synthesis, no single session UUIDs)
+
+## Output format
+
+Output ONLY valid JSON. No markdown fences, no preamble.
+
+Schema:
+{
+  "target": "string",
+  "decisions": [
+    {"proposalId": "string", "action": "keep|synthesize|cull|auto-reject", "reason": "string", "supersededBy": "string (optional)"}
+  ],
+  "clusters": [
+    {
+      "clusterName": "string",
+      "sourceIds": ["string"],
+      "synthesis": <Proposal object or null>
+    }
+  ]
+}
+
+The clusters array is only needed for claude_addition. Omit it for skill_improvement/claude_review/skill_scaffold.
+
+## Budget
+
+You have a budget of {{MAX_TURNS}} tool-call rounds. Read the target file first, then output the manifest. If you exhaust your budget, output your best manifest with what you have.
+`
+
+const defaultCuratorCheckPrompt = `You are a proposal checker for Cabrero. For each proposal in the input, determine whether its proposed change is already present in the current target file content.
+
+## Input
+
+A JSON array of check items:
+[
+  {
+    "proposalId": "string",
+    "target": "string (file path)",
+    "currentFileContent": "string (full file content, may be empty if file does not exist)",
+    "proposedChange": "string (the proposed change text)"
+  }
+]
+
+## Task
+
+For each item: determine if the target file already contains the substance of the proposed change. Use semantic equivalence — a paraphrase counts as already present. Word-for-word match is not required.
+
+If currentFileContent is empty, the file does not exist — the change is NOT already applied.
+
+## Output format
+
+Output ONLY valid JSON array. No markdown fences, no preamble.
+
+[
+  {"proposalId": "string", "alreadyApplied": true|false, "reason": "string (brief explanation)"}
+]
 `
