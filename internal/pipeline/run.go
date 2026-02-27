@@ -574,7 +574,7 @@ func ListCleanupRunsFromHistory(limit int) ([]PipelineRun, error) {
 			ErrorDetail:   rec.Error,
 		}
 		if rec.Error != "" {
-			run.Status = "error"
+			run.Status = HistoryStatusError
 		}
 		runs = append(runs, run)
 	}

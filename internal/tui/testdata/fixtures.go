@@ -378,7 +378,7 @@ func TestPipelineRuns() []pipeline.PipelineRun {
 			r.SessionID = "91cd02ab"
 			r.Project = "woo-payments"
 			r.Timestamp = time.Now().Add(-8 * time.Hour)
-			r.Status = "error"
+			r.Status = pipeline.HistoryStatusError
 			r.HasClassifier = false
 			r.HasEvaluator = false
 			r.ParseDuration = 400 * time.Millisecond

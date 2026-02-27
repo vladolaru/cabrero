@@ -245,7 +245,7 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	rec.ClassifierUsage = usageFromResult(classifierCR)
 
 	if err != nil {
-		rec.Status = "error"
+		rec.Status = HistoryStatusError
 		rec.ErrorDetail = err.Error()
 		rec.ParseDurationNs = int64(parseDuration)
 		rec.ClassifierDurationNs = int64(classifierOnly)
@@ -431,7 +431,7 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		case <-ctx.Done():
 			// Mark remaining sessions as errors.
 			for j := i; j < len(sessions); j++ {
-				results[j].Status = "error"
+				results[j].Status = HistoryStatusError
 				results[j].Error = ctx.Err()
 			}
 			return results
@@ -455,11 +455,11 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		rec.ClassifierUsage = usageFromResult(classifierCR)
 
 		if err != nil {
-			results[i].Status = "error"
+			results[i].Status = HistoryStatusError
 			results[i].Error = err
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
 
-			rec.Status = "error"
+			rec.Status = HistoryStatusError
 			rec.ErrorDetail = err.Error()
 			rec.computeUsageTotals()
 			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
