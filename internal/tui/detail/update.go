@@ -104,7 +104,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg { return message.ChatPanelToggled{} }
 
 	case key.Matches(msg, m.keys.UseRevision):
-		// Only meaningful if revision exists — handled by chat model.
+		if !m.HasRevision() {
+			return m, nil
+		}
+		m.applyState = ApplyConfirming
+		m.revConfirm = components.NewRevisionConfirm("Apply original or chat revision?")
+		m.refreshBodyViewport()
 		return m, nil
 
 	// Citation navigation (Up/Down) and expand/collapse (Enter).

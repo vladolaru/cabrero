@@ -315,3 +315,24 @@ func TestChat_MuteANSI_BlankLines(t *testing.T) {
 		t.Errorf("blank line should remain empty, got %q", lines[1])
 	}
 }
+
+func TestChat_RevisionGetter(t *testing.T) {
+	m := newTestChat()
+	if m.Revision() != nil {
+		t.Error("Revision should be nil initially")
+	}
+
+	// Simulate a stream done with revision block.
+	m.streaming = true
+	m.streamBuf.WriteString("Here is a revision:\n\n```revision\nnew content\n```\n")
+	m, _ = m.Update(message.ChatStreamDone{
+		FullResponse: m.streamBuf.String(),
+	})
+
+	if m.Revision() == nil {
+		t.Fatal("Revision should be non-nil after stream with revision block")
+	}
+	if *m.Revision() != "new content" {
+		t.Errorf("Revision content = %q, want %q", *m.Revision(), "new content")
+	}
+}

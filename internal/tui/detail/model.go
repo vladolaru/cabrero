@@ -172,6 +172,11 @@ func (m Model) HasRevision() bool {
 	return m.revision != nil
 }
 
+// SetRevision sets the chat-produced revision for the approve flow.
+func (m *Model) SetRevision(rev *string) {
+	m.revision = rev
+}
+
 // SetInlineChat sets rendered chat content to be appended inside the body viewport.
 // The input line is rendered as fixed chrome below the viewport (not scrollable).
 func (m *Model) SetInlineChat(content, input string) {

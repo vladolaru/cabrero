@@ -719,10 +719,11 @@ func (m appModel) renderVerticalSeparator(height int) string {
 	return strings.Join(lines, "\n")
 }
 
-// syncInlineChat clears any stale inline chat content from the detail viewport.
-// Narrow mode now uses a vertical split instead of inline embedding.
+// syncInlineChat clears any stale inline chat content from the detail viewport
+// and syncs the revision from chat to detail so the approval flow can access it.
 func (m *appModel) syncInlineChat() {
 	m.detail.ClearInlineChat()
+	m.detail.SetRevision(m.chat.Revision())
 }
 
 // childHeight returns the height available for child views (total minus persistent header and sub-header).

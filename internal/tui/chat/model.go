@@ -149,6 +149,11 @@ func (m Model) HasRevision() bool {
 	return m.revision != nil
 }
 
+// Revision returns the chat-produced revision content, or nil if none.
+func (m Model) Revision() *string {
+	return m.revision
+}
+
 // addMessage appends a message and updates the viewport.
 // User messages use simple word wrap; assistant messages are parsed as markdown.
 // Both use hanging indent so continuation lines align past the label.
