@@ -12,15 +12,24 @@ fi
 # Read stdin JSON payload.
 PAYLOAD=$(cat)
 
-# Extract fields. Uses parameter expansion to strip JSON — avoids jq dependency.
-# CC payloads are simple flat JSON, so this is reliable for single string values.
-SESSION_ID=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-TRANSCRIPT_PATH=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-SESSION_CWD=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-# Derive project slug from cwd: replace / and . with - (matches CC encoding).
-PROJECT_SLUG=$(printf '%s' "$SESSION_CWD" | sed 's/[\/.]/-/g')
-# Escape backslashes and quotes for safe JSON interpolation in heredoc.
-SESSION_CWD=$(printf '%s' "$SESSION_CWD" | sed 's/\\/\\\\/g; s/"/\\"/g')
+# Extract fields using python3 JSON parsing (robust against field ordering and escaping).
+eval "$(printf '%s' "$PAYLOAD" | python3 -c '
+import json, sys, re
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+sid = d.get("session_id", "")
+tp = d.get("transcript_path", "")
+cwd = d.get("cwd", "")
+slug = re.sub(r"[/.]", "-", cwd)
+# Escape for shell single-quote safety.
+def sh(s): return s.replace("\\", "\\\\").replace("\"", "\\\"")
+print(f"SESSION_ID=\"{sh(sid)}\"")
+print(f"TRANSCRIPT_PATH=\"{sh(tp)}\"")
+print(f"SESSION_CWD=\"{sh(cwd)}\"")
+print(f"PROJECT_SLUG=\"{sh(slug)}\"")
+' 2>/dev/null || echo 'SESSION_ID=""; TRANSCRIPT_PATH=""')"
 
 if [ -z "$SESSION_ID" ] || [ -z "$TRANSCRIPT_PATH" ]; then
   exit 0
@@ -34,9 +43,17 @@ esac
 CABRERO_ROOT="${HOME}/.cabrero"
 BLOCKLIST="${CABRERO_ROOT}/blocklist.json"
 
-# Check blocklist.
+# Check blocklist using JSON-aware lookup.
 if [ -f "$BLOCKLIST" ]; then
-  if printf '%s' "$(cat "$BLOCKLIST")" | grep -q "\"${SESSION_ID}\""; then
+  if python3 -c '
+import json, sys
+try:
+    bl = json.load(open(sys.argv[1]))
+    ids = bl if isinstance(bl, list) else bl.get("sessions", [])
+    sys.exit(0 if sys.argv[2] in ids else 1)
+except Exception:
+    sys.exit(1)
+' "$BLOCKLIST" "$SESSION_ID" 2>/dev/null; then
     exit 0
   fi
 fi
