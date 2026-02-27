@@ -54,6 +54,9 @@ type appModel struct {
 	// Source groups for re-use when pushing ViewSourceManager.
 	sourceGroups []fitness.SourceGroup
 
+	// Fitness chat state (ephemeral, reset on view pop).
+	fitnessChatOpen bool
+
 	// Terminal background detection.
 	isDark bool
 
@@ -143,7 +146,29 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.switchView(msg.View)
 
 	case message.ChatPanelToggled:
-		m.resizeDetailChat()
+		switch m.state {
+		case message.ViewProposalDetail:
+			m.resizeDetailChat()
+		case message.ViewFitnessDetail:
+			m.fitnessChatOpen = !m.fitnessChatOpen
+			if m.fitnessChatOpen {
+				report := m.fitness.Report()
+				if report == nil {
+					m.fitnessChatOpen = false
+					return m, nil
+				}
+				chips := fitnessChatChips()
+				chatCfg, err := buildFitnessChatConfig(report, m.config.Debug, m.pipelineCfg.ChatModel)
+				if err != nil {
+					m.fitnessChatOpen = false
+					return m, func() tea.Msg {
+						return message.StatusMessage{Text: "Chat unavailable: " + err.Error(), Duration: 5 * time.Second}
+					}
+				}
+				m.chat = chat.New(chips, chatCfg, m.width, m.childHeight())
+			}
+			m.resizeFitnessChat()
+		}
 		return m, nil
 
 	case message.ApproveStarted:
@@ -402,10 +427,23 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case message.ViewFitnessDetail:
-		var cmd tea.Cmd
-		m.fitness, cmd = m.fitness.Update(childMsg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
+		if _, isResize := childMsg.(tea.WindowSizeMsg); isResize {
+			m.resizeFitnessChat()
+		} else if keyMsg, isKey := childMsg.(tea.KeyPressMsg); isKey && m.fitnessChatOpen {
+			cmds = append(cmds, m.routeFitnessKey(keyMsg)...)
+		} else {
+			var cmd tea.Cmd
+			m.fitness, cmd = m.fitness.Update(childMsg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			if m.fitnessChatOpen {
+				var chatCmd tea.Cmd
+				m.chat, chatCmd = m.chat.Update(childMsg)
+				if chatCmd != nil {
+					cmds = append(cmds, chatCmd)
+				}
+			}
 		}
 	case message.ViewSourceManager:
 		var cmd tea.Cmd
@@ -478,7 +516,20 @@ func (m appModel) View() tea.View {
 			content += "\n" + components.RenderStatusBar(filtered, "", m.width)
 		}
 	case message.ViewFitnessDetail:
-		content = m.fitness.View()
+		if m.fitnessChatOpen && m.width >= 160 {
+			fitnessView := m.fitness.View()
+			sep := m.renderVerticalSeparator(m.childHeight() - 1)
+			chatView := m.chat.View()
+			content = lipgloss.JoinHorizontal(lipgloss.Top, fitnessView, sep, chatView)
+			content += "\n" + components.RenderStatusBar(m.keys.FitnessShortHelp(), "", m.width)
+		} else if m.fitnessChatOpen {
+			sep := shared.MutedStyle.Render(strings.Repeat("─", m.width))
+			chatView := shared.IndentBlock(m.chat.View(), 2)
+			content = m.fitness.View() + sep + "\n" + chatView
+			content += "\n" + components.RenderStatusBar(m.keys.FitnessShortHelp(), "", m.width)
+		} else {
+			content = m.fitness.View()
+		}
 	case message.ViewSourceManager:
 		content = m.sources.View()
 	case message.ViewPipelineMonitor:
@@ -567,6 +618,11 @@ func (m appModel) handleGlobalKey(msg tea.KeyPressMsg) (appModel, tea.Cmd, bool)
 			m.detail.CurrentFocus() == detail.FocusChat {
 			return m, nil, false
 		}
+		// Let routeFitnessKey handle Esc when fitness chat has focus.
+		if m.state == message.ViewFitnessDetail && m.fitnessChatOpen &&
+			m.fitness.CurrentFocus() == fitness_tui.FocusChat {
+			return m, nil, false
+		}
 		if m.state == message.ViewPipelineMonitor && m.pipelineMonitor.HasActivePrompt() {
 			return m, nil, false
 		}
@@ -587,6 +643,8 @@ func (m appModel) hasActiveTextInput() bool {
 		return m.dashboard.HasActiveInput()
 	case message.ViewProposalDetail:
 		return m.config.Detail.ChatPanelOpen && m.chat.IsInputFocused()
+	case message.ViewFitnessDetail:
+		return m.fitnessChatOpen && m.chat.IsInputFocused()
 	case message.ViewLogViewer:
 		return m.logViewer.IsSearchInputActive()
 	}
@@ -830,11 +888,104 @@ func (m *appModel) routeDetailKey(msg tea.KeyPressMsg) []tea.Cmd {
 	return cmds
 }
 
+// resizeFitnessChat sets layout-aware dimensions on fitness and chat models.
+func (m *appModel) resizeFitnessChat() {
+	ch := m.childHeight()
+	if !m.fitnessChatOpen {
+		m.fitness.SetSize(m.width, ch-1) // -1 for root-rendered status bar
+		return
+	}
+
+	chatPct := m.config.Detail.ChatPanelWidth // reuse detail's width config
+	if chatPct <= 0 {
+		chatPct = 35
+	}
+
+	if m.width >= 160 {
+		cw := m.width * chatPct / 100
+		dw := m.width - cw - 3
+		panelH := ch - 1
+		m.fitness.SetSize(dw, panelH)
+		m.chat.SetSize(cw, panelH)
+	} else {
+		panelH := ch - 1
+		chatH := panelH * chatPct / 100
+		if chatH < 8 {
+			chatH = 8
+		}
+		fitnessH := panelH - chatH - 1
+		m.fitness.SetSize(m.width, fitnessH)
+		m.chat.SetSize(m.width-2, chatH)
+	}
+}
+
+// routeFitnessKey routes a key event between fitness and chat based on focus.
+func (m *appModel) routeFitnessKey(msg tea.KeyPressMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+
+	// Tab goes to fitness for focus toggling, then sync chat focus.
+	if key.Matches(msg, m.keys.TabForward) || key.Matches(msg, m.keys.TabBackward) {
+		var cmd tea.Cmd
+		m.fitness, cmd = m.fitness.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		m.chat.SetFocused(m.fitness.CurrentFocus() == fitness_tui.FocusChat)
+		return cmds
+	}
+
+	chatFocused := m.fitness.CurrentFocus() == fitness_tui.FocusChat
+
+	if chatFocused {
+		if m.chat.IsInputFocused() {
+			// Chat input active — all keys to chat.
+			var cmd tea.Cmd
+			m.chat, cmd = m.chat.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		} else {
+			switch {
+			case key.Matches(msg, m.keys.Back):
+				// Esc switches focus back to report.
+				m.fitness.SetFocus(fitness_tui.FocusReport)
+				m.chat.SetFocused(false)
+			case key.Matches(msg, m.keys.Dismiss),
+				key.Matches(msg, m.keys.Sources),
+				key.Matches(msg, m.keys.Chat):
+				// Action keys go to fitness model.
+				var cmd tea.Cmd
+				m.fitness, cmd = m.fitness.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			default:
+				// Everything else to chat.
+				var cmd tea.Cmd
+				m.chat, cmd = m.chat.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			}
+		}
+	} else {
+		// Report panel has focus — all keys to fitness.
+		var cmd tea.Cmd
+		m.fitness, cmd = m.fitness.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	return cmds
+}
+
 func (m appModel) popView() (tea.Model, tea.Cmd) {
 	if len(m.viewStack) == 0 {
 		return m, nil
 	}
 
+	m.fitnessChatOpen = false // reset ephemeral chat state
 	m.state = m.viewStack[len(m.viewStack)-1]
 	m.viewStack = m.viewStack[:len(m.viewStack)-1]
 	return m, nil
@@ -999,6 +1150,73 @@ func defaultChips() []string {
 		"Conservative version",
 		"Risk of approving?",
 	}
+}
+
+func fitnessChatChips() []string {
+	return []string{
+		"What does this mean?",
+		"Improvement suggestions",
+		"Explain the evidence",
+		"Is this concerning?",
+	}
+}
+
+func buildFitnessChatConfig(r *fitness.Report, debug bool, model string) (chat.ChatConfig, error) {
+	sessionID, err := pipeline.GenerateUUID()
+	if err != nil {
+		return chat.ChatConfig{Debug: debug, Model: model}, nil
+	}
+	if err := store.BlockSession(sessionID, time.Now()); err != nil {
+		return chat.ChatConfig{}, fmt.Errorf("blocklisting chat session: %w", err)
+	}
+	return chat.ChatConfig{
+		SessionID:    sessionID,
+		SystemPrompt: buildFitnessChatSystemPrompt(r),
+		Model:        model,
+		Debug:        debug,
+	}, nil
+}
+
+func buildFitnessChatSystemPrompt(r *fitness.Report) string {
+	var b strings.Builder
+
+	b.WriteString("You are an AI assistant helping a human understand a Cabrero fitness report. ")
+	b.WriteString("Cabrero observes Claude Code sessions and evaluates how well skills and instructions are followed. ")
+	b.WriteString("Your role is to explain the report findings and suggest improvements.\n\n")
+
+	b.WriteString("## Report Details\n\n")
+	b.WriteString(fmt.Sprintf("- **Source:** %s\n", r.SourceName))
+	b.WriteString(fmt.Sprintf("- **Origin:** %s\n", r.SourceOrigin))
+	b.WriteString(fmt.Sprintf("- **Ownership:** %s\n", r.Ownership))
+	b.WriteString(fmt.Sprintf("- **Observed sessions:** %d\n", r.ObservedCount))
+	b.WriteString(fmt.Sprintf("- **Window:** %d days\n", r.WindowDays))
+
+	b.WriteString("\n### Assessment\n\n")
+	b.WriteString(fmt.Sprintf("- Followed: %.1f%% (%d)\n", r.Assessment.Followed.Percent, r.Assessment.Followed.Count))
+	b.WriteString(fmt.Sprintf("- Worked Around: %.1f%% (%d)\n", r.Assessment.WorkedAround.Percent, r.Assessment.WorkedAround.Count))
+	b.WriteString(fmt.Sprintf("- Confused: %.1f%% (%d)\n", r.Assessment.Confused.Percent, r.Assessment.Confused.Count))
+
+	b.WriteString(fmt.Sprintf("\n### Verdict\n\n%s\n", r.Verdict))
+
+	if len(r.Evidence) > 0 {
+		b.WriteString("\n### Evidence Groups\n\n")
+		for _, eg := range r.Evidence {
+			b.WriteString(fmt.Sprintf("**%s** (%d entries)\n", eg.Category, len(eg.Entries)))
+			for _, entry := range eg.Entries {
+				b.WriteString(fmt.Sprintf("  - %s: %s\n", entry.Timestamp.Format("2006-01-02"), entry.Summary))
+				if entry.Detail != "" {
+					b.WriteString(fmt.Sprintf("    Detail: %s\n", entry.Detail))
+				}
+			}
+		}
+	}
+
+	b.WriteString("\n## Guidelines\n\n")
+	b.WriteString("- Format your responses in Markdown. Your output is rendered in a terminal.\n")
+	b.WriteString("- Be concise and direct.\n")
+	b.WriteString("- Focus on actionable insights: what could be improved, what patterns suggest, and whether the skill needs revision.\n")
+
+	return b.String()
 }
 
 func actionStatusText(msg tea.Msg) string {

@@ -58,8 +58,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handleJumpToSources()
 
 	case key.Matches(msg, m.keys.Chat):
-		m.focus = FocusChat
-		return m, nil
+		return m, func() tea.Msg { return message.ChatPanelToggled{} }
 
 	case key.Matches(msg, m.keys.TabForward):
 		if m.focus == FocusReport {

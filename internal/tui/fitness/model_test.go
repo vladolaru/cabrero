@@ -204,13 +204,23 @@ func TestFitness_FocusToggle(t *testing.T) {
 	}
 }
 
-func TestFitness_ChatKey(t *testing.T) {
+func TestFitness_ChatKeyEmitsToggle(t *testing.T) {
 	m := newTestFitness()
 
-	// Press 'c' to focus chat.
-	m, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
-	if m.focus != FocusChat {
-		t.Errorf("focus after 'c' = %d, want FocusChat", m.focus)
+	// Press 'c' — should emit ChatPanelToggled, not change local focus.
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
+
+	if cmd == nil {
+		t.Fatal("c key should produce cmd")
+	}
+	msg := cmd()
+	if _, ok := msg.(message.ChatPanelToggled); !ok {
+		t.Fatalf("expected ChatPanelToggled, got %T", msg)
+	}
+
+	// Focus should remain on Report (root handles the toggle).
+	if m.focus != FocusReport {
+		t.Errorf("focus should stay FocusReport, got %d", m.focus)
 	}
 }
 

@@ -63,6 +63,15 @@ func New(report *fitness.Report, keys *shared.KeyMap, cfg *shared.Config) Model 
 	return m
 }
 
+// Report returns the underlying fitness report, or nil.
+func (m Model) Report() *fitness.Report { return m.report }
+
+// CurrentFocus returns which panel has focus.
+func (m Model) CurrentFocus() Focus { return m.focus }
+
+// SetFocus sets which panel has focus.
+func (m *Model) SetFocus(f Focus) { m.focus = f }
+
 // SetSize updates the model dimensions and recalculates the viewport.
 func (m *Model) SetSize(width, height int) {
 	m.width = width
