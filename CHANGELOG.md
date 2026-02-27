@@ -5,6 +5,37 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-02-27
+
+### Added
+- **pipeline**: Explicit `SessionID` field on `Proposal` struct for typed batch
+  partitioning. The evaluator prompt instructs the LLM to populate it; partitioning
+  uses exact match when available, falling back to legacy prefix matching for older
+  evaluator output.
+- **integration**: New `internal/integration/claude` package consolidating all Claude
+  Code settings logic (read/write `settings.json`, hook status checks, binary path
+  resolution). Replaces 6 inline implementations with 3 different "contains cabrero"
+  functions across `cmd/` and `tui/`.
+- **parser**: Unit tests for friction detection heuristics (`detectRetryAnomalies`,
+  `detectSearchFumbles`, `detectBacktracking`) and `inferClaudeMdLoaded`.
+
+### Fixed
+- **parser**: Agent-to-agentID mapping bug where all agents received the same ID
+  because the agent ID pool was never depleted during iteration. Now uses a claimed-set
+  with sorted spawn keys for deterministic one-to-one assignment; unmatched spawns get
+  `agentID: "unknown"`.
+
+### Changed
+- **pipeline**: Extract `finalizeSessionOutcome` helper consolidating the 12-site
+  set-status/compute-totals/append-history/mark-store bookkeeping sequence in `runner.go`.
+- **pipeline**: Extract `estimateStageDurations` helper deduplicating the mtime-based
+  duration estimation block between `ListPipelineRunsFromSessions` and
+  `ListPipelineRunsFromHistory`.
+- **pipeline**: Replace 4 remaining `"error"` string literals in `runner.go` status
+  assignments with `HistoryStatusError` constant.
+- **store**: `ShortSessionID` docstring updated to reflect display-only usage (no longer
+  used for pipeline partitioning).
+
 ## [0.26.0] - 2026-02-27
 
 ### Fixed
@@ -1028,6 +1059,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.27.0]: https://github.com/vladolaru/cabrero/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/vladolaru/cabrero/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/vladolaru/cabrero/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/vladolaru/cabrero/compare/v0.23.0...v0.24.0
