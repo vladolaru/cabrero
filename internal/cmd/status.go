@@ -37,6 +37,7 @@ func Status(args []string) error {
 		queued := 0
 		imported := 0
 		processed := 0
+		errored := 0
 		for _, s := range sessions {
 			switch s.Status {
 			case "queued":
@@ -45,10 +46,16 @@ func Status(args []string) error {
 				imported++
 			case "processed":
 				processed++
+			case "error":
+				errored++
 			}
 		}
-		fmt.Printf("  %s  %d captured, %d queued, %d imported, %d processed\n",
+		statusLine := fmt.Sprintf("  %s  %d captured, %d queued, %d imported, %d processed",
 			cli.Bold("Sessions:"), len(sessions), queued, imported, processed)
+		if errored > 0 {
+			statusLine += fmt.Sprintf(", %s", cli.Error(fmt.Sprintf("%d errored", errored)))
+		}
+		fmt.Println(statusLine)
 	}
 
 	// Blocklist count.
