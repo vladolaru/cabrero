@@ -5,6 +5,20 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.1] - 2026-02-27
+
+### Fixed
+- **pipeline**: Misplaced doc comment where `estimateStageDurations` stole
+  the `ListPipelineRunsFromSessions` godoc.
+
+### Changed
+- **integration**: Complete settings consolidation by migrating `setup.go`,
+  `doctor.go`, and `uninstall.go` to use `claude.LoadSettings()`,
+  `claude.WriteSettings()`, and `claude.SettingsPath()`. Delete redundant
+  unexported `containsCabrero` function. Net -39 lines.
+- **pipeline**: Use `HistoryStatusProcessed` constant in batch partition tests
+  instead of literal `"processed"` strings.
+
 ## [0.27.0] - 2026-02-27
 
 ### Added
@@ -1059,6 +1073,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.27.1]: https://github.com/vladolaru/cabrero/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/vladolaru/cabrero/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/vladolaru/cabrero/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/vladolaru/cabrero/compare/v0.24.0...v0.25.0
