@@ -455,3 +455,32 @@ func TestPromptVersions() []pipeline.PromptVersion {
 		{Name: "apply", Version: "v1", UpdatedAt: time.Now().Add(-3 * 24 * time.Hour)},
 	}
 }
+
+// TestOpsStats returns OpsStats fixtures for snapshot rendering.
+func TestOpsStats() pipeline.OpsStats {
+	now := time.Now()
+	return pipeline.OpsStats{
+		WindowStart:       now.Add(-48 * time.Hour),
+		WindowEnd:         now,
+		GatedRuns:         4,
+		SkippedBusy:       7,
+		MetaTriggered:     2,
+		MetaCooldowns:     3,
+		MetaNoThreshold:   8,
+		ErrorRuns:         1,
+		ProcessedRuns:     23,
+		GatedUnclassified: 3,
+		GatedPaused:       1,
+		DailyGated:        []int{2, 1, 0, 1, 0, 0, 0},
+		DailySkipped:      []int{3, 2, 1, 0, 1, 0, 0},
+		DailyProcessed:    []int{8, 6, 4, 3, 2, 0, 0},
+		DailyErrors:       []int{0, 1, 0, 0, 0, 0, 0},
+		RecentEvents: []pipeline.OpsEvent{
+			{Timestamp: now.Add(-15 * time.Minute), SessionID: "abc12345-1111-2222-3333-444455556666", Source: "daemon", Status: pipeline.HistoryStatusSkippedBusy, Reason: "slot occupied"},
+			{Timestamp: now.Add(-42 * time.Minute), SessionID: "def67890-aaaa-bbbb-cccc-ddddeeeeffff", Source: "daemon", Status: pipeline.HistoryStatusError, Reason: "classifier timeout"},
+			{Timestamp: now.Add(-1 * time.Hour), SessionID: "", Source: "meta", Status: pipeline.HistoryStatusMetaTriggered, Reason: "v3"},
+			{Timestamp: now.Add(-3 * time.Hour), SessionID: "ghi11111-2222-3333-4444-555566667777", Source: "daemon", Status: pipeline.HistoryStatusProcessed, Reason: "", Project: "~/Work/a8c/woocommerce"},
+			{Timestamp: now.Add(-5 * time.Hour), SessionID: "", Source: "meta", Status: pipeline.HistoryStatusMetaCooldown, Reason: "v2 in cooldown"},
+		},
+	}
+}

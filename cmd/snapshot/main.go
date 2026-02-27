@@ -26,6 +26,7 @@ import (
 	fitness_tui "github.com/vladolaru/cabrero/internal/tui/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/logview"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	ops_tui "github.com/vladolaru/cabrero/internal/tui/ops"
 	pipeline_tui "github.com/vladolaru/cabrero/internal/tui/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 	"github.com/vladolaru/cabrero/internal/tui/sources"
@@ -46,6 +47,7 @@ var views = []string{
 	"help-overlay",
 	"help-overlay-vim",
 	"log-viewer",
+	"operations",
 }
 
 func main() {
@@ -119,6 +121,8 @@ func render(view string, w, h int) (string, error) {
 		return renderHelpOverlay(w, h, "vim")
 	case "log-viewer":
 		return renderLogViewer(w, h)
+	case "operations":
+		return renderOperations(w, h)
 	default:
 		return "", fmt.Errorf("unknown view %q, available: %s", view, strings.Join(views, ", "))
 	}
@@ -295,6 +299,20 @@ func renderLogViewer(w, h int) (string, error) {
 	content := testdata.TestLogContent()
 
 	m := logview.New(content, &keys, cfg)
+	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
+	m.SetSize(w, h-th)
+	return prefix + m.View(), nil
+}
+
+func renderOperations(w, h int) (string, error) {
+	w, h = defaults(w, h)
+	stats := testdata.TestDashboardStats()
+
+	cfg := testdata.TestConfig()
+	keys := shared.NewKeyMap(cfg.Navigation)
+	opsStats := testdata.TestOpsStats()
+
+	m := ops_tui.New(opsStats, &keys, cfg)
 	prefix, th := renderWithSubHeader(stats, m.SubHeader(), w)
 	m.SetSize(w, h-th)
 	return prefix + m.View(), nil

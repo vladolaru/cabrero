@@ -136,6 +136,19 @@ func HelpForView(view message.ViewState, km KeyMap, sourceDetailOpen ...bool) He
 				"for watching the daemon process sessions in real time.",
 			Sections: logViewerHelp(km),
 		}
+	case message.ViewOperations:
+		return HelpContent{
+			Title: "Operations Help",
+			Description: "Shows operational signals from the daemon runtime: " +
+				"policy-gated runs, skipped-busy events, errors, and meta " +
+				"trigger/cooldown decisions. These signals are often spread " +
+				"across logs — this view makes them first-class.\n\n" +
+				"Summary cards show aggregate counts with sparklines for " +
+				"daily trends. The recent events list highlights noteworthy " +
+				"events in reverse chronological order. Data auto-refreshes " +
+				"every 5 seconds while the view is open.",
+			Sections: opsHelp(km),
+		}
 	default:
 		return HelpContent{
 			Title: "Dashboard Help",
@@ -175,6 +188,7 @@ func dashboardHelp(km KeyMap) []HelpSection {
 			Entries: []HelpEntry{
 				{km.Sources.Help().Key, "Open source manager"},
 				{km.Pipeline.Help().Key, "Open pipeline monitor"},
+				{km.Operations.Help().Key, "Open operations view"},
 			},
 		},
 		{
@@ -365,6 +379,27 @@ func pipelineHelp(km KeyMap) []HelpSection {
 			Title: "Views",
 			Entries: []HelpEntry{
 				{km.Sources.Help().Key, "Open source manager"},
+			},
+		},
+		{
+			Title: "Global",
+			Entries: []HelpEntry{
+				{km.Back.Help().Key, "Return to dashboard"},
+				{km.Help.Help().Key, "Toggle this help overlay"},
+				{km.Quit.Help().Key, "Quit the application"},
+				{km.ForceQuit.Help().Key, "Force quit immediately"},
+			},
+		},
+	}
+}
+
+func opsHelp(km KeyMap) []HelpSection {
+	return []HelpSection{
+		{
+			Title: "Navigation",
+			Entries: []HelpEntry{
+				{km.Up.Help().Key, "Move cursor up"},
+				{km.Down.Help().Key, "Move cursor down"},
 			},
 		},
 		{

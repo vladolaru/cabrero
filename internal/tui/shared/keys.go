@@ -63,8 +63,9 @@ type KeyMap struct {
 	CollapseAll  key.Binding
 
 	// View navigation
-	Sources  key.Binding
-	Pipeline key.Binding
+	Sources    key.Binding
+	Pipeline   key.Binding
+	Operations key.Binding
 }
 
 // NewKeyMap creates a KeyMap for the given navigation mode ("arrows" or "vim").
@@ -119,8 +120,9 @@ func NewKeyMap(nav string) KeyMap {
 		CollapseAll:  key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "collapse all")),
 
 		// View navigation.
-		Sources:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sources")),
-		Pipeline: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pipeline")),
+		Sources:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sources")),
+		Pipeline:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pipeline")),
+		Operations: key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "ops")),
 	}
 
 	if nav == "vim" {
@@ -149,7 +151,7 @@ func NewKeyMap(nav string) KeyMap {
 // ShortHelp returns bindings for the short help view (dashboard context).
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.Up, k.Down, k.Open, k.Approve, k.Reject, k.Defer, k.Sources, k.Pipeline, k.Help,
+		k.Up, k.Down, k.Open, k.Approve, k.Reject, k.Defer, k.Sources, k.Pipeline, k.Operations, k.Help,
 	}
 }
 
@@ -175,6 +177,11 @@ func (k KeyMap) SourcesShortHelp() []key.Binding {
 // PipelineShortHelp returns help bindings for the pipeline monitor view.
 func (k KeyMap) PipelineShortHelp() []key.Binding {
 	return []key.Binding{k.Up, k.Down, k.Open, k.Retry, k.Refresh, k.Sources, k.LogView, k.Back, k.Help}
+}
+
+// OpsShortHelp returns help bindings for the operations view.
+func (k KeyMap) OpsShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Back, k.Help}
 }
 
 // LogViewShortHelp returns help bindings for the log viewer.

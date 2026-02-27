@@ -101,6 +101,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return message.PushView{View: message.ViewPipelineMonitor}
 		}
+
+	case key.Matches(msg, m.keys.Operations):
+		return m, func() tea.Msg {
+			return message.PushView{View: message.ViewOperations}
+		}
 	}
 
 	// Navigation (up/down/half-page/goto) handled by list.

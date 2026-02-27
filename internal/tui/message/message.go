@@ -18,6 +18,7 @@ const (
 	ViewSourceManager
 	ViewPipelineMonitor
 	ViewLogViewer
+	ViewOperations
 )
 
 // Navigation messages.
@@ -200,6 +201,16 @@ type PipelineDataRefreshed struct {
 	Proposals       []pipeline.ProposalWithSession
 	PipelineMetrics pipeline.PipelineMetrics
 }
+
+// Ops view messages.
+
+// OpsDataRefreshed carries refreshed ops stats from background I/O.
+type OpsDataRefreshed struct {
+	Stats pipeline.OpsStats
+}
+
+// OpsTickMsg triggers auto-refresh of ops data.
+type OpsTickMsg struct{}
 
 // LogTickMsg triggers log viewer follow-mode refresh.
 type LogTickMsg struct{}

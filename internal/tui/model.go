@@ -27,6 +27,7 @@ import (
 	fitness_tui "github.com/vladolaru/cabrero/internal/tui/fitness"
 	"github.com/vladolaru/cabrero/internal/tui/logview"
 	"github.com/vladolaru/cabrero/internal/tui/message"
+	ops_tui "github.com/vladolaru/cabrero/internal/tui/ops"
 	pipeline_tui "github.com/vladolaru/cabrero/internal/tui/pipeline"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
 	"github.com/vladolaru/cabrero/internal/tui/sources"
@@ -49,6 +50,7 @@ type appModel struct {
 	fitness         fitness_tui.Model
 	sources         sources.Model
 	pipelineMonitor pipeline_tui.Model
+	opsView         ops_tui.Model
 	logViewer       logview.Model
 
 	// Source groups for re-use when pushing ViewSourceManager.
@@ -348,6 +350,25 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		return m, tea.Batch(statusCmd, nextTick, reloadCmd)
 
+	case message.OpsTickMsg:
+		if m.state == message.ViewOperations {
+			sparkDays := m.config.Pipeline.SparklineDays
+			return m, func() tea.Msg {
+				records, _ := pipeline.ReadHistory()
+				since := time.Now().Add(-48 * time.Hour)
+				stats := pipeline.ComputeOpsStats(records, since, sparkDays)
+				return message.OpsDataRefreshed{Stats: stats}
+			}
+		}
+		return m, nil
+
+	case message.OpsDataRefreshed:
+		m.opsView.UpdateStats(msg.Stats)
+		nextTick := tea.Tick(5*time.Second, func(time.Time) tea.Msg {
+			return message.OpsTickMsg{}
+		})
+		return m, nextTick
+
 	case message.LogViewerContentLoaded:
 		m.logViewer = logview.New(msg.Content, &m.keys, m.config)
 		m.logViewer.SetFileSize(msg.FileSize)
@@ -463,6 +484,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
+	case message.ViewOperations:
+		var cmd tea.Cmd
+		m.opsView, cmd = m.opsView.Update(childMsg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -536,6 +563,8 @@ func (m appModel) View() tea.View {
 		content = m.pipelineMonitor.View()
 	case message.ViewLogViewer:
 		content = m.logViewer.View()
+	case message.ViewOperations:
+		content = m.opsView.View()
 	}
 
 	// Help overlay.
@@ -742,6 +771,18 @@ func (m appModel) pushView(view message.ViewState, action string) (tea.Model, te
 		cmds = append(cmds, tea.Tick(time.Second, func(time.Time) tea.Msg {
 			return message.LogTickMsg{}
 		}))
+
+	case message.ViewOperations:
+		m.opsView = ops_tui.New(pipeline.OpsStats{}, &m.keys, m.config)
+		m.opsView.SetSize(m.width, m.childHeight())
+		// Load ops data asynchronously and start the refresh tick.
+		sparkDays := m.config.Pipeline.SparklineDays
+		cmds = append(cmds, func() tea.Msg {
+			records, _ := pipeline.ReadHistory()
+			since := time.Now().Add(-48 * time.Hour)
+			stats := pipeline.ComputeOpsStats(records, since, sparkDays)
+			return message.OpsDataRefreshed{Stats: stats}
+		})
 	}
 
 	return m, tea.Batch(cmds...)
@@ -762,6 +803,8 @@ func (m appModel) subHeader() string {
 		return m.pipelineMonitor.SubHeader()
 	case message.ViewLogViewer:
 		return m.logViewer.SubHeader()
+	case message.ViewOperations:
+		return m.opsView.SubHeader()
 	default:
 		return ""
 	}
@@ -1005,6 +1048,16 @@ func (m appModel) switchView(view message.ViewState) (tea.Model, tea.Cmd) {
 		return m, tea.Tick(5*time.Second, func(time.Time) tea.Msg {
 			return message.PipelineTickMsg{}
 		})
+	case message.ViewOperations:
+		m.opsView = ops_tui.New(pipeline.OpsStats{}, &m.keys, m.config)
+		m.opsView.SetSize(m.width, m.childHeight())
+		sparkDays := m.config.Pipeline.SparklineDays
+		return m, func() tea.Msg {
+			records, _ := pipeline.ReadHistory()
+			since := time.Now().Add(-48 * time.Hour)
+			stats := pipeline.ComputeOpsStats(records, since, sparkDays)
+			return message.OpsDataRefreshed{Stats: stats}
+		}
 	case message.ViewDashboard:
 		return m, nil
 	}

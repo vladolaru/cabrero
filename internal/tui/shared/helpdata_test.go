@@ -17,6 +17,7 @@ func TestHelpForView_AllViewsCovered(t *testing.T) {
 		message.ViewSourceManager,
 		message.ViewPipelineMonitor,
 		message.ViewLogViewer,
+		message.ViewOperations,
 	}
 
 	for _, v := range views {
@@ -108,6 +109,7 @@ func TestHelpForView_NoDuplicateKeys(t *testing.T) {
 		message.ViewSourceManager,
 		message.ViewPipelineMonitor,
 		message.ViewLogViewer,
+		message.ViewOperations,
 	}
 
 	for _, v := range views {
@@ -134,6 +136,7 @@ func TestHelpForView_AllViewsHaveTitleAndDescription(t *testing.T) {
 		message.ViewSourceManager,
 		message.ViewPipelineMonitor,
 		message.ViewLogViewer,
+		message.ViewOperations,
 	}
 
 	for _, v := range views {
