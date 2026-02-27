@@ -374,8 +374,17 @@ Cleanup record appended to cleanup_history.jsonl + macOS notification
 
 All LLM calls are mediated by the `claude` CLI. No API keys in the app — CC's existing
 auth is reused throughout. Classifier and Evaluator run as agentic tool-using sessions with
-constrained tool access (Read, Grep). Apply stage uses `--print` (non-agentic). The
-daemon sets `CABRERO_SESSION=1` on all CLI invocations to prevent loop capture.
+constrained tool access (Read, Grep). Apply stage uses `--print` (non-agentic).
+
+**Subprocess isolation.** Every `claude` CLI invocation is sandboxed to prevent interference from user configuration and to avoid loop capture:
+
+- **Environment:** `CLAUDECODE` and other CC-internal env vars are stripped (via `cleanClaudeEnv()`); `CABRERO_SESSION=1` is added to prevent loop capture by hooks
+- **CWD:** `os.TempDir()` — prevents CC's project-discovery walk-up from `~/.cabrero/` into `~/`, which triggers macOS TCC prompts for `~/Desktop`, `~/Music`, etc.
+- **MCP isolation:** `--mcp-config '{"mcpServers":{}}'` with `--strict-mcp-config` — ignores all other MCP sources (plugins, user settings, project config)
+- **Settings overrides:** `--settings '{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}'` — disables hooks, extended thinking, and plugins
+- **Slash commands:** `--disable-slash-commands`
+
+See `docs/subprocess-isolation.md` for the complete isolation model including per-mode specifics and known leaks.
 
 **Debug mode.** By default, `invokeClaude()` passes `--no-session-persistence` so CC
 discards the session transcript after each invocation — only the final text output is
@@ -410,8 +419,9 @@ contention:
   not retried.
 
 **Trigger:** The daemon only processes sessions with status `"queued"`. Hook-captured
-sessions (session-end, pre-compact) are written with `"queued"` status and processed
-automatically. Bulk-imported sessions get `"imported"` status and must be explicitly
+sessions (session-end, pre-compact) are written with `"queued"` status when the transcript
+copy succeeds, or `"error"` status when the copy fails — preventing permanently dangling
+queued sessions. Bulk-imported sessions get `"imported"` status and must be explicitly
 enqueued via `cabrero backfill --enqueue`.
 
 ### Pre-Parser (pure code, no LLM)
@@ -482,7 +492,7 @@ tool access. Apply and chat stages remain non-agentic.
 - **Evaluator** — chat: interactive proposal interrogation in the TUI. Latency-
   sensitive; fast enough to feel conversational. Non-agentic (`--print`).
 - **Curator** (`claude-sonnet-4-6`) — agentic curator with `Read,Grep` access, isolated
-  via `SettingSources: ""` (no user plugins or MCP servers). Runs once per multi-proposal
+  via the standard subprocess isolation model (see above). Runs once per multi-proposal
   target group in the daily cleanup. Receives the full proposal list for that target as its
   user prompt. Identifies concern clusters, produces a `CuratorManifest` with per-proposal
   decisions and synthesized proposals. Max 15 turns, 5-minute timeout.
@@ -645,7 +655,9 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
   non-blocking try-acquire: if all slots are busy, sessions stay queued and are retried
   on the next poll cycle. CLI commands block-wait for a slot with a progress message
 - **Transcript validation** — `ScanQueued` skips sessions without a `transcript.jsonl`
-  file, preventing repeated failures from incomplete captures
+  file, preventing repeated failures from incomplete captures. Complementary active cleanup:
+  `CleanDanglingQueued` runs during stale scans and marks queued sessions older than 1 hour
+  with no transcript as errored
 - **Smart batching** — uses `pipeline.BatchProcessor` to group queued sessions by project,
   run Classifier individually (cheap triage), then batch "evaluate" sessions into a single
   Evaluator call per project
@@ -691,9 +703,10 @@ low-signal redundancy, and auto-rejecting proposals that have already been appli
 - All Curator sessions run in parallel (goroutines), sharing the existing invoke semaphore
   for backpressure.
 
-**Isolation:** Curator sessions use `SettingSources: ""` to prevent loading user skills,
-plugins, or MCP servers. The Curator should not be influenced by the same skill infrastructure
-it is evaluating.
+**Isolation:** Curator sessions use the same subprocess isolation as all pipeline stages —
+`--strict-mcp-config`, `--settings` overrides, and `CABRERO_SESSION=1`. The Curator should
+not be influenced by the same skill infrastructure it is evaluating. See
+`docs/subprocess-isolation.md` for details.
 
 **Audit trail:** Every cleanup run appends a `CleanupRecord` to `cleanup_history.jsonl`:
 timestamp, duration, before/after proposal counts, all `CuratorDecision` entries, and per-call
