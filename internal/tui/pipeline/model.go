@@ -91,12 +91,13 @@ func (m *Model) refreshViewport() {
 
 // Refresh updates the pipeline data while preserving cursor and expansion state.
 // Returns a tea.Cmd when a timed status clear is needed (manual refresh).
-func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats, pipelineCfg pl.PipelineConfig) tea.Cmd {
+func (m *Model) Refresh(runs []pl.PipelineRun, stats pl.PipelineStats, prompts []pl.PromptVersion, dashStats message.DashboardStats, pipelineCfg pl.PipelineConfig, metrics pl.PipelineMetrics) tea.Cmd {
 	m.runs = runs
 	m.stats = stats
 	m.prompts = prompts
 	m.dashStats = dashStats
 	m.pipelineCfg = pipelineCfg
+	m.pipelineMetrics = metrics
 	// Clamp cursor to the new data bounds.
 	if m.cursor >= len(m.runs) {
 		m.cursor = max(0, len(m.runs)-1)

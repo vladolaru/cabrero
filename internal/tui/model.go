@@ -294,13 +294,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				stats, _ := pipeline.GatherPipelineStatsFromSessions(sessions, runs, sparklineDays)
 				prompts, _ := pipeline.ListPromptVersions()
 				dashStats := gatherStatsFromSessions(sessions, proposals, pipelineCfg)
+				metrics, _ := pipeline.ComputePipelineMetrics(pipelineCfg)
 				return message.PipelineDataRefreshed{
-					Runs:        runs,
-					Stats:       stats,
-					Prompts:     prompts,
-					DashStats:   dashStats,
-					PipelineCfg: pipelineCfg,
-					Proposals:   proposals,
+					Runs:            runs,
+					Stats:           stats,
+					Prompts:         prompts,
+					DashStats:       dashStats,
+					PipelineCfg:     pipelineCfg,
+					Proposals:       proposals,
+					PipelineMetrics: metrics,
 				}
 			}
 		}
@@ -308,7 +310,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case message.PipelineDataRefreshed:
 		m.pipelineRefreshing = false
-		statusCmd := m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats, msg.PipelineCfg)
+		statusCmd := m.pipelineMonitor.Refresh(msg.Runs, msg.Stats, msg.Prompts, msg.DashStats, msg.PipelineCfg, msg.PipelineMetrics)
 		// Update proposals if the tick returned a fresh list.
 		var reloadCmd tea.Cmd
 		if msg.Proposals != nil {
