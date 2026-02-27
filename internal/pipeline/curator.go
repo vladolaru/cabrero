@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/vladolaru/cabrero/internal/store"
 )
 
 // IsFileTarget returns true if target looks like a filesystem path
@@ -172,7 +174,7 @@ func RunCuratorGroup(target string, proposals []ProposalWithSession, cfg Pipelin
 		SystemPrompt:   systemPrompt,
 		Agentic:        true,
 		Prompt:         userPrompt,
-		AllowedTools:   "Read,Grep",
+		AllowedTools:   curatorAllowedTools(target),
 		MaxTurns:       cfg.CuratorMaxTurns,
 		Timeout:        cfg.CuratorTimeout,
 		Logger:         cfg.Logger,
@@ -190,4 +192,27 @@ func RunCuratorGroup(target string, proposals []ProposalWithSession, cfg Pipelin
 	}
 	manifest.Target = target // ensure target is set even if LLM omitted it
 	return &manifest, cr, nil
+}
+
+// curatorAllowedTools builds a path-scoped --allowedTools value for the curator.
+// Scopes access to the target file's directory and ~/.cabrero.
+func curatorAllowedTools(target string) string {
+	cabreroRoot := store.Root()
+	paths := []string{
+		fmt.Sprintf("Read(//%s/**)", cabreroRoot),
+		fmt.Sprintf("Grep(//%s/**)", cabreroRoot),
+	}
+
+	// Add the target file's parent directory.
+	if target != "" {
+		targetDir := filepath.Dir(target)
+		if targetDir != "" && targetDir != "." {
+			paths = append(paths,
+				fmt.Sprintf("Read(//%s/**)", targetDir),
+				fmt.Sprintf("Grep(//%s/**)", targetDir),
+			)
+		}
+	}
+
+	return strings.Join(paths, ",")
 }

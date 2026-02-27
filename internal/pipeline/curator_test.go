@@ -168,6 +168,20 @@ func TestCleanLLMJSONArray(t *testing.T) {
 	}
 }
 
+func TestCuratorAllowedToolsAreScoped(t *testing.T) {
+	// Verify the curator uses path-scoped tools, not bare "Read,Grep".
+	tools := curatorAllowedTools("/home/user/projects/myapp/CLAUDE.md")
+	if tools == "Read,Grep" {
+		t.Error("curator tools should be path-scoped, not bare Read,Grep")
+	}
+	if !strings.Contains(tools, "Read(//") {
+		t.Errorf("curator tools should contain path-scoped Read, got: %s", tools)
+	}
+	if !strings.Contains(tools, "Grep(//") {
+		t.Errorf("curator tools should contain path-scoped Grep, got: %s", tools)
+	}
+}
+
 func TestNewProposalTypes_Defined(t *testing.T) {
 	// Verify string values match what the design specifies.
 	if TypePromptImprovement != "prompt_improvement" {
