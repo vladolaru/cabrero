@@ -745,8 +745,8 @@ func (m *appModel) resizeDetailChat() {
 	}
 
 	if m.width >= 160 {
-		// Horizontal split: detail and chat each get 50% width, status bar rendered by root.
-		cw := m.width * 50 / 100
+		// Horizontal split: chat gets configured width percentage, detail gets the rest.
+		cw := m.width * chatPct / 100
 		dw := m.width - cw - 3 // -3 for padded vertical separator ( │ )
 		panelH := ch - 1        // -1 for root-rendered status bar
 		m.detail.SetSize(dw, panelH)
