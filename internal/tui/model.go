@@ -547,7 +547,7 @@ func (m appModel) handleGlobalKey(msg tea.KeyPressMsg) (appModel, tea.Cmd, bool)
 			return m, nil, true
 		}
 		// Let child views handle Esc when they have active prompts or searches.
-		if m.state == message.ViewLogViewer && m.logViewer.HasActiveSearch() {
+		if m.state == message.ViewLogViewer && (m.logViewer.HasActiveSearch() || m.logViewer.IsSearchInputActive()) {
 			return m, nil, false
 		}
 		if m.state == message.ViewSourceManager && m.sources.HasActivePrompt() {

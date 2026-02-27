@@ -160,6 +160,22 @@ func TestLogModelEscFromSearch(t *testing.T) {
 	}
 }
 
+func TestIsSearchInputActive_TrueWhileTyping(t *testing.T) {
+	m := newTestLogModel()
+	m.SetSize(120, 40)
+
+	// Activate search.
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	if !m.IsSearchInputActive() {
+		t.Error("IsSearchInputActive should be true after pressing /")
+	}
+
+	// HasActiveSearch should be false (no term submitted yet).
+	if m.HasActiveSearch() {
+		t.Error("HasActiveSearch should be false before submitting a search term")
+	}
+}
+
 func TestLogModelHasActiveSearch(t *testing.T) {
 	m := newTestLogModel()
 	m.SetSize(120, 40)
