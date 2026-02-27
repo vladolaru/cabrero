@@ -5,6 +5,35 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-02-27
+
+### Added
+- **Source identity hardening** — `MergeSources` now indexes by `(origin, name)` tuple
+  instead of name alone, preventing cross-origin collisions when different sources share
+  the same name. Added `UpdateSourceByIdentity` for origin-aware updates and wired it
+  through the TUI source management views.
+- **Source policy gate** — new `CheckSourcePolicy` gate runs after classification and
+  before evaluation. Sessions touching unclassified or paused sources are skipped with a
+  `gate_reason` recorded in the history record, enforcing source governance automatically.
+- **Meta cooldown over archived proposals** — `metaCooldownActive` now checks both
+  pending and recently archived (approved/rejected) proposals via `ArchivedMetaProposalAfter`,
+  preventing re-triggering meta-analysis shortly after a recent decision.
+- **Batch evaluator retry loop** — `RunEvaluatorBatch` now retries on retriable JSON
+  parse failures, matching the single-session evaluator's retry semantics.
+- **Batch evaluator fallback** — when batch evaluation fails, the runner now falls back
+  to per-session evaluation for each session in the chunk instead of marking all as error.
+- **Batch allowed-tools scope union** — batch evaluator filesystem scope now reflects all
+  unique session cwds via `evaluatorAllowedToolsMulti`, not just the first session's cwd.
+- **Busy-slot skip observability** — when the daemon skips sessions due to busy invoke
+  slots, a lightweight `skipped_busy` history record is now persisted. `cabrero status`
+  shows the contention count (last 7 days) when non-zero.
+
+### Changed
+- **Hook JSON parsing** — `pre-compact-backup.sh` and `session-end.sh` now use `python3`
+  JSON parsing instead of `sed` regexes for field extraction and blocklist checks. Robust
+  against field reordering and escaped characters. Falls back to clean exit if `python3`
+  is unavailable.
+
 ## [0.23.0] - 2026-02-27
 
 ### Added
@@ -964,6 +993,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.24.0]: https://github.com/vladolaru/cabrero/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/vladolaru/cabrero/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/vladolaru/cabrero/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/vladolaru/cabrero/compare/v0.22.0...v0.22.1
