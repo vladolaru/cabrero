@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -96,12 +97,22 @@ func MetaCooldownCutoff(cooldownDays int) time.Time {
 }
 
 // ProposalCreatedAfter returns true if the proposal was created after the given cutoff.
+// For meta proposals (prop-meta-<unix_ts>-N), parses the timestamp from the ID.
+// For other proposals with no embedded timestamp, returns true (fail-open: treat as recent).
 func ProposalCreatedAfter(pw ProposalWithSession, cutoff time.Time) bool {
-	// Use the proposal ID's timestamp component if available; otherwise use zero.
-	// Proposals are stored with a timestamp in the filename prefix; if the
-	// proposal is in-queue, treat it as recent (created after cutoff).
-	_ = cutoff
-	return true // conservative: treat all queued proposals as recent
+	// Meta proposal IDs: prop-meta-<unix_timestamp>-<index>
+	if strings.HasPrefix(pw.Proposal.ID, "prop-meta-") {
+		parts := strings.Split(pw.Proposal.ID, "-")
+		// Expected: ["prop", "meta", "<timestamp>", "<index>"]
+		if len(parts) >= 4 {
+			ts, err := strconv.ParseInt(parts[2], 10, 64)
+			if err == nil {
+				return time.Unix(ts, 0).After(cutoff)
+			}
+		}
+	}
+	// No timestamp available — fail open (treat as recent).
+	return true
 }
 
 func median(vals []float64) float64 {

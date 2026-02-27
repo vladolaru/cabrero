@@ -68,6 +68,45 @@ func TestRunMetaAnalysis_SkipsTranscriptWithNoToolUse(t *testing.T) {
 	}
 }
 
+func TestProposalCreatedAfter(t *testing.T) {
+	now := time.Now()
+	cutoff := now.Add(-7 * 24 * time.Hour) // 7 days ago
+
+	tests := []struct {
+		name     string
+		id       string
+		wantTrue bool
+	}{
+		{
+			name:     "meta proposal created recently (after cutoff)",
+			id:       fmt.Sprintf("prop-meta-%d-1", now.Add(-1*24*time.Hour).Unix()),
+			wantTrue: true,
+		},
+		{
+			name:     "meta proposal created long ago (before cutoff)",
+			id:       fmt.Sprintf("prop-meta-%d-1", now.Add(-30*24*time.Hour).Unix()),
+			wantTrue: false,
+		},
+		{
+			name:     "evaluator proposal with no timestamp in ID",
+			id:       "prop-abcd1234-0",
+			wantTrue: true, // no timestamp info → treat as recent (fail open)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pw := ProposalWithSession{
+				Proposal: Proposal{ID: tt.id},
+			}
+			got := ProposalCreatedAfter(pw, cutoff)
+			if got != tt.wantTrue {
+				t.Errorf("ProposalCreatedAfter(%q, cutoff) = %v, want %v", tt.id, got, tt.wantTrue)
+			}
+		})
+	}
+}
+
 func TestComputePipelineMetrics_ClassifierFPR(t *testing.T) {
 	tmp := t.TempDir()
 	old := store.RootOverrideForTest(tmp)
