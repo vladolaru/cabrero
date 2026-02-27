@@ -727,23 +727,41 @@ func (d *Digest) finalizeAgents(sessionID string, agentSpawns map[string]*AgentI
 	}
 	sort.Strings(sortedAgentIDs)
 
-	for toolUseID, item := range agentSpawns {
+	// Track which agentIDs have been claimed to avoid double-assignment.
+	claimed := make(map[string]bool)
+
+	// Sort spawn keys for deterministic iteration over the map.
+	spawnKeys := make([]string, 0, len(agentSpawns))
+	for k := range agentSpawns {
+		spawnKeys = append(spawnKeys, k)
+	}
+	sort.Strings(spawnKeys)
+
+	for _, toolUseID := range spawnKeys {
+		item := agentSpawns[toolUseID]
 		item.Abandoned = !agentResultIDs[toolUseID]
 
-		// Try to match agent ID counts (entries in main transcript with this agentId).
-		// The agentId in entries is a short form, not the tool_use_id. We look for
-		// any agentId that matches a known pattern.
-		// Iterate in sorted order for deterministic assignment.
+		// Try to match an unclaimed agentID from the pool.
+		matched := false
 		for _, agentID := range sortedAgentIDs {
+			if claimed[agentID] {
+				continue
+			}
 			count := agentIDCounts[agentID]
-			// Heuristic: agent entries reference by a shortened agent ID.
-			// We can't perfectly map tool_use_id to agentId without more data,
-			// but we collect what we find.
-			if item.EntryCount == 0 {
+			if count > 0 {
 				item.AgentID = agentID
 				item.EntryCount = count
 				item.HasOwnTranscript = agentFiles[agentID]
+				claimed[agentID] = true
+				matched = true
+				break
 			}
+		}
+
+		if !matched {
+			item.AgentID = "unknown"
+			item.EntryCount = 0
+			item.HasOwnTranscript = false
 		}
 
 		d.Agents.Inventory = append(d.Agents.Inventory, *item)
