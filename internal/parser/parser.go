@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -719,13 +720,22 @@ func (d *Digest) finalizeAgents(sessionID string, agentSpawns map[string]*AgentI
 		}
 	}
 
+	// Sort agent IDs for deterministic assignment when multiple candidates exist.
+	sortedAgentIDs := make([]string, 0, len(agentIDCounts))
+	for id := range agentIDCounts {
+		sortedAgentIDs = append(sortedAgentIDs, id)
+	}
+	sort.Strings(sortedAgentIDs)
+
 	for toolUseID, item := range agentSpawns {
 		item.Abandoned = !agentResultIDs[toolUseID]
 
 		// Try to match agent ID counts (entries in main transcript with this agentId).
 		// The agentId in entries is a short form, not the tool_use_id. We look for
 		// any agentId that matches a known pattern.
-		for agentID, count := range agentIDCounts {
+		// Iterate in sorted order for deterministic assignment.
+		for _, agentID := range sortedAgentIDs {
+			count := agentIDCounts[agentID]
 			// Heuristic: agent entries reference by a shortened agent ID.
 			// We can't perfectly map tool_use_id to agentId without more data,
 			// but we collect what we find.
