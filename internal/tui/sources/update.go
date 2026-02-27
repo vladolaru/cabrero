@@ -167,12 +167,14 @@ func (m Model) handleOpen() (Model, tea.Cmd) {
 	src := *s
 	m.detailSource = &src
 	sourceName := src.Name
+	sourceOrigin := src.Origin
 	return m, func() tea.Msg {
-		changes, err := store.ChangesBySource(sourceName)
+		changes, err := store.ChangesBySourceIdentity(sourceName, sourceOrigin)
 		return message.SourceChangesLoaded{
-			SourceName: sourceName,
-			Changes:    changes,
-			Err:        err,
+			SourceName:   sourceName,
+			SourceOrigin: sourceOrigin,
+			Changes:      changes,
+			Err:          err,
 		}
 	}
 }
@@ -394,14 +396,16 @@ func (m Model) handleRollbackFinished(msg message.RollbackFinished) (Model, tea.
 	// Reload changes from store to reflect the new rollback entry.
 	if m.detailSource != nil {
 		sourceName := m.detailSource.Name
+		sourceOrigin := m.detailSource.Origin
 		return m, tea.Batch(
 			statusCmd,
 			func() tea.Msg {
-				changes, err := store.ChangesBySource(sourceName)
+				changes, err := store.ChangesBySourceIdentity(sourceName, sourceOrigin)
 				return message.SourceChangesLoaded{
-					SourceName: sourceName,
-					Changes:    changes,
-					Err:        err,
+					SourceName:   sourceName,
+					SourceOrigin: sourceOrigin,
+					Changes:      changes,
+					Err:          err,
 				}
 			},
 		)
@@ -440,13 +444,14 @@ func executeRollback(changeID string) message.RollbackFinished {
 
 	// Record rollback audit entry.
 	rollbackEntry := fitness.ChangeEntry{
-		ID:          "rollback-" + changeID,
-		SourceName:  entry.SourceName,
-		ProposalID:  entry.ProposalID,
-		Description: "Rollback of " + changeID,
-		Timestamp:   time.Now(),
-		Status:      "rollback",
-		FilePath:    entry.FilePath,
+		ID:           "rollback-" + changeID,
+		SourceName:   entry.SourceName,
+		SourceOrigin: entry.SourceOrigin,
+		ProposalID:   entry.ProposalID,
+		Description:  "Rollback of " + changeID,
+		Timestamp:    time.Now(),
+		Status:       "rollback",
+		FilePath:     entry.FilePath,
 	}
 	// Ignore audit write error — rollback itself succeeded.
 	_ = store.AppendChange(rollbackEntry)

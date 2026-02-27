@@ -172,9 +172,10 @@ type RollbackFinished struct {
 
 // SourceChangesLoaded carries change history for a source detail view.
 type SourceChangesLoaded struct {
-	SourceName string
-	Changes    []fitness.ChangeEntry
-	Err        error
+	SourceName   string
+	SourceOrigin string
+	Changes      []fitness.ChangeEntry
+	Err          error
 }
 
 // Pipeline monitor messages.
