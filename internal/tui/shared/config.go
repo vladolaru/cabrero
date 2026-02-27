@@ -52,6 +52,7 @@ type PipelineConfig struct {
 	SparklineDays   int  `json:"sparklineDays"`
 	RecentRunsLimit int  `json:"recentRunsLimit"`
 	LogFollowMode   bool `json:"logFollowMode"`
+	RetryEnabled    bool `json:"retryEnabled"`
 }
 
 // ConfirmConfig controls which actions require confirmation.

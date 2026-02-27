@@ -67,6 +67,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Retry):
+		if !m.config.Pipeline.RetryEnabled {
+			run := m.SelectedRun()
+			if run != nil && run.Status == "error" {
+				m.statusMsg = "Retry unavailable in TUI. Use: cabrero run " + store.ShortSessionID(run.SessionID)
+			}
+			return m, nil
+		}
 		run := m.SelectedRun()
 		if run != nil && run.Status == "error" {
 			if m.config.Confirmations.RetryRequiresConfirm {

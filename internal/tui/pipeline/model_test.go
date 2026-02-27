@@ -188,6 +188,7 @@ func TestModelExpandRun(t *testing.T) {
 
 func TestModelRetryKey(t *testing.T) {
 	m := newTestModel()
+	m.config.Pipeline.RetryEnabled = true
 	m.SetSize(120, 40)
 
 	// Navigate to errored run (index 2).
@@ -369,6 +370,63 @@ func TestRenderMetrics_ShowsHeader(t *testing.T) {
 	}
 	if !strings.Contains(rendered, "Classifier FPR") {
 		t.Error("missing Classifier FPR line")
+	}
+}
+
+func TestRetryKey_DisabledDoesNotEmitRetryStarted(t *testing.T) {
+	m := newTestModel()
+	// RetryEnabled defaults to false via TestConfig / zero value.
+	m.SetSize(120, 40)
+
+	// Navigate to errored run (index 2).
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+
+	// Press R — should NOT activate confirm or emit RetryRunStarted.
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
+
+	if m.confirm.Active {
+		t.Error("R should not activate confirm when retry is disabled")
+	}
+	if cmd != nil {
+		msg := cmd()
+		if _, ok := msg.(message.RetryRunStarted); ok {
+			t.Error("R should not emit RetryRunStarted when retry is disabled")
+		}
+	}
+}
+
+func TestPipeline_StatusBarHidesRetryWhenDisabled(t *testing.T) {
+	m := newTestModel()
+	// RetryEnabled defaults to false.
+	m.SetSize(120, 40)
+	view := ansi.Strip(m.View())
+
+	// Status bar should NOT show "retry".
+	lines := strings.Split(view, "\n")
+	statusBar := lines[len(lines)-1]
+	if strings.Contains(strings.ToLower(statusBar), "retry") {
+		t.Errorf("status bar should not show retry when disabled: %q", statusBar)
+	}
+}
+
+func TestRetryKey_DisabledShowsGuidanceMessage(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	// Navigate to errored run (index 2).
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+
+	// Press R.
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
+
+	// Should show guidance message.
+	if m.statusMsg == "" {
+		t.Error("expected guidance status message")
+	}
+	if !strings.Contains(m.statusMsg, "cabrero run") {
+		t.Errorf("guidance should mention CLI alternative, got: %q", m.statusMsg)
 	}
 }
 

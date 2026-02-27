@@ -59,6 +59,14 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("Confirmations.RollbackRequiresConfirm: got false, want true")
 	}
 
+	// Pipeline defaults.
+	if cfg.Pipeline.SparklineDays != 7 {
+		t.Errorf("Pipeline.SparklineDays: got %d, want 7", cfg.Pipeline.SparklineDays)
+	}
+	if cfg.Pipeline.RetryEnabled {
+		t.Error("Pipeline.RetryEnabled: got true, want false")
+	}
+
 	// SourceManager defaults.
 	if cfg.SourceManager.GroupCollapsedDefault {
 		t.Error("SourceManager.GroupCollapsedDefault: got true, want false")

@@ -343,10 +343,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case message.RetryRunStarted:
-		sessionID := msg.SessionID
+		// Real retry execution will be implemented when Pipeline.RetryEnabled
+		// is wired to subprocess: cabrero run <session-id>.
+		// For now, this path should not be reachable (RetryEnabled defaults to false).
 		return m, func() tea.Msg {
-			// Placeholder — actual retry via exec.Command in future.
-			return message.RetryRunFinished{SessionID: sessionID}
+			return message.RetryRunFinished{
+				SessionID: msg.SessionID,
+				Err:       fmt.Errorf("retry not implemented"),
+			}
 		}
 
 	case message.RetryRunFinished:

@@ -357,7 +357,6 @@ func pipelineHelp(km KeyMap) []HelpSection {
 			Title: "Actions",
 			Entries: []HelpEntry{
 				{km.Open.Help().Key, "Open run detail"},
-				{km.Retry.Help().Key, "Retry failed run"},
 				{km.Refresh.Help().Key, "Refresh data"},
 				{km.LogView.Help().Key, "View daemon logs"},
 			},

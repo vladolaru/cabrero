@@ -470,6 +470,7 @@ func TestPipelineToLogViewerAndBack(t *testing.T) {
 
 func TestPipelineRetryFlow(t *testing.T) {
 	m := newTestRoot()
+	m.config.Pipeline.RetryEnabled = true
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Push to pipeline monitor.

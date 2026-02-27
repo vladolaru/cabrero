@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 
 	"github.com/vladolaru/cabrero/internal/cli"
@@ -52,7 +53,17 @@ func (m Model) View() string {
 		return components.RenderConfirmOverlay(m.confirm.View(), m.width, m.height)
 	}
 
-	statusBar := components.RenderStatusBar(m.keys.PipelineShortHelp(), m.statusMsg, m.width)
+	bindings := m.keys.PipelineShortHelp()
+	if !m.config.Pipeline.RetryEnabled {
+		filtered := make([]key.Binding, 0, len(bindings))
+		for _, b := range bindings {
+			if b.Help().Key != m.keys.Retry.Help().Key {
+				filtered = append(filtered, b)
+			}
+		}
+		bindings = filtered
+	}
+	statusBar := components.RenderStatusBar(bindings, m.statusMsg, m.width)
 	return m.viewport.View() + "\n" + statusBar
 }
 
