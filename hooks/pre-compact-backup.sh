@@ -73,14 +73,24 @@ SESSION_DIR="${CABRERO_ROOT}/raw/${SESSION_ID}"
 mkdir -p "$SESSION_DIR"
 
 # Copy transcript.
+TRANSCRIPT_COPIED=0
 if [ -f "$TRANSCRIPT_PATH" ]; then
-  cp "$TRANSCRIPT_PATH" "${SESSION_DIR}/transcript.jsonl"
+  if cp "$TRANSCRIPT_PATH" "${SESSION_DIR}/transcript.jsonl" 2>/dev/null; then
+    TRANSCRIPT_COPIED=1
+  fi
 fi
 
 # Get CC version for metadata.
 CC_VERSION=""
 if command -v claude >/dev/null 2>&1; then
   CC_VERSION=$(claude --version 2>/dev/null || true)
+fi
+
+# Only queue if transcript was successfully copied; otherwise mark as error.
+if [ "$TRANSCRIPT_COPIED" = "1" ]; then
+  SESSION_STATUS="queued"
+else
+  SESSION_STATUS="error"
 fi
 
 # Write metadata.
@@ -92,7 +102,7 @@ cat > "${SESSION_DIR}/metadata.json" << METAEOF
   "cc_version": "${CC_VERSION}",
   "project": "${PROJECT_SLUG}",
   "work_dir": "${SESSION_CWD}",
-  "status": "queued"
+  "status": "${SESSION_STATUS}"
 }
 METAEOF
 

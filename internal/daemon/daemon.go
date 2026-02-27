@@ -333,6 +333,12 @@ func (d *Daemon) scanStale() {
 	if recovered > 0 {
 		d.log.Info("stale scan: recovered %d session(s)", recovered)
 	}
+
+	// Clean up queued sessions that have no transcript (hook captured metadata
+	// but transcript copy failed). These will never be processable.
+	if cleaned := CleanDanglingQueued(d.log); cleaned > 0 {
+		d.log.Info("dangling queue cleanup: marked %d session(s) as error", cleaned)
+	}
 }
 
 // --- PID file helpers ---

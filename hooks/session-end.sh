@@ -73,8 +73,11 @@ mkdir -p "$SESSION_DIR"
 
 # Always copy transcript — the SessionEnd version is a strict superset of any
 # PreCompact capture (compaction appends a boundary, doesn't truncate).
+TRANSCRIPT_COPIED=0
 if [ -f "$TRANSCRIPT_PATH" ]; then
-  cp "$TRANSCRIPT_PATH" "${SESSION_DIR}/transcript.jsonl"
+  if cp "$TRANSCRIPT_PATH" "${SESSION_DIR}/transcript.jsonl" 2>/dev/null; then
+    TRANSCRIPT_COPIED=1
+  fi
 fi
 
 # Determine capture trigger (note if PreCompact already ran).
@@ -99,6 +102,13 @@ if command -v claude >/dev/null 2>&1; then
   CC_VERSION=$(claude --version 2>/dev/null || true)
 fi
 
+# Only queue if transcript was successfully copied; otherwise mark as error.
+if [ "$TRANSCRIPT_COPIED" = "1" ]; then
+  SESSION_STATUS="queued"
+else
+  SESSION_STATUS="error"
+fi
+
 cat > "${SESSION_DIR}/metadata.json" << METAEOF
 {
   "session_id": "${SESSION_ID}",
@@ -107,7 +117,7 @@ cat > "${SESSION_DIR}/metadata.json" << METAEOF
   "cc_version": "${CC_VERSION}",
   "project": "${PROJECT_SLUG}",
   "work_dir": "${SESSION_CWD}",
-  "status": "queued"
+  "status": "${SESSION_STATUS}"
 }
 METAEOF
 

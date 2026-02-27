@@ -281,3 +281,72 @@ func TestScanQueued_SkipsSessionsWithoutTranscript(t *testing.T) {
 		t.Errorf("SessionID = %q, want %q", queued[0].SessionID, "has-transcript-001")
 	}
 }
+
+func TestCleanDanglingQueued(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	log, err := NewLogger(filepath.Join(dir, "test.log"), 0)
+	if err != nil {
+		t.Fatalf("NewLogger: %v", err)
+	}
+	defer log.Close()
+
+	// Old queued session WITHOUT transcript — should be cleaned up.
+	oldRaw := store.RawDir("dangling-old-001")
+	if err := os.MkdirAll(oldRaw, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldMeta := store.Metadata{
+		SessionID: "dangling-old-001",
+		Timestamp: time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339),
+		Status:    store.StatusQueued,
+	}
+	if err := store.WriteMetadata(oldRaw, oldMeta); err != nil {
+		t.Fatal(err)
+	}
+
+	// Recent queued session WITHOUT transcript — too fresh, should NOT be cleaned up.
+	freshRaw := store.RawDir("dangling-fresh-001")
+	if err := os.MkdirAll(freshRaw, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	freshMeta := store.Metadata{
+		SessionID: "dangling-fresh-001",
+		Timestamp: time.Now().Add(-10 * time.Minute).UTC().Format(time.RFC3339),
+		Status:    store.StatusQueued,
+	}
+	if err := store.WriteMetadata(freshRaw, freshMeta); err != nil {
+		t.Fatal(err)
+	}
+
+	// Queued session WITH transcript — should NOT be cleaned up.
+	createQueuedSession(t, "has-transcript-002")
+
+	cleaned := CleanDanglingQueued(log)
+	if cleaned != 1 {
+		t.Fatalf("cleaned %d sessions, want 1", cleaned)
+	}
+
+	// Verify the old one was marked as error.
+	sessions, _ := store.ListSessions()
+	for _, s := range sessions {
+		switch s.SessionID {
+		case "dangling-old-001":
+			if s.Status != store.StatusError {
+				t.Errorf("dangling-old-001 status = %q, want %q", s.Status, store.StatusError)
+			}
+		case "dangling-fresh-001":
+			if s.Status != store.StatusQueued {
+				t.Errorf("dangling-fresh-001 status = %q, want %q", s.Status, store.StatusQueued)
+			}
+		case "has-transcript-002":
+			if s.Status != store.StatusQueued {
+				t.Errorf("has-transcript-002 status = %q, want %q", s.Status, store.StatusQueued)
+			}
+		}
+	}
+}
