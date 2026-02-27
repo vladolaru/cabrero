@@ -391,7 +391,7 @@ func lookupOriginalDecision(sessionID string) string {
 	if err == nil {
 		for _, p := range proposals {
 			if p.SessionID == sessionID {
-				return "evaluate"
+				return pipeline.TriageEvaluate
 			}
 		}
 	}
@@ -415,7 +415,7 @@ func lookupOriginalDecision(sessionID string) string {
 				continue
 			}
 			if wrapper.SessionID == sessionID {
-				return "evaluate"
+				return pipeline.TriageEvaluate
 			}
 		}
 	}
@@ -424,9 +424,9 @@ func lookupOriginalDecision(sessionID string) string {
 	evalOut, err := pipeline.ReadEvaluatorOutput(sessionID)
 	if err == nil && evalOut != nil {
 		if len(evalOut.Proposals) > 0 {
-			return "evaluate"
+			return pipeline.TriageEvaluate
 		}
-		return "evaluate" // evaluated but produced no proposals
+		return pipeline.TriageEvaluate // evaluated but produced no proposals
 	}
 
 	// Check classifier output for triage decision.

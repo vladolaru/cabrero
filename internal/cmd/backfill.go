@@ -285,7 +285,7 @@ func runBackfill(sessions []store.Metadata, cfg pipeline.PipelineConfig) error {
 					}
 				}
 				fmt.Printf("    [%d/%d] %s — Classifier: %s", idx, sessionCount, sid, event.Triage)
-				if event.Triage == "clean" {
+				if event.Triage == pipeline.TriageClean {
 					fmt.Print(" ✓")
 				}
 				fmt.Println()
@@ -305,10 +305,10 @@ func runBackfill(sessions []store.Metadata, cfg pipeline.PipelineConfig) error {
 			} else {
 				totalProcessed++
 			}
-			if r.Triage == "clean" {
+			if r.Triage == pipeline.TriageClean {
 				totalClean++
 			}
-			if r.Triage == "evaluate" {
+			if r.Triage == pipeline.TriageEvaluate {
 				groupEvaluated++
 				totalEvaluated++
 			}

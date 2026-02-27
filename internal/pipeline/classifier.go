@@ -102,9 +102,9 @@ func runClassifierCore(sessionID string, digest *parser.Digest, aggregatorOutput
 	output.SessionID = sessionID
 	output.PromptVersion = strings.TrimSuffix(classifierPromptFile, ".txt")
 
-	// Default empty triage to "evaluate" for backward compatibility with v2 prompt.
+	// Default empty triage to TriageEvaluate for backward compatibility with v2 prompt.
 	if output.Triage == "" {
-		output.Triage = "evaluate"
+		output.Triage = TriageEvaluate
 	}
 
 	// Validate cited UUIDs.

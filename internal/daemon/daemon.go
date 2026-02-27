@@ -257,7 +257,7 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 	d.runner.OnStatus = func(sessionID string, event pipeline.BatchEvent) {
 		switch event.Type {
 		case "classifier_done":
-			if event.Triage == "clean" {
+			if event.Triage == pipeline.TriageClean {
 				d.log.Info("session %s triaged as clean", store.ShortSessionID(sessionID))
 			}
 		case "error":
@@ -271,7 +271,7 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 	toEvalCount := 0
 	for _, r := range results {
 		totalProposals += r.Proposals
-		if r.Triage == "evaluate" {
+		if r.Triage == pipeline.TriageEvaluate {
 			toEvalCount++
 		}
 	}

@@ -380,9 +380,9 @@ func (m Model) renderMetrics() string {
 
 func statusIndicator(status string) string {
 	switch status {
-	case "processed":
+	case pl.HistoryStatusProcessed:
 		return shared.SuccessStyle.Render("✓")
-	case "error":
+	case pl.HistoryStatusError:
 		return shared.ErrorStyle.Render("✗")
 	case "queued":
 		return shared.MutedStyle.Render("○")
@@ -440,7 +440,7 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 			evalCol = fmt.Sprintf("%6.0fs eval", run.EvaluatorDuration.Seconds())
 		} else if run.Status == "error" && run.HasClassifier {
 			evalCol = shared.ErrorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
-		} else if run.Status == "processed" && run.HasClassifier {
+		} else if run.Status == pl.HistoryStatusProcessed && run.HasClassifier {
 			evalCol = shared.MutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
 		}
 
@@ -453,7 +453,7 @@ func formatTimingForMode(run pl.PipelineRun, mode layout) string {
 		evalCol = fmt.Sprintf("%6.0fs eval", run.EvaluatorDuration.Seconds())
 	} else if run.Status == "error" && run.HasClassifier {
 		evalCol = shared.ErrorStyle.Render(fmt.Sprintf("%7s eval", "failed"))
-	} else if run.Status == "processed" && run.HasClassifier {
+	} else if run.Status == pl.HistoryStatusProcessed && run.HasClassifier {
 		evalCol = shared.MutedStyle.Render(fmt.Sprintf("%7s eval", "skipped"))
 	}
 

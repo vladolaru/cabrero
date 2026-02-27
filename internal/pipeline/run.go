@@ -308,15 +308,15 @@ func ComputeStatsFromHistory(records []HistoryRecord, since time.Time) HistorySt
 		}
 
 		// Outcome.
-		if rec.Status == "error" {
+		if rec.Status == HistoryStatusError {
 			stats.ErrorRuns++
 		}
-		if rec.Status == "skipped_busy" {
+		if rec.Status == HistoryStatusSkippedBusy {
 			stats.SkippedBusy++
 		}
 
 		// Triage.
-		if rec.Triage == "clean" {
+		if rec.Triage == TriageClean {
 			stats.EvaluatorSkipped++
 		}
 		if rec.GateReason != "" {
@@ -566,7 +566,7 @@ func ListCleanupRunsFromHistory(limit int) ([]PipelineRun, error) {
 		run := PipelineRun{
 			Source:        "cleanup",
 			Timestamp:     rec.Timestamp,
-			Status:        "processed",
+			Status:        HistoryStatusProcessed,
 			ProposalCount: archived,
 			InputTokens:   inputTokens,
 			OutputTokens:  outputTokens,

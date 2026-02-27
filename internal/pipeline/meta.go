@@ -49,7 +49,7 @@ func ComputePipelineMetrics(cfg PipelineConfig) (PipelineMetrics, error) {
 		if r.Timestamp.Before(cutoff) {
 			continue
 		}
-		if r.Triage == "evaluate" {
+		if r.Triage == TriageEvaluate {
 			evaluateSessions++
 			if r.ProposalCount == 0 {
 				fpSessions++

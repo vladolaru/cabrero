@@ -43,6 +43,8 @@ func (d *Daemon) performMetaRun(ctx context.Context) {
 		if metaCooldownActive(stats.PromptVersion, cfg.MetaCooldownDays) {
 			d.log.Info("meta: version %s above threshold but in cooldown period, skipping",
 				stats.PromptVersion)
+			_ = pipeline.AppendMetaRecord(pipeline.HistoryStatusMetaCooldown,
+				fmt.Sprintf("version %s in cooldown", stats.PromptVersion))
 			continue
 		}
 		d.log.Info("meta: version %s rejection rate %.0f%% exceeds threshold %.0f%%",
@@ -56,6 +58,8 @@ func (d *Daemon) performMetaRun(ctx context.Context) {
 		}
 		if propID != "" {
 			d.log.Info("meta: proposal %s written for version %s", propID, stats.PromptVersion)
+			_ = pipeline.AppendMetaRecord(pipeline.HistoryStatusMetaTriggered,
+				fmt.Sprintf("version %s, proposal %s", stats.PromptVersion, propID))
 		}
 	}
 
@@ -66,6 +70,8 @@ func (d *Daemon) performMetaRun(ctx context.Context) {
 		}
 		d.log.Info("meta: no thresholds exceeded (classifier FPR: %s, %d versions checked)",
 			fprStr, len(metrics.AcceptanceByVersion))
+		_ = pipeline.AppendMetaRecord(pipeline.HistoryStatusMetaNoThreshold,
+			fmt.Sprintf("classifier FPR: %s, versions: %d", fprStr, len(metrics.AcceptanceByVersion)))
 	}
 }
 

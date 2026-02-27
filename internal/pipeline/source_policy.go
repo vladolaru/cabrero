@@ -65,14 +65,14 @@ func CheckSourcePolicy(co *ClassifierOutput) SourceGateResult {
 		if !found || s.Ownership == "" {
 			return SourceGateResult{
 				Allowed:    false,
-				Reason:     "unclassified_source",
+				Reason:     GateReasonUnclassified,
 				SourceName: id.Name,
 			}
 		}
 		if s.Approach == "paused" {
 			return SourceGateResult{
 				Allowed:    false,
-				Reason:     "paused_source",
+				Reason:     GateReasonPaused,
 				SourceName: id.Name,
 			}
 		}

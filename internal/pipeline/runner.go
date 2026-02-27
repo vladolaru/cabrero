@@ -268,10 +268,10 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	}
 
 	// Triage gate.
-	if classifierResult.ClassifierOutput.Triage == "clean" {
+	if classifierResult.ClassifierOutput.Triage == TriageClean {
 		log.Info("  Classifier triage: clean session — skipping Evaluator")
-		rec.Triage = "clean"
-		rec.Status = "processed"
+		rec.Triage = TriageClean
+		rec.Status = HistoryStatusProcessed
 		rec.EvaluatorModel = "" // evaluator not used
 		rec.EvaluatorPromptVersion = ""
 		rec.computeUsageTotals()
@@ -283,13 +283,13 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 		return result, nil
 	}
 	log.Info("  Classifier triage: session worth evaluating")
-	rec.Triage = "evaluate"
+	rec.Triage = TriageEvaluate
 
 	// Source policy gate: skip evaluator for unclassified or paused sources.
 	gate := CheckSourcePolicy(classifierResult.ClassifierOutput)
 	if !gate.Allowed {
 		log.Info("  Source policy gate: %s (source %q) — skipping Evaluator", gate.Reason, gate.SourceName)
-		rec.Status = "processed"
+		rec.Status = HistoryStatusProcessed
 		rec.GateReason = gate.Reason
 		rec.EvaluatorModel = ""
 		rec.EvaluatorPromptVersion = ""
@@ -317,7 +317,7 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	rec.EvaluatorUsage = usageFromResult(evaluatorCR)
 
 	if err != nil {
-		rec.Status = "error"
+		rec.Status = HistoryStatusError
 		rec.ErrorDetail = err.Error()
 		rec.EvaluatorDurationNs = int64(evalDuration)
 		rec.computeUsageTotals()
@@ -346,7 +346,7 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 		log.Info("  Evaluator: no proposals (%s)", reason)
 	}
 
-	rec.Status = "processed"
+	rec.Status = HistoryStatusProcessed
 	rec.ProposalCount = len(evaluatorOutput.Proposals)
 	rec.EvaluatorDurationNs = int64(evalDuration)
 	rec.computeUsageTotals()
@@ -478,12 +478,12 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 			rec.ClassifierPromptVersion = classifierResult.ClassifierOutput.PromptVersion
 		}
 
-		if triage == "clean" {
-			results[i].Status = "processed"
-			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "clean"})
+		if triage == TriageClean {
+			results[i].Status = HistoryStatusProcessed
+			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: TriageClean})
 
-			rec.Triage = "clean"
-			rec.Status = "processed"
+			rec.Triage = TriageClean
+			rec.Status = HistoryStatusProcessed
 			rec.EvaluatorModel = ""
 			rec.EvaluatorPromptVersion = ""
 			rec.computeUsageTotals()
@@ -496,15 +496,15 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 			continue
 		}
 
-		rec.Triage = "evaluate"
+		rec.Triage = TriageEvaluate
 
 		// Source policy gate: skip evaluator for unclassified or paused sources.
 		gate := CheckSourcePolicy(classifierResult.ClassifierOutput)
 		if !gate.Allowed {
-			results[i].Status = "processed"
-			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "evaluate"})
+			results[i].Status = HistoryStatusProcessed
+			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: TriageEvaluate})
 
-			rec.Status = "processed"
+			rec.Status = HistoryStatusProcessed
 			rec.GateReason = gate.Reason
 			rec.EvaluatorModel = ""
 			rec.EvaluatorPromptVersion = ""
@@ -519,7 +519,7 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 		}
 
 		// Session needs evaluation.
-		r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "evaluate"})
+		r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: TriageEvaluate})
 		toEvaluate = append(toEvaluate, BatchSession{
 			SessionID:        s.SessionID,
 			Digest:           classifierResult.Digest,
@@ -539,7 +539,7 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 			// Mark remaining evaluate-sessions as errors.
 			for j := chunkStart; j < len(toEvaluate); j++ {
 				idx := indexByID[toEvaluate[j].SessionID]
-				results[idx].Status = "error"
+				results[idx].Status = HistoryStatusError
 				results[idx].Error = ctx.Err()
 			}
 			return results
@@ -574,11 +574,11 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 	rec.EvaluatorUsage = usageFromResult(evaluatorCR)
 
 	if err != nil {
-		results[idx].Status = "error"
+		results[idx].Status = HistoryStatusError
 		results[idx].Error = err
 		r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
 
-		rec.Status = "error"
+		rec.Status = HistoryStatusError
 		rec.ErrorDetail = err.Error()
 		rec.computeUsageTotals()
 		rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
@@ -595,11 +595,11 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 	}
 
 	proposals := persistEvaluatorResults(s.SessionID, evaluatorOutput, r.log())
-	results[idx].Status = "processed"
+	results[idx].Status = HistoryStatusProcessed
 	results[idx].Proposals = proposals
 	r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
 
-	rec.Status = "processed"
+	rec.Status = HistoryStatusProcessed
 	rec.ProposalCount = len(evaluatorOutput.Proposals)
 	rec.computeUsageTotals()
 	rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
@@ -654,12 +654,12 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
 		for i, s := range chunk {
 			idx := indexByID[s.SessionID]
-			results[idx].Status = "error"
+			results[idx].Status = HistoryStatusError
 			results[idx].Error = partitionErr
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: partitionErr})
 
 			rec := records[s.SessionID]
-			rec.Status = "error"
+			rec.Status = HistoryStatusError
 			rec.ErrorDetail = partitionErr.Error()
 			rec.EvaluatorDurationNs = int64(perSessionDuration)
 			rec.EvaluatorUsage = splitUsage[i]
@@ -684,11 +684,11 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 		}
 
 		proposals := persistEvaluatorResults(s.SessionID, partitioned[i].filtered, r.log())
-		results[idx].Status = "processed"
+		results[idx].Status = HistoryStatusProcessed
 		results[idx].Proposals = proposals
 		r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
 
-		rec.Status = "processed"
+		rec.Status = HistoryStatusProcessed
 		rec.ProposalCount = len(partitioned[i].filtered.Proposals)
 		rec.EvaluatorDurationNs = int64(perSessionDuration)
 		rec.EvaluatorUsage = splitUsage[i]

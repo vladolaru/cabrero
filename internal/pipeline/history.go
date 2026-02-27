@@ -11,6 +11,44 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
+// --- History record status constants ---
+
+// HistoryStatusProcessed indicates a session was successfully processed by the pipeline.
+const HistoryStatusProcessed = "processed"
+
+// HistoryStatusError indicates a pipeline run that encountered an error.
+const HistoryStatusError = "error"
+
+// HistoryStatusSkippedBusy indicates a session was skipped because all invoke slots were busy.
+const HistoryStatusSkippedBusy = "skipped_busy"
+
+// --- Triage constants ---
+
+// TriageClean means the session has no actionable signals; evaluator is skipped.
+const TriageClean = "clean"
+
+// TriageEvaluate means the session warrants deeper evaluator analysis.
+const TriageEvaluate = "evaluate"
+
+// --- Gate reason constants ---
+
+// GateReasonUnclassified blocks evaluator because a touched source has no ownership.
+const GateReasonUnclassified = "unclassified_source"
+
+// GateReasonPaused blocks evaluator because a touched source has approach "paused".
+const GateReasonPaused = "paused_source"
+
+// --- Meta event status constants ---
+
+// HistoryStatusMetaTriggered indicates a meta analysis was triggered and run.
+const HistoryStatusMetaTriggered = "meta_triggered"
+
+// HistoryStatusMetaCooldown indicates a meta check was skipped due to cooldown.
+const HistoryStatusMetaCooldown = "meta_cooldown_skip"
+
+// HistoryStatusMetaNoThreshold indicates a meta check found no thresholds exceeded.
+const HistoryStatusMetaNoThreshold = "meta_no_threshold"
+
 // InvocationUsage captures token consumption and cost for one LLM invocation.
 type InvocationUsage struct {
 	CCSessionID         string  `json:"cc_session_id,omitempty"`   // CC session ID for cross-referencing
@@ -182,7 +220,20 @@ func AppendSkipRecord(sessionID, source string) error {
 		SessionID: sessionID,
 		Timestamp: time.Now().UTC(),
 		Source:    source,
-		Status:    "skipped_busy",
+		Status:    HistoryStatusSkippedBusy,
+	}
+	return AppendHistory(rec)
+}
+
+// AppendMetaRecord writes a history record for a meta-analysis event.
+// status should be one of HistoryStatusMetaTriggered, HistoryStatusMetaCooldown,
+// or HistoryStatusMetaNoThreshold. detail provides context (e.g. prompt version).
+func AppendMetaRecord(status, detail string) error {
+	rec := HistoryRecord{
+		Timestamp:   time.Now().UTC(),
+		Source:      "meta",
+		Status:      status,
+		ErrorDetail: detail, // repurposed for meta event context
 	}
 	return AppendHistory(rec)
 }
