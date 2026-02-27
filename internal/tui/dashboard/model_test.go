@@ -483,3 +483,34 @@ func TestDashboard_StatusMessage_Expiry(t *testing.T) {
 		t.Errorf("statusMsg should be cleared, got %q", m.statusMsg)
 	}
 }
+
+func TestDashboard_FilteredEmptyShowsFilterMessage(t *testing.T) {
+	m := newTestModel()
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Verify items exist before filtering.
+	if len(m.list.Items()) == 0 {
+		t.Fatal("test model should have items")
+	}
+
+	// Apply a non-matching filter programmatically.
+	m.list.SetFilterText("zzz_nonexistent_term")
+
+	// Should have zero visible items but filter is active.
+	if len(m.list.VisibleItems()) != 0 {
+		t.Fatalf("expected 0 visible items after non-matching filter, got %d", len(m.list.VisibleItems()))
+	}
+	if !m.list.IsFiltered() {
+		t.Fatal("list should be in filtered state")
+	}
+
+	view := ansi.Strip(m.View())
+
+	// Should NOT say "No proposals pending" when items exist but are filtered out.
+	if strings.Contains(view, "No proposals pending") {
+		t.Error("filtered empty state should not say 'No proposals pending'")
+	}
+	if strings.Contains(view, "flock is calm") {
+		t.Error("filtered empty state should not show flavor text for truly empty")
+	}
+}

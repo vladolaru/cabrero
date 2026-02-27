@@ -35,7 +35,13 @@ func (m Model) View() string {
 		// No items — show flavor text padded to the list height so the view
 		// fills the terminal exactly as the list would when items are present.
 		// The empty block does NOT append a trailing \n; it's self-contained.
-		emptyLine := "\n" + shared.MutedStyle.Render("  "+components.EmptyProposals())
+		var emptyText string
+		if m.list.IsFiltered() {
+			emptyText = "No matches for current filter."
+		} else {
+			emptyText = components.EmptyProposals()
+		}
+		emptyLine := "\n" + shared.MutedStyle.Render("  "+emptyText)
 		listHeight := m.list.Height()
 		padding := listHeight - strings.Count(emptyLine, "\n") - 1
 		if padding > 0 {
