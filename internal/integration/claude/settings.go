@@ -74,7 +74,7 @@ func HookStatus(settingsPath string) (bool, bool) {
 		return false, false
 	}
 
-	return containsCabrero(hooks["PreCompact"]), containsCabrero(hooks["SessionEnd"])
+	return HookGroupContainsCabrero(hooks["PreCompact"]), HookGroupContainsCabrero(hooks["SessionEnd"])
 }
 
 // HookGroupContainsCabrero checks if a hook group (any type) contains
@@ -87,14 +87,6 @@ func HookGroupContainsCabrero(v interface{}) bool {
 	}
 	raw, err := json.Marshal(v)
 	if err != nil {
-		return false
-	}
-	return strings.Contains(string(raw), "cabrero")
-}
-
-// containsCabrero checks if a hook group's JSON contains "cabrero".
-func containsCabrero(raw json.RawMessage) bool {
-	if raw == nil {
 		return false
 	}
 	return strings.Contains(string(raw), "cabrero")

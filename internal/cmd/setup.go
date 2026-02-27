@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -171,28 +170,21 @@ func (s *setupRunner) stepInstallHookScripts(step, total int) error {
 
 // Step 4: Register hooks in Claude Code settings.json.
 func (s *setupRunner) stepRegisterHooks(step, total int) error {
-	home, err := os.UserHomeDir()
+	settingsPath, err := claude.SettingsPath()
 	if err != nil {
 		return err
 	}
-
-	settingsPath := filepath.Join(home, ".claude", "settings.json")
 	hooksDir := filepath.Join(store.Root(), "hooks")
 
 	// Read existing settings.
-	data, err := os.ReadFile(settingsPath)
+	settings, _, err := claude.LoadSettings(settingsPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Printf("  %s Claude Code settings not found — skipping hook registration\n", cli.Warn("!"))
-			fmt.Printf("    Expected: %s\n", settingsPath)
-			return nil
-		}
 		return fmt.Errorf("reading settings: %w", err)
 	}
-
-	var settings map[string]interface{}
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return fmt.Errorf("parsing settings: %w", err)
+	if settings == nil {
+		fmt.Printf("  %s Claude Code settings not found — skipping hook registration\n", cli.Warn("!"))
+		fmt.Printf("    Expected: %s\n", settingsPath)
+		return nil
 	}
 
 	// Check existing hooks.
@@ -262,12 +254,7 @@ func (s *setupRunner) stepRegisterHooks(step, total int) error {
 
 	settings["hooks"] = hooksMap
 
-	out, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return fmt.Errorf("serializing settings: %w", err)
-	}
-
-	if err := os.WriteFile(settingsPath, append(out, '\n'), 0o644); err != nil {
+	if err := claude.WriteSettings(settings, settingsPath); err != nil {
 		return fmt.Errorf("writing settings: %w", err)
 	}
 

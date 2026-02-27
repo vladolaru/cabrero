@@ -519,7 +519,7 @@ func (d *doctorRunner) makeInstallHookFix(path, content string) func() error {
 func (d *doctorRunner) checkClaudeCodeIntegration() []checkResult {
 	var results []checkResult
 
-	home, err := os.UserHomeDir()
+	settingsPath, err := claude.SettingsPath()
 	if err != nil {
 		results = append(results, checkResult{
 			name:     "Home directory accessible",
@@ -530,14 +530,22 @@ func (d *doctorRunner) checkClaudeCodeIntegration() []checkResult {
 		return results
 	}
 
-	settingsPath := filepath.Join(home, ".claude", "settings.json")
-	data, err := os.ReadFile(settingsPath)
-	if err != nil {
+	settings, _, err := claude.LoadSettings(settingsPath)
+	if settings == nil && err == nil {
 		results = append(results, checkResult{
 			name:     "settings.json found",
 			category: "Claude Code Integration",
 			status:   checkFail,
 			message:  "not found at " + settingsPath,
+		})
+		return results
+	}
+	if err != nil {
+		results = append(results, checkResult{
+			name:     "settings.json found",
+			category: "Claude Code Integration",
+			status:   checkFail,
+			message:  fmt.Sprintf("failed to load: %v", err),
 		})
 		return results
 	}
@@ -547,17 +555,6 @@ func (d *doctorRunner) checkClaudeCodeIntegration() []checkResult {
 		category: "Claude Code Integration",
 		status:   checkPass,
 	})
-
-	var settings map[string]interface{}
-	if err := json.Unmarshal(data, &settings); err != nil {
-		results = append(results, checkResult{
-			name:     "settings.json valid",
-			category: "Claude Code Integration",
-			status:   checkFail,
-			message:  fmt.Sprintf("invalid JSON: %v", err),
-		})
-		return results
-	}
 
 	hooksMap, _ := settings["hooks"].(map[string]interface{})
 	hooksDir := filepath.Join(store.Root(), "hooks")
@@ -702,11 +699,7 @@ func (d *doctorRunner) makeRegisterHooksFix(settings map[string]interface{}, set
 
 		settings["hooks"] = hooksMap
 
-		out, err := json.MarshalIndent(settings, "", "  ")
-		if err != nil {
-			return fmt.Errorf("serializing settings: %w", err)
-		}
-		return os.WriteFile(settingsPath, append(out, '\n'), 0o644)
+		return claude.WriteSettings(settings, settingsPath)
 	}
 }
 
