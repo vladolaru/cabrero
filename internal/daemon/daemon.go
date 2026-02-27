@@ -240,6 +240,9 @@ func (d *Daemon) processQueued(ctx context.Context) {
 func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessions []QueuedSession) {
 	if !pipeline.TryAcquireInvokeSemaphore() {
 		d.log.Info("skipping batch for %s: all invoke slots busy", store.ProjectDisplayName(project))
+		for _, s := range sessions {
+			_ = pipeline.AppendSkipRecord(s.SessionID, "daemon")
+		}
 		return
 	}
 	pipeline.ReleaseInvokeSemaphore()
@@ -290,6 +293,7 @@ func (d *Daemon) processOne(ctx context.Context, sessionID string) {
 	// queued and will be picked up on the next poll cycle.
 	if !pipeline.TryAcquireInvokeSemaphore() {
 		d.log.Info("skipping session %s: all invoke slots busy", sessionID)
+		_ = pipeline.AppendSkipRecord(sessionID, "daemon")
 		return
 	}
 	pipeline.ReleaseInvokeSemaphore()

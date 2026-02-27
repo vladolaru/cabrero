@@ -224,6 +224,25 @@ func TestProcessOne_SkipsWhenSemaphoreFull(t *testing.T) {
 	if meta.Status != store.StatusQueued {
 		t.Errorf("status = %q, want %q (session should remain queued)", meta.Status, store.StatusQueued)
 	}
+
+	// A skipped_busy history record should have been written.
+	records, err := pipeline.ReadHistory()
+	if err != nil {
+		t.Fatalf("ReadHistory: %v", err)
+	}
+	var found bool
+	for _, rec := range records {
+		if rec.SessionID == "session-blocked" && rec.Status == "skipped_busy" {
+			found = true
+			if rec.Source != "daemon" {
+				t.Errorf("skip record Source = %q, want %q", rec.Source, "daemon")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected a skipped_busy history record for session-blocked")
+	}
 }
 
 func TestScanQueued_SkipsSessionsWithoutTranscript(t *testing.T) {

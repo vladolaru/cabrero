@@ -112,6 +112,17 @@ func Status(args []string) error {
 	}
 	fmt.Println(evalLine)
 
+	// Recent skip count from history.
+	if history, err := pipeline.ReadHistory(); err == nil && len(history) > 0 {
+		since := time.Now().AddDate(0, 0, -7)
+		stats := pipeline.ComputeStatsFromHistory(history, since)
+		if stats.SkippedBusy > 0 {
+			fmt.Printf("  %s  %s %s\n", cli.Bold("Contention:"),
+				cli.Warn(fmt.Sprintf("%d sessions skipped (busy slots)", stats.SkippedBusy)),
+				cli.Muted("(last 7 days)"))
+		}
+	}
+
 	// Debug mode.
 	if store.ReadDebugFlag() {
 		fmt.Printf("  %s  %s %s\n", cli.Bold("Debug:"), cli.Warn("enabled"), cli.Muted("(via config)"))
