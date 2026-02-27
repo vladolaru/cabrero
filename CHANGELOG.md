@@ -5,6 +5,17 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.4] - 2026-02-27
+
+### Fixed
+- **pipeline**: Harden subprocess isolation — add `--strict-mcp-config` to all
+  `claude` subprocess invocations (pipeline, chat, apply) so only the empty MCP
+  config is used, ignoring plugins, user settings, and project `.mcp.json`.
+  Expand `--settings` overrides to disable `alwaysThinkingEnabled` (prevents
+  unnecessary extended thinking cost) and `enabledPlugins` (prevents plugin
+  context bloat). Also fix `apply.go` CWD to use `os.TempDir()` matching the
+  pipeline fix.
+
 ## [0.27.3] - 2026-02-27
 
 ### Fixed
@@ -1098,6 +1109,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.27.4]: https://github.com/vladolaru/cabrero/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/vladolaru/cabrero/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/vladolaru/cabrero/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/vladolaru/cabrero/compare/v0.27.0...v0.27.1
