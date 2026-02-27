@@ -1316,3 +1316,45 @@ func TestListPipelineRunsFromHistory_FallbackToMtime(t *testing.T) {
 		t.Error("HasDigest = true, want false (no digest file)")
 	}
 }
+
+func TestRunGroupEvalBatch_MismatchedProposalsMarkError(t *testing.T) {
+	setupBatchStore(t)
+
+	s1 := createBatchSession(t, "aaaaaaaa-1111-1111-1111-111111111111")
+	s2 := createBatchSession(t, "bbbbbbbb-2222-2222-2222-222222222222")
+
+	runner := NewRunnerWithStages(DefaultPipelineConfig(), TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalBatchFunc: func(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			// Return proposals with IDs that don't match any session prefix.
+			return &EvaluatorOutput{
+				Proposals: []Proposal{
+					{ID: "prop-ZZZZZZZZ-0", Type: "skill_improvement", Confidence: "high", Rationale: "orphan"},
+				},
+			}, nil, nil
+		},
+	})
+	runner.Source = "test"
+
+	results := runner.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	// Both sessions should be marked as error because proposals didn't partition cleanly.
+	for i, r := range results {
+		if r.Status != "error" {
+			t.Errorf("results[%d] status = %q, want %q", i, r.Status, "error")
+		}
+	}
+
+	// Verify history records also show error status.
+	records := readHistoryForTest(t)
+	for _, sid := range []string{s1.SessionID, s2.SessionID} {
+		rec := findRecord(records, sid)
+		if rec == nil {
+			t.Errorf("no history record for %s", sid)
+			continue
+		}
+		if rec.Status != "error" {
+			t.Errorf("history record for %s: status = %q, want %q", sid, rec.Status, "error")
+		}
+	}
+}

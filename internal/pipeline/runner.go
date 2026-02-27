@@ -610,27 +610,63 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 
 	// Partition proposals by session: proposal IDs encode their session
 	// via the format "prop-{first 8 chars of sessionId}-{index}".
+	type sessionResult struct {
+		filtered *EvaluatorOutput
+		matched  int
+	}
+	partitioned := make([]sessionResult, len(chunk))
 	totalMatched := 0
-	for i, s := range chunk {
-		idx := indexByID[s.SessionID]
-		rec := records[s.SessionID]
 
+	for i, s := range chunk {
 		prefix := "prop-" + store.ShortSessionID(s.SessionID) + "-"
 		filtered := filterProposals(evaluatorOutput, prefix)
 		filtered.SessionID = s.SessionID
+		partitioned[i] = sessionResult{filtered: filtered, matched: len(filtered.Proposals)}
 		totalMatched += len(filtered.Proposals)
+	}
+
+	// Validate: if proposals are unmatched, mark all sessions as error.
+	if totalMatched != len(evaluatorOutput.Proposals) {
+		partitionErr := fmt.Errorf("batch: %d of %d proposals unmatched after partitioning (possible ID format mismatch)",
+			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
+		for i, s := range chunk {
+			idx := indexByID[s.SessionID]
+			results[idx].Status = "error"
+			results[idx].Error = partitionErr
+			r.emit(s.SessionID, BatchEvent{Type: "error", Error: partitionErr})
+
+			rec := records[s.SessionID]
+			rec.Status = "error"
+			rec.ErrorDetail = partitionErr.Error()
+			rec.EvaluatorDurationNs = int64(perSessionDuration)
+			rec.EvaluatorUsage = splitUsage[i]
+			rec.computeUsageTotals()
+			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+			_ = AppendHistory(*rec)
+
+			if markErr := store.MarkError(s.SessionID); markErr != nil {
+				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
+			}
+		}
+		return
+	}
+
+	// Partition valid — persist results and mark processed.
+	for i, s := range chunk {
+		idx := indexByID[s.SessionID]
+		rec := records[s.SessionID]
 
 		if evaluatorOutput.PromptVersion != "" {
 			rec.EvaluatorPromptVersion = evaluatorOutput.PromptVersion
 		}
 
-		proposals := persistEvaluatorResults(s.SessionID, filtered, r.log())
+		proposals := persistEvaluatorResults(s.SessionID, partitioned[i].filtered, r.log())
 		results[idx].Status = "processed"
 		results[idx].Proposals = proposals
 		r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
 
 		rec.Status = "processed"
-		rec.ProposalCount = len(filtered.Proposals)
+		rec.ProposalCount = len(partitioned[i].filtered.Proposals)
 		rec.EvaluatorDurationNs = int64(perSessionDuration)
 		rec.EvaluatorUsage = splitUsage[i]
 		rec.computeUsageTotals()
@@ -640,18 +676,6 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 		if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
 		}
-	}
-
-	if totalMatched == 0 && len(evaluatorOutput.Proposals) > 0 {
-		err := fmt.Errorf("batch: all %d proposals dropped during partitioning (possible ID format mismatch)",
-			len(evaluatorOutput.Proposals))
-		for _, s := range chunk {
-			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
-		}
-	} else if totalMatched != len(evaluatorOutput.Proposals) {
-		err := fmt.Errorf("batch: %d of %d proposals unmatched after partitioning",
-			len(evaluatorOutput.Proposals)-totalMatched, len(evaluatorOutput.Proposals))
-		r.emit(chunk[0].SessionID, BatchEvent{Type: "error", Error: err})
 	}
 }
 
