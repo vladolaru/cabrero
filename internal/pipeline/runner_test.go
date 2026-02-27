@@ -1706,8 +1706,8 @@ func TestRunGroupEvalBatch_PartitionBySessionID(t *testing.T) {
 
 	// Both sessions should be processed successfully.
 	for i, r := range results {
-		if r.Status != "processed" {
-			t.Errorf("results[%d] status = %q, want %q", i, r.Status, "processed")
+		if r.Status != HistoryStatusProcessed {
+			t.Errorf("results[%d] status = %q, want %q", i, r.Status, HistoryStatusProcessed)
 		}
 	}
 	// s1 gets 1 proposal, s2 gets 2.
@@ -1745,8 +1745,8 @@ func TestRunGroupEvalBatch_LegacyFallback(t *testing.T) {
 
 	// Both sessions should be processed via legacy prefix matching.
 	for i, r := range results {
-		if r.Status != "processed" {
-			t.Errorf("results[%d] status = %q, want %q", i, r.Status, "processed")
+		if r.Status != HistoryStatusProcessed {
+			t.Errorf("results[%d] status = %q, want %q", i, r.Status, HistoryStatusProcessed)
 		}
 	}
 	if results[0].Proposals != 1 {
