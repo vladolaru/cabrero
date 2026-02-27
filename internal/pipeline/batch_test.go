@@ -403,6 +403,46 @@ func TestValidateEvaluatorOutput(t *testing.T) {
 	})
 }
 
+func TestWriteProposal_RejectsCollision(t *testing.T) {
+	setupBatchStore(t)
+
+	p1 := &Proposal{
+		ID:         "prop-collision-1",
+		Type:       "skill_improvement",
+		Confidence: "high",
+		Rationale:  "first proposal",
+	}
+	p2 := &Proposal{
+		ID:         "prop-collision-1", // same ID
+		Type:       "skill_improvement",
+		Confidence: "high",
+		Rationale:  "second proposal that should be rejected",
+	}
+
+	// First write should succeed.
+	if err := WriteProposal(p1, "session-aaa"); err != nil {
+		t.Fatalf("first WriteProposal failed: %v", err)
+	}
+
+	// Second write with same ID should fail.
+	err := WriteProposal(p2, "session-bbb")
+	if err == nil {
+		t.Fatal("expected error on duplicate proposal ID, got nil")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("expected 'already exists' in error, got: %v", err)
+	}
+
+	// Verify original proposal is unchanged.
+	pw, err := ReadProposal("prop-collision-1")
+	if err != nil {
+		t.Fatalf("reading proposal after collision: %v", err)
+	}
+	if pw.Proposal.Rationale != "first proposal" {
+		t.Errorf("original proposal was overwritten: got rationale %q", pw.Proposal.Rationale)
+	}
+}
+
 // writeTranscript writes a minimal JSONL transcript with the given UUIDs.
 func writeTranscript(t *testing.T, sessionID string, uuids []string) {
 	t.Helper()

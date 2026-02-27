@@ -186,6 +186,9 @@ func WriteProposal(p *Proposal, sessionID string) error {
 	}
 
 	path := filepath.Join(dir, p.ID+".json")
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("proposal %s already exists", p.ID)
+	}
 	return store.AtomicWrite(path, data, 0o644)
 }
 
