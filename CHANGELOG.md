@@ -5,6 +5,32 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Meta cooldown logic** — `ProposalCreatedAfter` was a stub that always returned `true`,
+  permanently suppressing meta-analysis after the first matching proposal. Now parses unix
+  timestamps from meta proposal IDs for real comparison.
+- **Batch partition validation** — batch evaluator validated proposal partitioning *after*
+  marking sessions as processed. Now validates partition completeness first and marks sessions
+  as error when proposals are unmatched.
+- **Proposal ID collision guard** — `WriteProposal` now rejects writes when a proposal with
+  the same ID already exists, preventing silent overwrites of pending proposals.
+- **Cleanup cancellation** — bare `break` inside `select` only exited the `select`, not the
+  `for` loop, so curator goroutines kept launching after context cancellation. Fixed with
+  labeled break.
+- **Curator tool scoping** — curator used unscoped `Read,Grep` (full filesystem access). Now
+  scoped to the target directory and `~/.cabrero`, consistent with classifier and evaluator.
+- **Metrics window mismatch** — `CostPerAcceptedProposal` divided 30-day cost by all-time
+  approvals. Now uses the same 30-day window for both numerator and denominator.
+- **Batch web counter duplication** — `splitUsageForBatch` copied `WebSearchRequests` and
+  `WebFetchRequests` in full to each session instead of dividing by N.
+- **Rejection note persistence** — `Archive()` accepted a `note` parameter but never wrote
+  it to the archived JSON. Rejection reasons from `cabrero reject --reason` are now persisted.
+- **Status error count** — `cabrero status` now shows errored session count when present.
+- **Agent attribution determinism** — parser agent ID assignment used Go map iteration (random
+  order). Now sorts agent IDs for consistent results across runs.
+
 ## [0.22.1] - 2026-02-26
 
 ### Fixed
