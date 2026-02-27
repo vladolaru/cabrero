@@ -3,6 +3,7 @@ package parser
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vladolaru/cabrero/internal/store"
@@ -118,5 +119,212 @@ func TestFinalizeAgents_MoreSpawnsThanAgentIDs(t *testing.T) {
 	}
 	if unknownCount != 1 {
 		t.Errorf("unknown agents = %d, want 1", unknownCount)
+	}
+}
+
+// --- detectRetryAnomalies tests ---
+
+func TestDetectRetryAnomalies_NoAnomalies(t *testing.T) {
+	calls := []recentToolCall{
+		{toolName: "Read", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "file_a.go"},
+		{toolName: "Read", uuid: "u2", timestamp: "2024-01-01T00:00:10Z", inputKey: "file_b.go"},
+	}
+	anomalies := detectRetryAnomalies(calls)
+	if len(anomalies) != 0 {
+		t.Errorf("anomalies = %d, want 0", len(anomalies))
+	}
+}
+
+func TestDetectRetryAnomalies_SingleCall(t *testing.T) {
+	calls := []recentToolCall{
+		{toolName: "Bash", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "npm test"},
+	}
+	anomalies := detectRetryAnomalies(calls)
+	if len(anomalies) != 0 {
+		t.Errorf("anomalies = %d, want 0 for single call", len(anomalies))
+	}
+}
+
+func TestDetectRetryAnomalies_SameToolSameInput(t *testing.T) {
+	calls := []recentToolCall{
+		{toolName: "Bash", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "npm test"},
+		{toolName: "Bash", uuid: "u2", timestamp: "2024-01-01T00:00:05Z", inputKey: "npm test"},
+		{toolName: "Bash", uuid: "u3", timestamp: "2024-01-01T00:00:10Z", inputKey: "npm test"},
+	}
+	anomalies := detectRetryAnomalies(calls)
+	if len(anomalies) == 0 {
+		t.Fatal("expected at least one retry anomaly for 3 identical Bash calls")
+	}
+	if anomalies[0].ToolName != "Bash" {
+		t.Errorf("ToolName = %q, want 'Bash'", anomalies[0].ToolName)
+	}
+	if len(anomalies[0].UUIDs) != 3 {
+		t.Errorf("UUIDs count = %d, want 3", len(anomalies[0].UUIDs))
+	}
+	if anomalies[0].InputSimilarity != "exact" {
+		t.Errorf("InputSimilarity = %q, want 'exact'", anomalies[0].InputSimilarity)
+	}
+}
+
+func TestDetectRetryAnomalies_OutsideTimeWindow(t *testing.T) {
+	// Same tool+input but >60s apart — should not be flagged.
+	calls := []recentToolCall{
+		{toolName: "Bash", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "npm test"},
+		{toolName: "Bash", uuid: "u2", timestamp: "2024-01-01T00:02:00Z", inputKey: "npm test"},
+	}
+	anomalies := detectRetryAnomalies(calls)
+	if len(anomalies) != 0 {
+		t.Errorf("anomalies = %d, want 0 for calls outside time window", len(anomalies))
+	}
+}
+
+// --- detectSearchFumbles tests ---
+
+func TestDetectSearchFumbles_SingleCall(t *testing.T) {
+	calls := []recentToolCall{
+		{toolName: "Grep", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "pattern1"},
+	}
+	fumbles := detectSearchFumbles(calls)
+	if len(fumbles) != 0 {
+		t.Errorf("fumbles = %d, want 0 for single call", len(fumbles))
+	}
+}
+
+func TestDetectSearchFumbles_TwoDistinctInputs(t *testing.T) {
+	// Only 2 distinct inputs — threshold is 3.
+	calls := []recentToolCall{
+		{toolName: "Grep", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "pattern1"},
+		{toolName: "Grep", uuid: "u2", timestamp: "2024-01-01T00:00:05Z", inputKey: "pattern2"},
+	}
+	fumbles := detectSearchFumbles(calls)
+	if len(fumbles) != 0 {
+		t.Errorf("fumbles = %d, want 0 for only 2 distinct inputs", len(fumbles))
+	}
+}
+
+func TestDetectSearchFumbles_ThreeDistinctInputs(t *testing.T) {
+	// 3 distinct inputs in sequence within 60s — should be a fumble.
+	calls := []recentToolCall{
+		{toolName: "Grep", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "pattern1"},
+		{toolName: "Grep", uuid: "u2", timestamp: "2024-01-01T00:00:05Z", inputKey: "pattern2"},
+		{toolName: "Grep", uuid: "u3", timestamp: "2024-01-01T00:00:10Z", inputKey: "pattern3"},
+	}
+	fumbles := detectSearchFumbles(calls)
+	if len(fumbles) == 0 {
+		t.Fatal("expected fumble for 3 distinct Grep inputs in sequence")
+	}
+	if fumbles[0].Type != "search_fumble" {
+		t.Errorf("Type = %q, want 'search_fumble'", fumbles[0].Type)
+	}
+	if fumbles[0].ToolName != "Grep" {
+		t.Errorf("ToolName = %q, want 'Grep'", fumbles[0].ToolName)
+	}
+}
+
+func TestDetectSearchFumbles_NonSearchTool(t *testing.T) {
+	// Non-search tools should not trigger fumbles.
+	calls := []recentToolCall{
+		{toolName: "Read", uuid: "u1", timestamp: "2024-01-01T00:00:00Z", inputKey: "a.go"},
+		{toolName: "Read", uuid: "u2", timestamp: "2024-01-01T00:00:05Z", inputKey: "b.go"},
+		{toolName: "Read", uuid: "u3", timestamp: "2024-01-01T00:00:10Z", inputKey: "c.go"},
+	}
+	fumbles := detectSearchFumbles(calls)
+	if len(fumbles) != 0 {
+		t.Errorf("fumbles = %d, want 0 for non-search tool", len(fumbles))
+	}
+}
+
+// --- detectBacktracking tests ---
+
+func TestDetectBacktracking_NoBacktrack(t *testing.T) {
+	accesses := []fileAccess{
+		{filePath: "a.go", toolName: "Read", uuid: "u1", seqIndex: 0},
+		{filePath: "b.go", toolName: "Read", uuid: "u2", seqIndex: 1},
+		{filePath: "c.go", toolName: "Read", uuid: "u3", seqIndex: 2},
+	}
+	signals := detectBacktracking(accesses)
+	if len(signals) != 0 {
+		t.Errorf("backtrack signals = %d, want 0", len(signals))
+	}
+}
+
+func TestDetectBacktracking_WithBacktrack(t *testing.T) {
+	// Access a.go, then 3 other files, then a.go again — should detect backtrack.
+	accesses := []fileAccess{
+		{filePath: "a.go", toolName: "Read", uuid: "u1", seqIndex: 0},
+		{filePath: "b.go", toolName: "Read", uuid: "u2", seqIndex: 1},
+		{filePath: "c.go", toolName: "Read", uuid: "u3", seqIndex: 2},
+		{filePath: "d.go", toolName: "Read", uuid: "u4", seqIndex: 3},
+		{filePath: "a.go", toolName: "Read", uuid: "u5", seqIndex: 4},
+	}
+	signals := detectBacktracking(accesses)
+	if len(signals) == 0 {
+		t.Fatal("expected backtrack signal for a.go after 3 intervening files")
+	}
+	if signals[0].Type != "backtrack" {
+		t.Errorf("Type = %q, want 'backtrack'", signals[0].Type)
+	}
+	if !strings.Contains(signals[0].Detail, "a.go") {
+		t.Errorf("Detail = %q, want to mention 'a.go'", signals[0].Detail)
+	}
+}
+
+func TestDetectBacktracking_TooFewIntervening(t *testing.T) {
+	// Access a.go, then 2 other files, then a.go again — threshold is 3.
+	accesses := []fileAccess{
+		{filePath: "a.go", toolName: "Read", uuid: "u1", seqIndex: 0},
+		{filePath: "b.go", toolName: "Read", uuid: "u2", seqIndex: 1},
+		{filePath: "c.go", toolName: "Read", uuid: "u3", seqIndex: 2},
+		{filePath: "a.go", toolName: "Read", uuid: "u4", seqIndex: 3},
+	}
+	signals := detectBacktracking(accesses)
+	if len(signals) != 0 {
+		t.Errorf("backtrack signals = %d, want 0 for only 2 intervening files", len(signals))
+	}
+}
+
+// --- inferClaudeMdLoaded tests ---
+
+func TestInferClaudeMdLoaded_WithCwd(t *testing.T) {
+	cwd := "/home/user/project"
+	d := &Digest{
+		Shape: Shape{Cwd: &cwd},
+	}
+	d.inferClaudeMdLoaded()
+
+	if len(d.ClaudeMd.Loaded) == 0 {
+		t.Fatal("expected at least one inferred CLAUDE.md path")
+	}
+
+	foundUser := false
+	foundProject := false
+	for _, loaded := range d.ClaudeMd.Loaded {
+		if loaded.Source == "user_config" {
+			foundUser = true
+		}
+		if loaded.Source == "project_cwd" {
+			foundProject = true
+		}
+	}
+	if !foundUser {
+		t.Error("missing user_config CLAUDE.md")
+	}
+	if !foundProject {
+		t.Error("missing project_cwd CLAUDE.md")
+	}
+}
+
+func TestInferClaudeMdLoaded_NoCwd(t *testing.T) {
+	d := &Digest{}
+	d.inferClaudeMdLoaded()
+
+	// Should still have user_config but no project_cwd.
+	if len(d.ClaudeMd.Loaded) == 0 {
+		t.Fatal("expected user_config CLAUDE.md even without cwd")
+	}
+	for _, loaded := range d.ClaudeMd.Loaded {
+		if loaded.Source == "project_cwd" {
+			t.Error("should not have project_cwd CLAUDE.md when cwd is nil")
+		}
 	}
 }
