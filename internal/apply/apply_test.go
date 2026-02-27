@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -95,6 +96,90 @@ func TestArchive_WritesOutcomeAndTimestamp(t *testing.T) {
 	// archiveReason must NOT be written by new code.
 	if _, ok := result["archiveReason"]; ok {
 		t.Error("archiveReason should not be written by new code")
+	}
+}
+
+func TestArchive_PersistsNote(t *testing.T) {
+	tmp := t.TempDir()
+	old := store.RootOverrideForTest(tmp)
+	defer store.ResetRootOverrideForTest(old)
+	store.Init()
+
+	// Create a proposal to archive.
+	p := &pipeline.Proposal{
+		ID:         "prop-note-test-1",
+		Type:       "skill_improvement",
+		Confidence: "high",
+		Rationale:  "test proposal",
+	}
+	if err := pipeline.WriteProposal(p, "test-session"); err != nil {
+		t.Fatalf("writing proposal: %v", err)
+	}
+
+	// Archive with a note.
+	note := "Rejected because the change is too broad"
+	if err := Archive("prop-note-test-1", OutcomeRejected, note); err != nil {
+		t.Fatalf("archiving: %v", err)
+	}
+
+	// Read the archived file and verify note is persisted.
+	archivedPath := filepath.Join(store.Root(), "proposals", "archived", "prop-note-test-1.json")
+	data, err := os.ReadFile(archivedPath)
+	if err != nil {
+		t.Fatalf("reading archived file: %v", err)
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("parsing archived JSON: %v", err)
+	}
+
+	noteRaw, ok := raw["note"]
+	if !ok {
+		t.Fatal("archived JSON missing 'note' field")
+	}
+	var got string
+	json.Unmarshal(noteRaw, &got)
+	if got != note {
+		t.Errorf("note = %q, want %q", got, note)
+	}
+}
+
+func TestArchive_OmitsEmptyNote(t *testing.T) {
+	tmp := t.TempDir()
+	old := store.RootOverrideForTest(tmp)
+	defer store.ResetRootOverrideForTest(old)
+	store.Init()
+
+	p := &pipeline.Proposal{
+		ID:         "prop-no-note-1",
+		Type:       "skill_improvement",
+		Confidence: "high",
+		Rationale:  "test proposal",
+	}
+	if err := pipeline.WriteProposal(p, "test-session"); err != nil {
+		t.Fatalf("writing proposal: %v", err)
+	}
+
+	// Archive with empty note.
+	if err := Archive("prop-no-note-1", OutcomeRejected, ""); err != nil {
+		t.Fatalf("archiving: %v", err)
+	}
+
+	// Read the archived file and verify note is NOT present.
+	archivedPath := filepath.Join(store.Root(), "proposals", "archived", "prop-no-note-1.json")
+	data, err := os.ReadFile(archivedPath)
+	if err != nil {
+		t.Fatalf("reading archived file: %v", err)
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("parsing archived JSON: %v", err)
+	}
+
+	if _, ok := raw["note"]; ok {
+		t.Error("archived JSON has 'note' field for empty note — should be omitted")
 	}
 }
 

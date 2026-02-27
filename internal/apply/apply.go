@@ -168,6 +168,11 @@ func Archive(proposalID string, outcome ArchiveOutcome, note string) error {
 	archivedAtJSON, _ := json.Marshal(time.Now())
 	raw["archivedAt"] = archivedAtJSON
 
+	if note != "" {
+		noteJSON, _ := json.Marshal(note)
+		raw["note"] = noteJSON
+	}
+
 	// Do NOT write "archiveReason" — reads use readArchiveOutcome for migration.
 	delete(raw, "archiveReason") // remove if present from old data
 
