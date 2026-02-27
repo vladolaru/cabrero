@@ -17,6 +17,7 @@ This file provides guidance to AI coding agents when working with code in this r
 - **DESIGN.md** is the living architecture document. Keep it updated whenever adding, changing, or removing features, commands, pipeline stages, or architectural decisions. If a commit changes behavior documented in DESIGN.md, update DESIGN.md in the same commit.
 - **CHANGELOG.md** follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add an entry under an `[Unreleased]` section for every user-visible change (new feature, fix, removal, deprecation). When a version is tagged, move unreleased entries under the new version heading with the release date.
 - **docs/claude-cli-settings-and-hooks.md** — reference for `--setting-sources`, `--settings`, and `disableAllHooks` when invoking the `claude` CLI programmatically. Consult when modifying `invokeClaude`, `buildChatArgs`, or any code that spawns `claude` subprocesses.
+- **docs/subprocess-isolation.md** — complete isolation model for `claude` CLI subprocesses: env vars (`CLAUDECODE`, `CABRERO_SESSION`), CLI flags, settings overrides, per-mode specifics, and what still leaks through. Consult when adding new subprocess invocation sites or debugging isolation failures.
 
 ## Snapshots
 
