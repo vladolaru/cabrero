@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -45,6 +47,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case message.RollbackFinished:
 		return m.handleRollbackFinished(msg)
+
+	case message.SourceChangesLoaded:
+		if msg.Err == nil {
+			m.changes = msg.Changes
+		}
+		return m, nil
 	}
 
 	// Handle ConfirmResult messages from the confirm component.
@@ -158,7 +166,15 @@ func (m Model) handleOpen() (Model, tea.Cmd) {
 	m.detailOpen = true
 	src := *s
 	m.detailSource = &src
-	return m, nil
+	sourceName := src.Name
+	return m, func() tea.Msg {
+		changes, err := store.ChangesBySource(sourceName)
+		return message.SourceChangesLoaded{
+			SourceName: sourceName,
+			Changes:    changes,
+			Err:        err,
+		}
+	}
 }
 
 // handleToggleApproach initiates the approach toggle with confirmation.
@@ -264,7 +280,7 @@ func (m Model) handleConfirmResult(result components.ConfirmResult) (Model, tea.
 		}
 		changeID := m.changes[0].ID
 		return m, func() tea.Msg {
-			return message.RollbackFinished{ChangeID: changeID}
+			return executeRollback(changeID)
 		}
 	}
 
@@ -296,10 +312,10 @@ func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
 				m.confirm = components.NewConfirm("Rollback change " + m.changes[0].ID + "?")
 				return m, nil
 			}
-			// No confirmation needed — emit directly.
+			// No confirmation needed — execute directly.
 			changeID := m.changes[0].ID
 			return m, func() tea.Msg {
-				return message.RollbackFinished{ChangeID: changeID}
+				return executeRollback(changeID)
 			}
 		}
 	}
@@ -365,19 +381,30 @@ func (m Model) handleOwnershipFinished(msg message.SetOwnershipFinished) (Model,
 func (m Model) handleRollbackFinished(msg message.RollbackFinished) (Model, tea.Cmd) {
 	if msg.Err != nil {
 		return m, func() tea.Msg {
-			return message.StatusMessage{Text: "Rollback failed: " + msg.Err.Error(), Duration: 3 * time.Second}
+			return message.StatusMessage{Text: "Rollback failed: " + msg.Err.Error(), Duration: 5 * time.Second}
 		}
 	}
-	// Remove the rolled-back change from the list.
-	for i, c := range m.changes {
-		if c.ID == msg.ChangeID {
-			m.changes = append(m.changes[:i], m.changes[i+1:]...)
-			break
-		}
-	}
-	return m, func() tea.Msg {
+
+	statusCmd := func() tea.Msg {
 		return message.StatusMessage{Text: "Rollback complete.", Duration: 3 * time.Second}
 	}
+
+	// Reload changes from store to reflect the new rollback entry.
+	if m.detailSource != nil {
+		sourceName := m.detailSource.Name
+		return m, tea.Batch(
+			statusCmd,
+			func() tea.Msg {
+				changes, err := store.ChangesBySource(sourceName)
+				return message.SourceChangesLoaded{
+					SourceName: sourceName,
+					Changes:    changes,
+					Err:        err,
+				}
+			},
+		)
+	}
+	return m, statusCmd
 }
 
 // cursorGroupIdx returns the group index for the current cursor position.
@@ -388,4 +415,39 @@ func (m Model) cursorGroupIdx() int {
 		return -1
 	}
 	return m.flatItems[m.cursor].groupIdx
+}
+
+// executeRollback loads the change entry, restores the file, and records
+// a rollback audit entry.
+func executeRollback(changeID string) message.RollbackFinished {
+	entry, err := store.GetChange(changeID)
+	if err != nil {
+		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("load change: %w", err)}
+	}
+	if entry == nil {
+		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("change %s not found", changeID)}
+	}
+	if entry.PreviousContent == "" {
+		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("no previous content to restore for %s", changeID)}
+	}
+
+	// Restore file content.
+	if err := os.WriteFile(entry.FilePath, []byte(entry.PreviousContent), 0o644); err != nil {
+		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("write file: %w", err)}
+	}
+
+	// Record rollback audit entry.
+	rollbackEntry := fitness.ChangeEntry{
+		ID:          "rollback-" + changeID,
+		SourceName:  entry.SourceName,
+		ProposalID:  entry.ProposalID,
+		Description: "Rollback of " + changeID,
+		Timestamp:   time.Now(),
+		Status:      "rollback",
+		FilePath:    entry.FilePath,
+	}
+	// Ignore audit write error — rollback itself succeeded.
+	_ = store.AppendChange(rollbackEntry)
+
+	return message.RollbackFinished{ChangeID: changeID}
 }

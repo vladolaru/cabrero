@@ -4,6 +4,7 @@ package message
 import (
 	"time"
 
+	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 )
 
@@ -164,6 +165,13 @@ type SetOwnershipFinished struct {
 type RollbackFinished struct {
 	ChangeID string
 	Err      error
+}
+
+// SourceChangesLoaded carries change history for a source detail view.
+type SourceChangesLoaded struct {
+	SourceName string
+	Changes    []fitness.ChangeEntry
+	Err        error
 }
 
 // Pipeline monitor messages.

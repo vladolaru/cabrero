@@ -2,6 +2,8 @@ package sources
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/vladolaru/cabrero/internal/fitness"
+	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
 	"github.com/vladolaru/cabrero/internal/tui/message"
 	"github.com/vladolaru/cabrero/internal/tui/shared"
@@ -443,11 +446,38 @@ func TestSources_DetailAndRollback(t *testing.T) {
 		t.Error("list view should be visible after closing detail")
 	}
 
-	// Reopen detail with changes, test rollback with confirmation.
+	// Set up a temp store for rollback testing.
+	dir := t.TempDir()
+	old := store.RootOverrideForTest(dir)
+	defer store.ResetRootOverrideForTest(old)
+
+	// Create a target file that will be rolled back.
+	targetFile := filepath.Join(dir, "skill.md")
+	if err := os.WriteFile(targetFile, []byte("modified content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Persist change entries in the store.
+	if err := store.AppendChange(fitness.ChangeEntry{
+		ID: "change-1", SourceName: "docx-helper", Description: "Updated workflow step",
+		PreviousContent: "original content", FilePath: targetFile, Status: "approved",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendChange(fitness.ChangeEntry{
+		ID: "change-2", SourceName: "docx-helper", Description: "Fixed template",
+		PreviousContent: "older content", FilePath: targetFile, Status: "approved",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reopen detail with changes loaded from store.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m.changes = []fitness.ChangeEntry{
-		{ID: "change-1", SourceName: "docx-helper", Description: "Updated workflow step"},
-		{ID: "change-2", SourceName: "docx-helper", Description: "Fixed template"},
+		{ID: "change-1", SourceName: "docx-helper", Description: "Updated workflow step",
+			PreviousContent: "original content", FilePath: targetFile},
+		{ID: "change-2", SourceName: "docx-helper", Description: "Fixed template",
+			PreviousContent: "older content", FilePath: targetFile},
 	}
 
 	// Rollback requires confirm (default config).
@@ -487,15 +517,24 @@ func TestSources_DetailAndRollback(t *testing.T) {
 	if rb.ChangeID != "change-1" {
 		t.Errorf("RollbackFinished.ChangeID = %q, want change-1", rb.ChangeID)
 	}
+	if rb.Err != nil {
+		t.Errorf("RollbackFinished.Err = %v, want nil", rb.Err)
+	}
 
-	// Feed the finished message back.
+	// Verify the file was restored.
+	restored, err := os.ReadFile(targetFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(restored) != "original content" {
+		t.Errorf("file content after rollback = %q, want 'original content'", string(restored))
+	}
+
+	// Feed the finished message back — triggers async reload from store.
 	m, _ = m.Update(rb)
-	if len(m.changes) != 1 {
-		t.Errorf("changes after rollback = %d, want 1", len(m.changes))
-	}
-	if m.changes[0].ID != "change-2" {
-		t.Errorf("remaining change = %q, want change-2", m.changes[0].ID)
-	}
+	// The store now has 3 entries (2 originals + 1 rollback audit).
+	// In-memory reload happens via async SourceChangesLoaded, so we don't
+	// assert m.changes length synchronously here.
 }
 
 func TestSources_RollbackWithoutConfirm(t *testing.T) {
@@ -816,5 +855,23 @@ func TestSources_ResizeUpdatesViewport(t *testing.T) {
 	}
 	if m.viewport.Height() != 28 {
 		t.Errorf("viewport.Height after resize = %d, want 28", m.viewport.Height())
+	}
+}
+
+func TestSources_DetailOpenLoadsChanges(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	// Move to first source (index 1, after group header at 0).
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+
+	// Open detail.
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if !m.detailOpen {
+		t.Fatal("detail should be open")
+	}
+	if cmd == nil {
+		t.Fatal("opening detail should dispatch a load changes command")
 	}
 }
