@@ -80,6 +80,7 @@ func readAllChanges() ([]fitness.ChangeEntry, error) {
 
 	var entries []fitness.ChangeEntry
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		var e fitness.ChangeEntry
 		if err := json.Unmarshal(scanner.Bytes(), &e); err != nil {

@@ -116,6 +116,37 @@ func TestChangeStore_RollbackEntry(t *testing.T) {
 	}
 }
 
+func TestChangeStore_LargeEntry(t *testing.T) {
+	dir := t.TempDir()
+	old := RootOverrideForTest(dir)
+	defer ResetRootOverrideForTest(old)
+
+	// Create an entry with PreviousContent exceeding default scanner buffer (64KB).
+	largeContent := make([]byte, 128*1024) // 128KB
+	for i := range largeContent {
+		largeContent[i] = 'x'
+	}
+	entry := fitness.ChangeEntry{
+		ID:              "change-large",
+		SourceName:      "big-skill",
+		PreviousContent: string(largeContent),
+	}
+	if err := AppendChange(entry); err != nil {
+		t.Fatalf("AppendChange: %v", err)
+	}
+
+	changes, err := ChangesBySource("big-skill")
+	if err != nil {
+		t.Fatalf("ChangesBySource: %v", err)
+	}
+	if len(changes) != 1 {
+		t.Fatalf("changes = %d, want 1 (large entry was silently dropped)", len(changes))
+	}
+	if changes[0].ID != "change-large" {
+		t.Errorf("ID = %q, want change-large", changes[0].ID)
+	}
+}
+
 func TestChangeStore_FileCreatedOnDemand(t *testing.T) {
 	dir := t.TempDir()
 	old := RootOverrideForTest(dir)
