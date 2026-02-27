@@ -169,8 +169,7 @@ func ListSessions() ([]Metadata, error) {
 }
 
 // ShortSessionID returns the first 8 characters of a session ID (the first
-// UUID segment). Use this for display in logs, CLI output, TUI views, and
-// pipeline proposal ID prefixes.
+// UUID segment). Use this for display in logs, CLI output, and TUI views.
 func ShortSessionID(id string) string {
 	if len(id) > 8 {
 		return id[:8]

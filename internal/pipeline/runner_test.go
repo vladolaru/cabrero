@@ -1679,6 +1679,84 @@ func writeSources(t *testing.T, entries []sourceEntry) {
 	}
 }
 
+func TestRunGroupEvalBatch_PartitionBySessionID(t *testing.T) {
+	setupBatchStore(t)
+
+	sid1 := "aaaa1111-1111-1111-1111-111111111111"
+	sid2 := "bbbb2222-2222-2222-2222-222222222222"
+	s1 := createBatchSession(t, sid1)
+	s2 := createBatchSession(t, sid2)
+
+	runner := NewRunnerWithStages(DefaultPipelineConfig(), TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalBatchFunc: func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			// Return proposals with explicit SessionID fields.
+			return &EvaluatorOutput{
+				Proposals: []Proposal{
+					{ID: "prop-aaaa1111-0", SessionID: sid1, Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+					{ID: "prop-bbbb2222-0", SessionID: sid2, Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+					{ID: "prop-bbbb2222-1", SessionID: sid2, Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				},
+			}, nil, nil
+		},
+	})
+	runner.Source = "test"
+
+	results := runner.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	// Both sessions should be processed successfully.
+	for i, r := range results {
+		if r.Status != "processed" {
+			t.Errorf("results[%d] status = %q, want %q", i, r.Status, "processed")
+		}
+	}
+	// s1 gets 1 proposal, s2 gets 2.
+	if results[0].Proposals != 1 {
+		t.Errorf("results[0].Proposals = %d, want 1", results[0].Proposals)
+	}
+	if results[1].Proposals != 2 {
+		t.Errorf("results[1].Proposals = %d, want 2", results[1].Proposals)
+	}
+}
+
+func TestRunGroupEvalBatch_LegacyFallback(t *testing.T) {
+	setupBatchStore(t)
+
+	sid1 := "cccc3333-3333-3333-3333-333333333333"
+	sid2 := "dddd4444-4444-4444-4444-444444444444"
+	s1 := createBatchSession(t, sid1)
+	s2 := createBatchSession(t, sid2)
+
+	runner := NewRunnerWithStages(DefaultPipelineConfig(), TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalBatchFunc: func(sessions []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			// Return proposals WITHOUT SessionID (legacy format).
+			return &EvaluatorOutput{
+				Proposals: []Proposal{
+					{ID: "prop-cccc3333-0", Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+					{ID: "prop-dddd4444-0", Type: "skill_improvement", Confidence: "high", Rationale: "test"},
+				},
+			}, nil, nil
+		},
+	})
+	runner.Source = "test"
+
+	results := runner.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	// Both sessions should be processed via legacy prefix matching.
+	for i, r := range results {
+		if r.Status != "processed" {
+			t.Errorf("results[%d] status = %q, want %q", i, r.Status, "processed")
+		}
+	}
+	if results[0].Proposals != 1 {
+		t.Errorf("results[0].Proposals = %d, want 1", results[0].Proposals)
+	}
+	if results[1].Proposals != 1 {
+		t.Errorf("results[1].Proposals = %d, want 1", results[1].Proposals)
+	}
+}
+
 func TestFinalizeSessionOutcome_Error(t *testing.T) {
 	setupBatchStore(t)
 	sid := "finalize-err-001"

@@ -108,6 +108,7 @@ const (
 // prompt_improvement, pipeline_insight.
 type Proposal struct {
 	ID                   string   `json:"id"`
+	SessionID            string   `json:"sessionId,omitempty"`
 	Type                 string   `json:"type"`
 	Confidence           string   `json:"confidence"`
 	Target               string   `json:"target"`

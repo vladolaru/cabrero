@@ -46,11 +46,25 @@ func persistEvaluatorResults(sessionID string, output *EvaluatorOutput, log Logg
 
 // filterProposals returns a shallow copy of the EvaluatorOutput with only
 // the proposals whose ID starts with the given prefix.
+// Used as legacy fallback when proposals lack explicit SessionID fields.
 func filterProposals(output *EvaluatorOutput, prefix string) *EvaluatorOutput {
 	filtered := *output // shallow copy
 	filtered.Proposals = []Proposal{}
 	for _, p := range output.Proposals {
 		if strings.HasPrefix(p.ID, prefix) {
+			filtered.Proposals = append(filtered.Proposals, p)
+		}
+	}
+	return &filtered
+}
+
+// filterProposalsBySessionID returns a shallow copy of the EvaluatorOutput
+// with only the proposals whose SessionID matches the given session ID.
+func filterProposalsBySessionID(output *EvaluatorOutput, sessionID string) *EvaluatorOutput {
+	filtered := *output // shallow copy
+	filtered.Proposals = []Proposal{}
+	for _, p := range output.Proposals {
+		if p.SessionID == sessionID {
 			filtered.Proposals = append(filtered.Proposals, p)
 		}
 	}

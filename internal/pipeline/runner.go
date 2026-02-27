@@ -579,8 +579,9 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 		return
 	}
 
-	// Partition proposals by session: proposal IDs encode their session
-	// via the format "prop-{first 8 chars of sessionId}-{index}".
+	// Partition proposals by session.
+	// Prefer explicit SessionID field (typed contract); fall back to prefix
+	// matching on proposal IDs for legacy evaluator output without SessionID.
 	type sessionResult struct {
 		filtered *EvaluatorOutput
 		matched  int
@@ -588,9 +589,22 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 	partitioned := make([]sessionResult, len(chunk))
 	totalMatched := 0
 
+	allHaveSessionID := len(evaluatorOutput.Proposals) > 0
+	for _, p := range evaluatorOutput.Proposals {
+		if p.SessionID == "" {
+			allHaveSessionID = false
+			break
+		}
+	}
+
 	for i, s := range chunk {
-		prefix := "prop-" + store.ShortSessionID(s.SessionID) + "-"
-		filtered := filterProposals(evaluatorOutput, prefix)
+		var filtered *EvaluatorOutput
+		if allHaveSessionID {
+			filtered = filterProposalsBySessionID(evaluatorOutput, s.SessionID)
+		} else {
+			prefix := "prop-" + store.ShortSessionID(s.SessionID) + "-"
+			filtered = filterProposals(evaluatorOutput, prefix)
+		}
 		filtered.SessionID = s.SessionID
 		partitioned[i] = sessionResult{filtered: filtered, matched: len(filtered.Proposals)}
 		totalMatched += len(filtered.Proposals)

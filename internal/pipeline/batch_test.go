@@ -111,6 +111,60 @@ func TestFilterProposals(t *testing.T) {
 	})
 }
 
+func TestFilterProposalsBySessionID(t *testing.T) {
+	t.Run("keeps only matching sessionId", func(t *testing.T) {
+		out := &EvaluatorOutput{
+			Proposals: []Proposal{
+				{ID: "prop-aaa-0", SessionID: "aaaa-1111"},
+				{ID: "prop-aaa-1", SessionID: "aaaa-1111"},
+				{ID: "prop-bbb-0", SessionID: "bbbb-2222"},
+			},
+		}
+		got := filterProposalsBySessionID(out, "aaaa-1111")
+		if len(got.Proposals) != 2 {
+			t.Fatalf("got %d proposals, want 2", len(got.Proposals))
+		}
+		for _, p := range got.Proposals {
+			if p.SessionID != "aaaa-1111" {
+				t.Errorf("unexpected SessionID %q", p.SessionID)
+			}
+		}
+	})
+
+	t.Run("no matches returns empty slice", func(t *testing.T) {
+		out := &EvaluatorOutput{
+			Proposals: []Proposal{
+				{ID: "prop-aaa-0", SessionID: "aaaa-1111"},
+			},
+		}
+		got := filterProposalsBySessionID(out, "cccc-3333")
+		if len(got.Proposals) != 0 {
+			t.Errorf("got %d proposals, want 0", len(got.Proposals))
+		}
+	})
+
+	t.Run("returns shallow copy not same pointer", func(t *testing.T) {
+		out := &EvaluatorOutput{SessionID: "batch", Proposals: []Proposal{}}
+		got := filterProposalsBySessionID(out, "any")
+		if got == out {
+			t.Error("filterProposalsBySessionID returned same pointer, want a copy")
+		}
+	})
+
+	t.Run("does not modify original", func(t *testing.T) {
+		original := &EvaluatorOutput{
+			Proposals: []Proposal{
+				{ID: "prop-aaa-0", SessionID: "aaaa-1111"},
+				{ID: "prop-bbb-0", SessionID: "bbbb-2222"},
+			},
+		}
+		filterProposalsBySessionID(original, "aaaa-1111")
+		if len(original.Proposals) != 2 {
+			t.Errorf("original modified: got %d proposals, want 2", len(original.Proposals))
+		}
+	})
+}
+
 // --- Store and session helpers ---
 
 func setupBatchStore(t *testing.T) {

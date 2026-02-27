@@ -133,7 +133,8 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	// Build batch prompt with indexed session data.
 	var dataBuilder strings.Builder
 	dataBuilder.WriteString(fmt.Sprintf("You are evaluating %d sessions from the same project in a single batch.\n", len(sessions)))
-	dataBuilder.WriteString("Generate proposals for ALL sessions that warrant them. Use the standard proposal ID format: prop-{first 8 chars of sessionId}-{index}.\n\n")
+	dataBuilder.WriteString("Generate proposals for ALL sessions that warrant them. Use the standard proposal ID format: prop-{first 8 chars of sessionId}-{index}.\n")
+	dataBuilder.WriteString("IMPORTANT: Each proposal MUST include a \"sessionId\" field containing the full session UUID it belongs to.\n\n")
 
 	for i, s := range sessions {
 		classifierJSON, err := json.MarshalIndent(s.ClassifierOutput, "", "  ")
