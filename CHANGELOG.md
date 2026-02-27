@@ -5,6 +5,37 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-02-27
+
+### Added
+- **Fitness report chat panel** — pressing `c` in the fitness detail view now opens an AI
+  chat panel (mirroring the proposal detail pattern) with the report context pre-loaded.
+  Supports horizontal/vertical split layout, tab focus switching, and lazy initialization.
+- **Persistent change history** — source changes are now recorded in `changes.jsonl`
+  (append-only JSON Lines) via `store.AppendChange`, `ChangesBySource`, and `GetChange`.
+- **Real rollback execution** — rolling back a change in the source detail view now restores
+  the previous file content from the change entry and records a rollback audit entry.
+- **Pipeline metrics population** — `ComputePipelineMetrics()` is now called during each
+  pipeline refresh cycle, populating the previously empty metrics section.
+- **Revision approval flow** — chat-produced revisions are now synced from the chat model
+  to the detail model via `Revision()`/`SetRevision()`, making the `u` (use revision) key
+  functional.
+- **Pipeline retry config gate** — `Pipeline.RetryEnabled` (default `false`) controls
+  whether the retry key, status bar binding, and help entry are shown. Prevents users
+  from triggering the unimplemented retry path.
+
+### Fixed
+- **Esc key in log viewer search** — Esc now correctly delegates to the log viewer when the
+  search input is active, instead of popping the view.
+- **Resize handling in Sources and Pipeline** — `WindowSizeMsg` now calls `SetSize()` instead
+  of directly assigning width/height fields, ensuring viewport dimensions stay in sync.
+- **Dashboard filtered empty state** — when all proposals are filtered out, the dashboard now
+  shows "No matches for current filter." instead of the misleading "No proposals pending."
+- **Chat panel width on wide terminals** — the configured `chatPanelWidth` percentage is now
+  respected in wide mode (>= 160 columns) instead of being hardcoded to 50%.
+- **Pipeline retry false success** — the synthetic placeholder that showed "Retry complete."
+  is replaced with an error fallback, preventing misleading success messages.
+
 ## [0.22.2] - 2026-02-27
 
 ### Fixed
@@ -933,6 +964,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.23.0]: https://github.com/vladolaru/cabrero/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/vladolaru/cabrero/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/vladolaru/cabrero/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/vladolaru/cabrero/compare/v0.21.0...v0.22.0
