@@ -107,6 +107,58 @@ func TestProposalCreatedAfter(t *testing.T) {
 	}
 }
 
+func TestCostPerAcceptedProposal_UsesWindowedApprovals(t *testing.T) {
+	tmp := t.TempDir()
+	origRoot := store.RootOverrideForTest(tmp)
+	defer store.ResetRootOverrideForTest(origRoot)
+	store.Init()
+
+	// Write history records: one recent, one old.
+	recentRec := HistoryRecord{
+		SessionID:              "recent-session",
+		Timestamp:              time.Now().Add(-5 * 24 * time.Hour), // 5 days ago
+		Triage:                 "evaluate",
+		TotalCostUSD:           1.0,
+		ProposalCount:          1,
+		EvaluatorPromptVersion: "v1",
+	}
+	oldRec := HistoryRecord{
+		SessionID:              "old-session",
+		Timestamp:              time.Now().Add(-60 * 24 * time.Hour), // 60 days ago
+		Triage:                 "evaluate",
+		TotalCostUSD:           1.0,
+		ProposalCount:          1,
+		EvaluatorPromptVersion: "v1",
+	}
+	_ = AppendHistory(recentRec)
+	_ = AppendHistory(oldRec)
+
+	// Write archived proposals: one from each session, both approved.
+	archivedDir := store.ArchivedProposalsDir()
+	os.MkdirAll(archivedDir, 0o755)
+
+	writeArchived := func(name, sessionID, outcome string, daysAgo int) {
+		archivedAt := time.Now().Add(time.Duration(-daysAgo) * 24 * time.Hour)
+		archivedAtJSON, _ := json.Marshal(archivedAt)
+		data := fmt.Sprintf(`{"sessionId":"%s","outcome":"%s","archivedAt":%s,"proposal":{"id":"%s"}}`,
+			sessionID, outcome, string(archivedAtJSON), name)
+		os.WriteFile(filepath.Join(archivedDir, name+".json"), []byte(data), 0o644)
+	}
+	writeArchived("prop-recent-1", "recent-session", "approved", 4)  // 4 days ago, within window
+	writeArchived("prop-old-1", "old-session", "approved", 55)       // 55 days ago, outside window
+
+	metrics, err := ComputePipelineMetrics(DefaultPipelineConfig())
+	if err != nil {
+		t.Fatalf("ComputePipelineMetrics: %v", err)
+	}
+
+	// CostPerAccepted should be 1.0/1 = 1.0 (only recent cost / recent approvals)
+	// NOT 1.0/2 = 0.5 (30-day cost / all-time approvals)
+	if metrics.CostPerAcceptedProposal < 0.9 || metrics.CostPerAcceptedProposal > 1.1 {
+		t.Errorf("CostPerAcceptedProposal = %f, want ~1.0 (windowed)", metrics.CostPerAcceptedProposal)
+	}
+}
+
 func TestComputePipelineMetrics_ClassifierFPR(t *testing.T) {
 	tmp := t.TempDir()
 	old := store.RootOverrideForTest(tmp)

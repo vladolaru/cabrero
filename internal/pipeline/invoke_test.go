@@ -842,8 +842,8 @@ func TestSplitUsageForBatch_SplitsEvenly(t *testing.T) {
 		OutputTokens:        3000,
 		CacheCreationTokens: 600,
 		CacheReadTokens:     1200,
-		WebSearchRequests:   2,
-		WebFetchRequests:    4,
+		WebSearchRequests:   6,
+		WebFetchRequests:    3,
 	}
 
 	result := splitUsageForBatch(cr, 3)
@@ -880,9 +880,12 @@ func TestSplitUsageForBatch_SplitsEvenly(t *testing.T) {
 		if u.CostUSD != 0.02 {
 			t.Errorf("[%d] CostUSD = %f, want 0.02", i, u.CostUSD)
 		}
-		// Web requests are shared (not divided).
+		// Web requests split equally.
 		if u.WebSearchRequests != 2 {
 			t.Errorf("[%d] WebSearchRequests = %d, want 2", i, u.WebSearchRequests)
+		}
+		if u.WebFetchRequests != 1 {
+			t.Errorf("[%d] WebFetchRequests = %d, want 1", i, u.WebFetchRequests)
 		}
 	}
 }

@@ -697,8 +697,8 @@ func splitUsageForBatch(cr *ClaudeResult, n int) []*InvocationUsage {
 			CacheCreationTokens: cr.CacheCreationTokens / n,
 			CacheReadTokens:     cr.CacheReadTokens / n,
 			CostUSD:             cr.TotalCostUSD / float64(n),
-			WebSearchRequests:   cr.WebSearchRequests,
-			WebFetchRequests:    cr.WebFetchRequests,
+			WebSearchRequests:   cr.WebSearchRequests / n,
+			WebFetchRequests:    cr.WebFetchRequests / n,
 		}
 	}
 

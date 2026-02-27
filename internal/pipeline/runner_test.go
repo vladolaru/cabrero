@@ -1358,3 +1358,24 @@ func TestRunGroupEvalBatch_MismatchedProposalsMarkError(t *testing.T) {
 		}
 	}
 }
+
+func TestSplitUsageForBatch_DividesWebCounters(t *testing.T) {
+	cr := &ClaudeResult{
+		InputTokens:       1000,
+		OutputTokens:      500,
+		WebSearchRequests: 6,
+		WebFetchRequests:  3,
+		TotalCostUSD:      0.06,
+	}
+
+	splits := splitUsageForBatch(cr, 3)
+
+	for i, s := range splits {
+		if s.WebSearchRequests != 2 {
+			t.Errorf("splits[%d].WebSearchRequests = %d, want 2", i, s.WebSearchRequests)
+		}
+		if s.WebFetchRequests != 1 {
+			t.Errorf("splits[%d].WebFetchRequests = %d, want 1", i, s.WebFetchRequests)
+		}
+	}
+}

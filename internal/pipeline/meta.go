@@ -71,10 +71,9 @@ func ComputePipelineMetrics(cfg PipelineConfig) (PipelineMetrics, error) {
 
 	acceptanceByVersion, _ := ListAcceptanceRateByPromptVersion()
 
-	// Count total approved for cost-per-accepted-proposal.
-	for _, a := range acceptanceByVersion {
-		totalApproved += a.Approved
-	}
+	// Count windowed approved proposals for cost-per-accepted-proposal.
+	// Use the same 30-day window as the cost aggregation.
+	totalApproved = countWindowedApprovals(cutoff)
 	costPerAccepted := math.NaN()
 	if totalApproved > 0 {
 		costPerAccepted = totalCost / float64(totalApproved)
@@ -113,6 +112,42 @@ func ProposalCreatedAfter(pw ProposalWithSession, cutoff time.Time) bool {
 	}
 	// No timestamp available — fail open (treat as recent).
 	return true
+}
+
+// countWindowedApprovals counts proposals approved after the given cutoff,
+// using the archivedAt timestamp from the archived proposal JSON.
+func countWindowedApprovals(cutoff time.Time) int {
+	archivedDir := store.ArchivedProposalsDir()
+	entries, err := os.ReadDir(archivedDir)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(archivedDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		var raw map[string]json.RawMessage
+		if json.Unmarshal(data, &raw) != nil {
+			continue
+		}
+		outcome := readArchivedOutcome(raw)
+		if outcome != "approved" {
+			continue
+		}
+		// Check archivedAt timestamp.
+		if archivedAtRaw, ok := raw["archivedAt"]; ok {
+			var archivedAt time.Time
+			if json.Unmarshal(archivedAtRaw, &archivedAt) == nil && archivedAt.After(cutoff) {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func median(vals []float64) float64 {
