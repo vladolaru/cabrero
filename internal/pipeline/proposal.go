@@ -124,6 +124,39 @@ type Proposal struct {
 
 // --- Persistence ---
 
+// schemaVersionProbe is used for fast schema detection without full decode.
+type schemaVersionProbe struct {
+	SchemaVersion int `json:"schemaVersion"`
+}
+
+// decodeProposalFile reads raw JSON and returns a v1 ProposalWithSession.
+// It detects v2 format (schemaVersion == 2) and converts via V2ToLegacyView.
+func decodeProposalFile(data []byte) (*ProposalWithSession, error) {
+	var probe schemaVersionProbe
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return nil, err
+	}
+
+	if probe.SchemaVersion == 2 {
+		var v2 ProposalV2WithSession
+		if err := json.Unmarshal(data, &v2); err != nil {
+			return nil, fmt.Errorf("parsing v2 proposal: %w", err)
+		}
+		legacy := V2ToLegacyView(&v2.Proposal)
+		return &ProposalWithSession{
+			SessionID: v2.SessionID,
+			Proposal:  legacy,
+		}, nil
+	}
+
+	// v1 format (no schemaVersion or schemaVersion != 2).
+	var p ProposalWithSession
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 // WriteClassifierOutput writes the Classifier result to disk.
 func WriteClassifierOutput(sessionID string, output *ClassifierOutput) error {
 	return writeEvaluation(sessionID+"-classifier.json", output)
@@ -163,6 +196,7 @@ func ReadEvaluatorOutput(sessionID string) (*EvaluatorOutput, error) {
 }
 
 // WriteProposal writes a single proposal to the proposals directory.
+// The on-disk format depends on DefaultWriterMode.
 func WriteProposal(p *Proposal, sessionID string) error {
 	if err := ValidateProposalID(p.ID); err != nil {
 		return err
@@ -172,27 +206,43 @@ func WriteProposal(p *Proposal, sessionID string) error {
 		return err
 	}
 
-	wrapped := struct {
-		SessionID string   `json:"sessionId"`
-		Proposal  Proposal `json:"proposal"`
-	}{
-		SessionID: sessionID,
-		Proposal:  *p,
-	}
-
-	data, err := json.MarshalIndent(wrapped, "", "  ")
-	if err != nil {
-		return err
-	}
-
 	path := filepath.Join(dir, p.ID+".json")
 	if _, err := os.Stat(path); err == nil {
 		return fmt.Errorf("proposal %s already exists", p.ID)
 	}
+
+	var data []byte
+	var marshalErr error
+
+	switch DefaultWriterMode {
+	case WriteV2, WriteBoth:
+		v2 := V1ToV2(p)
+		wrapped := ProposalV2WithSession{
+			SchemaVersion: 2,
+			SessionID:     sessionID,
+			Proposal:      v2,
+		}
+		data, marshalErr = json.MarshalIndent(wrapped, "", "  ")
+	default: // WriteLegacy
+		wrapped := struct {
+			SessionID string   `json:"sessionId"`
+			Proposal  Proposal `json:"proposal"`
+		}{
+			SessionID: sessionID,
+			Proposal:  *p,
+		}
+		data, marshalErr = json.MarshalIndent(wrapped, "", "  ")
+	}
+
+	if marshalErr != nil {
+		return marshalErr
+	}
+
 	return store.AtomicWrite(path, data, 0o644)
 }
 
 // ListProposals returns all proposal files from the proposals directory.
+// Supports both v1 and v2 on-disk formats via dual-read.
 func ListProposals() ([]ProposalWithSession, error) {
 	dir := filepath.Join(store.Root(), "proposals")
 	entries, err := os.ReadDir(dir)
@@ -212,11 +262,11 @@ func ListProposals() ([]ProposalWithSession, error) {
 		if err != nil {
 			continue
 		}
-		var p ProposalWithSession
-		if err := json.Unmarshal(data, &p); err != nil {
+		p, err := decodeProposalFile(data)
+		if err != nil {
 			continue
 		}
-		proposals = append(proposals, p)
+		proposals = append(proposals, *p)
 	}
 
 	return proposals, nil
@@ -229,6 +279,7 @@ type ProposalWithSession struct {
 }
 
 // ReadProposal reads a single proposal by ID.
+// Supports both v1 and v2 on-disk formats via dual-read.
 func ReadProposal(proposalID string) (*ProposalWithSession, error) {
 	if err := ValidateProposalID(proposalID); err != nil {
 		return nil, err
@@ -238,11 +289,11 @@ func ReadProposal(proposalID string) (*ProposalWithSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading proposal: %w", err)
 	}
-	var p ProposalWithSession
-	if err := json.Unmarshal(data, &p); err != nil {
+	p, err := decodeProposalFile(data)
+	if err != nil {
 		return nil, fmt.Errorf("parsing proposal: %w", err)
 	}
-	return &p, nil
+	return p, nil
 }
 
 func writeEvaluation(filename string, v interface{}) error {
