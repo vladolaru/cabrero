@@ -232,6 +232,46 @@ or `"cleanup"`. Cleanup runs are loaded separately from `cleanup_history.jsonl` 
 `ListCleanupRunsFromHistory` and prepended to session runs before display. The TUI renders
 them as `CLEANUP` rows with archived-count and cost instead of session ID and project.
 
+### Proposal Taxonomy v2
+
+The v2 envelope adds structured semantics to proposals while preserving backward
+compatibility via dual-read persistence.
+
+**Schema:** v2 proposals include `schemaVersion: 2` plus:
+- `kind` — `artifact_change`, `artifact_review`, `prompt_change`, `system_insight`
+- `action` — `apply_diff`, `review_only`, `classify_source`, `none`
+- `target` — structured target with `sourceName`, `sourceOrigin`, `filePath`, `artifact`
+- `evidence` — citations and source references
+
+**Dual-read:** `decodeProposalFile` probes `schemaVersion` and dispatches to the
+appropriate parser. V2 proposals are mapped to v1 `ProposalWithSession` via
+`V2ToLegacyView`, so all existing consumers (dashboard, detail view, approval flow)
+work unchanged.
+
+**Writer mode:** `DefaultWriterMode` controls output format:
+- `WriteLegacy` (default) — v1 JSON only
+- `WriteV2` — v2 envelope only
+- `WriteBoth` — both formats side by side
+
+**Adapters:** `V1ToV2` and `V2ToLegacyView` provide lossless round-trip conversion.
+`LegacyType` is preserved in v2 proposals for exact v1 reconstruction; native v2
+proposals without a legacy type use heuristic mapping from kind/action.
+
+### Operational Constants
+
+String literals for runtime statuses, triage decisions, and gate reasons are defined
+as named constants in `internal/pipeline/history.go`:
+
+- **History status:** `HistoryStatusProcessed`, `HistoryStatusError`,
+  `HistoryStatusSkippedBusy`, `HistoryStatusMetaTriggered`,
+  `HistoryStatusMetaCooldown`, `HistoryStatusMetaNoThreshold`
+- **Triage:** `TriageClean`, `TriageEvaluate`
+- **Gate reasons:** `GateReasonUnclassified`, `GateReasonPaused`
+
+All production code uses these constants rather than string literals.
+`AppendMetaRecord(status, detail)` emits durable history records for meta-analysis
+decisions (trigger, cooldown-skip, no-threshold).
+
 ### Store Write Invariants
 
 The `~/.cabrero/` store is shared between the CLI, daemon, and TUI. All writers
@@ -1184,10 +1224,10 @@ for the full design specification.
 
 **TUI uniformization:** All views share a persistent header and a consistent
 sub-header (title + contextual stats). Bare `cabrero` launches the dashboard
-(same as `cabrero dashboard`). The three top-level sections (Proposals, Sources,
-Pipeline) are cross-navigable — `s`/`p` shortcuts jump directly between them
-via a `SwitchView` message that replaces the current view without growing the
-navigation stack. Esc from any top-level section always returns to Proposals.
+(same as `cabrero dashboard`). The four top-level sections (Proposals, Sources,
+Pipeline, Operations) are navigable — `s`/`p`/`O` shortcuts jump between them.
+`s`/`p` use `SwitchView` for peer navigation without growing the stack;
+`O` uses `PushView` so Esc returns to the dashboard.
 `q` quits the app from any view (suppressed when a text input is focused).
 Section headings within detail views use a consistent style: bold + accent color,
 uppercase (e.g. "PROPOSED CHANGE", "RATIONALE", "INFO", "RECENT CHANGES").
@@ -1222,6 +1262,31 @@ uppercase (e.g. "PROPOSED CHANGE", "RATIONALE", "INFO", "RECENT CHANGES").
     with empty content and dispatches a background `tea.Cmd` that reads the file and
     returns `LogViewerContentLoaded`. This keeps the Bubble Tea event loop unblocked
     while the file loads.
+
+**Phase 4d — TUI (operations view) + taxonomy v2** ✓
+
+19. **Operations view** — new dedicated view (`O` from dashboard) for runtime operational
+    signals: policy-gated runs, skipped-busy events, errors, and meta trigger/cooldown
+    decisions. Summary cards with sparkline daily trends, meta analysis breakdown, gate
+    reason breakdown, and a recent events list with color-coded status. Data loads
+    asynchronously on view open and auto-refreshes every 5 seconds. Accessible via
+    `O` key from the dashboard.
+20. **Proposal taxonomy v2** — structured envelope with `schemaVersion: 2`, explicit
+    `kind` (artifact_change, artifact_review, prompt_change, system_insight),
+    `action` (apply_diff, review_only, classify_source, none), structured `target`
+    and `evidence` fields. Dual-read persistence: reader detects schema version and
+    returns v1 `ProposalWithSession` to all consumers. Writer mode configurable
+    (`WriteLegacy` default during rollout). Lossless v1↔v2 adapters with round-trip
+    fidelity via `LegacyType` preservation.
+21. **Standardized operational constants** — string literals for history status
+    (`processed`, `error`, `skipped_busy`), triage decisions (`clean`, `evaluate`),
+    gate reasons (`unclassified_source`, `paused_source`), and meta statuses
+    (`meta_triggered`, `meta_cooldown_skip`, `meta_no_threshold`) replaced with
+    named constants throughout production code.
+22. **Meta history emission** — meta-analysis trigger, cooldown-skip, and
+    no-threshold decisions now emit durable `HistoryRecord` entries via
+    `AppendMetaRecord`, closing an observability gap where these events were
+    only visible in daemon logs.
 
 **Phase 5 — Iteration tooling** ✓
 

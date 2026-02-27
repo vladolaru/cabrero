@@ -5,6 +5,26 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-02-27
+
+### Added
+- **Operations view** — new TUI view (`O` from dashboard) for runtime operational
+  signals: policy-gated runs, skipped-busy events, errors, and meta trigger/cooldown
+  decisions. Summary cards with sparkline daily trends, meta analysis section, gate
+  reason breakdown, and a recent events list. Auto-refreshes every 5 seconds.
+- **Proposal taxonomy v2** — structured envelope with `schemaVersion: 2`, explicit
+  `kind`/`action`/`target`/`evidence` fields. Dual-read persistence supports both v1
+  and v2 proposals transparently. Writer mode configurable (`WriteLegacy` default).
+  Lossless v1↔v2 adapters with round-trip fidelity.
+- **Meta history emission** — meta-analysis trigger, cooldown-skip, and no-threshold
+  decisions now emit durable history records via `AppendMetaRecord`, closing an
+  observability gap where these events were only visible in daemon logs.
+
+### Changed
+- **Operational constants** — string literals for history statuses, triage decisions,
+  and gate reasons replaced with named constants (`HistoryStatusProcessed`,
+  `TriageEvaluate`, `GateReasonUnclassified`, etc.) across all production code.
+
 ## [0.24.0] - 2026-02-27
 
 ### Added
@@ -993,6 +1013,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.25.0]: https://github.com/vladolaru/cabrero/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/vladolaru/cabrero/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/vladolaru/cabrero/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/vladolaru/cabrero/compare/v0.22.1...v0.22.2
