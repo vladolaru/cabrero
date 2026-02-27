@@ -44,6 +44,7 @@ Confirmed bug. The inner loop assigns the first sorted agentID to every spawn it
 - Simplification:
   - Stop forcing ambiguous mapping in-place.
   - Move correlation to a dedicated resolver that returns `unknown` when evidence is weak.
+  - Record mapping confidence/method (e.g., `exact`, `heuristic`, `unknown`) so downstream analysis can distinguish "unmapped" from "no agent activity."
 - Dependency: **Ship with a focused test for the mapping bug.** Comprehensive parser tests (#1) are valuable but not a prerequisite for this specific fix.
 
 ### 3) Medium: session statuses are still hard-coded strings in multiple places
@@ -127,26 +128,26 @@ Setup and doctor share the heavy logic (binary path resolution, `renderPlist`, c
 
 ### 7) Medium: batch proposal/session association relies on implicit prompt convention instead of typed contract
 
-The link between the evaluator prompt instruction (`evaluator.go:136`: "Use the standard proposal ID format: prop-{first 8 chars of sessionId}-{index}") and the Go partitioning code (`runner.go:644`: prefix matching on `ShortSessionID`) is invisible to the type system. An agent modifying the evaluator prompt can silently break batch partitioning with no compile-time signal. The fallback at `runner.go:625-631` masks failures by silently doubling LLM calls — batch evaluation appears to work but every batch silently falls back to per-session evaluation.
+The link between the evaluator prompt instruction (`evaluator.go:136`: "Use the standard proposal ID format: prop-{first 8 chars of sessionId}-{index}") and the Go partitioning code (`runner.go:644`: prefix matching on `ShortSessionID`) is invisible to the type system. An agent modifying the evaluator prompt can break batch partitioning with no compile-time signal. The fallback at `runner.go:625-631` can roughly double LLM calls; it is logged, but not surfaced as degraded batch efficiency in user-facing status/cost views.
 
 - Evidence:
   - [internal/pipeline/evaluator.go:136](internal/pipeline/evaluator.go:136) — prompt instruction defines the ID format convention
   - [internal/pipeline/runner.go:634](internal/pipeline/runner.go:634) — partitioning relies on the same convention (comment only)
   - [internal/pipeline/runner.go:644](internal/pipeline/runner.go:644) — `ShortSessionID` prefix matching
-  - [internal/pipeline/runner.go:625-631](internal/pipeline/runner.go:625) — silent fallback to per-session evaluation on batch failure
+  - [internal/pipeline/runner.go:625-631](internal/pipeline/runner.go:625) — logged fallback to per-session evaluation on batch failure
   - [internal/pipeline/runner.go:651](internal/pipeline/runner.go:651) — validation catches mismatches but marks all sessions as error
   - [internal/store/session.go:174](internal/store/session.go:174) — `ShortSessionID` serves double duty (display AND partitioning)
 - Risks of current approach:
   - **Implicit contract:** No type, constant, or struct field signals that proposal ID format is load-bearing. An agent sees a comment and a prompt string — easy to change one without the other.
-  - **Silent cost explosion:** The fallback at line 625 retries every session individually. Batch evaluation looks healthy while costs double.
-  - **8-char collision:** `ShortSessionID` takes the first 8 hex chars (~4B combinations). Astronomically unlikely for typical batch sizes, but zero handling if it happens — proposals get silently mis-attributed.
+  - **Fallback cost visibility gap:** The fallback at line 625 retries every session individually. This is logged, but not currently surfaced as degraded batch efficiency in user-facing status/cost outputs.
+  - **8-char collision:** `ShortSessionID` takes the first 8 hex chars (~4B combinations). Astronomically unlikely for typical batch sizes; if it occurs, partition validation fails closed and marks the chunk as error (not silent mis-attribution).
   - **Dual-purpose `ShortSessionID`:** Used for display (TUI, logs) AND partitioning. Changing the display format breaks partitioning.
 - Simplification:
   - Add explicit `sessionId` field on `Proposal` struct and in evaluator output schema.
   - Partition by `proposal.SessionID == session.ID` instead of prefix matching.
   - Validate the `sessionId` field is present and matches a known session — compile-time type enforcement + runtime validation.
   - Decouple `ShortSessionID` from partitioning (keep for display only).
-- Scope note: Requires updating evaluator prompt, `Proposal` struct, `filterProposals`, partitioning in `runner.go`, and existing tests in `batch_test.go`. Existing stored proposals with old format need graceful handling (tolerate missing `sessionId` field, fall back to prefix matching for legacy data).
+- Scope note: Requires updating evaluator prompt, `Proposal` struct, `filterProposals`, partitioning in `runner.go`, and existing tests in both `batch_test.go` and `runner_test.go` (partition mismatch + fallback behavior). Existing stored proposals with old format need graceful handling (tolerate missing `sessionId` field, fall back to prefix matching for legacy data).
 
 ### 8) Low: TUI root model is a large single file
 
