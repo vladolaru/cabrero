@@ -15,6 +15,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
+	claude "github.com/vladolaru/cabrero/internal/integration/claude"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -203,8 +204,8 @@ func (s *setupRunner) stepRegisterHooks(step, total int) error {
 		hooksMap = make(map[string]interface{})
 	}
 
-	preCompactRegistered := hookGroupContainsCabrero(hooksMap["PreCompact"])
-	sessionEndRegistered := hookGroupContainsCabrero(hooksMap["SessionEnd"])
+	preCompactRegistered := claude.HookGroupContainsCabrero(hooksMap["PreCompact"])
+	sessionEndRegistered := claude.HookGroupContainsCabrero(hooksMap["SessionEnd"])
 
 	if preCompactRegistered && sessionEndRegistered {
 		fmt.Printf("  %s Hooks already registered\n", cli.Success("✓"))
@@ -274,15 +275,6 @@ func (s *setupRunner) stepRegisterHooks(step, total int) error {
 	return nil
 }
 
-// hookGroupContainsCabrero checks if a hook group ([]interface{}) contains a cabrero hook.
-func hookGroupContainsCabrero(v interface{}) bool {
-	groups, ok := v.([]interface{})
-	if !ok {
-		return false
-	}
-	raw, _ := json.Marshal(groups)
-	return strings.Contains(string(raw), "cabrero")
-}
 
 // Step 5: Install LaunchAgent.
 func (s *setupRunner) stepInstallLaunchAgent(step, total int) error {
@@ -298,20 +290,7 @@ func (s *setupRunner) stepInstallLaunchAgent(step, total int) error {
 
 	plistPath := filepath.Join(home, "Library", "LaunchAgents", "com.cabrero.daemon.plist")
 
-	// Determine binary path: prefer ~/.cabrero/bin/cabrero, fall back to current executable.
-	binaryPath := filepath.Join(store.Root(), "bin", "cabrero")
-	if _, err := os.Stat(binaryPath); err != nil {
-		exe, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("cannot determine binary path: %w", err)
-		}
-		resolved, err := filepath.EvalSymlinks(exe)
-		if err == nil {
-			binaryPath = resolved
-		} else {
-			binaryPath = exe
-		}
-	}
+	binaryPath := claude.DetermineBinaryPath()
 
 	pathEnv := daemonPATH(s.claudeDir)
 	plistContent, err := renderPlist(binaryPath, pathEnv)

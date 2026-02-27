@@ -1,15 +1,14 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
+	claude "github.com/vladolaru/cabrero/internal/integration/claude"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -83,7 +82,8 @@ func Status(args []string) error {
 	}
 
 	// Hook status.
-	preCompact, sessionEnd := checkHooks()
+	settingsPath, _ := claude.SettingsPath()
+	preCompact, sessionEnd := claude.HookStatus(settingsPath)
 	fmt.Printf("  %s  pre-compact %s   session-end %s\n",
 		cli.Bold("Hooks:"), hookStatus(preCompact), hookStatus(sessionEnd))
 
@@ -139,42 +139,3 @@ func hookStatus(installed bool) string {
 	return cli.Error("✗")
 }
 
-func checkHooks() (preCompact, sessionEnd bool) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false, false
-	}
-
-	settingsPath := filepath.Join(home, ".claude", "settings.json")
-	data, err := os.ReadFile(settingsPath)
-	if err != nil {
-		return false, false
-	}
-
-	var settings map[string]json.RawMessage
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return false, false
-	}
-
-	hooksRaw, ok := settings["hooks"]
-	if !ok {
-		return false, false
-	}
-
-	var hooks map[string]json.RawMessage
-	if err := json.Unmarshal(hooksRaw, &hooks); err != nil {
-		return false, false
-	}
-
-	preCompact = hookContainsCabrero(hooks["PreCompact"])
-	sessionEnd = hookContainsCabrero(hooks["SessionEnd"])
-	return
-}
-
-func hookContainsCabrero(raw json.RawMessage) bool {
-	if raw == nil {
-		return false
-	}
-	// The hook config is an array of matcher groups.
-	return strings.Contains(string(raw), "cabrero")
-}

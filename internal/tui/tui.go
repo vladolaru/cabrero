@@ -1,11 +1,9 @@
 package tui
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +11,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/daemon"
 	"github.com/vladolaru/cabrero/internal/fitness"
+	claude "github.com/vladolaru/cabrero/internal/integration/claude"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
@@ -124,7 +123,9 @@ func gatherStatsFromSessions(sessions []store.Metadata, proposals []pipeline.Pro
 	stats.DiskBytes = storeDiskBytes(store.Root())
 
 	// Hook status.
-	stats.HookPreCompact, stats.HookSessionEnd = checkHookStatus()
+	if sp, err := claude.SettingsPath(); err == nil {
+		stats.HookPreCompact, stats.HookSessionEnd = claude.HookStatus(sp)
+	}
 
 	// Debug mode.
 	stats.DebugMode = store.ReadDebugFlag()
@@ -167,44 +168,3 @@ func walkDiskBytes(root string) int64 {
 	return total
 }
 
-// checkHookStatus reads Claude Code settings to determine hook installation status.
-func checkHookStatus() (preCompact, sessionEnd bool) {
-	// Reuse the same logic from cmd/status.go.
-	// For now, a simplified check.
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false, false
-	}
-
-	settingsPath := filepath.Join(home, ".claude", "settings.json")
-	data, err := os.ReadFile(settingsPath)
-	if err != nil {
-		return false, false
-	}
-
-	var settings map[string]json.RawMessage
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return false, false
-	}
-
-	hooksRaw, ok := settings["hooks"]
-	if !ok {
-		return false, false
-	}
-
-	var hooks map[string]json.RawMessage
-	if err := json.Unmarshal(hooksRaw, &hooks); err != nil {
-		return false, false
-	}
-
-	preCompact = containsCabrero(hooks["PreCompact"])
-	sessionEnd = containsCabrero(hooks["SessionEnd"])
-	return
-}
-
-func containsCabrero(raw json.RawMessage) bool {
-	if raw == nil {
-		return false
-	}
-	return strings.Contains(string(raw), "cabrero")
-}

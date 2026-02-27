@@ -15,6 +15,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
+	claude "github.com/vladolaru/cabrero/internal/integration/claude"
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
@@ -242,16 +243,8 @@ func (u *uninstallRunner) stepUnregisterHooks(step, total int) error {
 	// Identify which hook groups contain cabrero entries.
 	var cabreroGroups []string
 	for groupName, v := range hooksMap {
-		groups, ok := v.([]interface{})
-		if !ok {
-			continue
-		}
-		for _, g := range groups {
-			raw, _ := json.Marshal(g)
-			if strings.Contains(string(raw), "cabrero") {
-				cabreroGroups = append(cabreroGroups, groupName)
-				break
-			}
+		if claude.HookGroupContainsCabrero(v) {
+			cabreroGroups = append(cabreroGroups, groupName)
 		}
 	}
 
@@ -299,8 +292,7 @@ func filterCabreroHooks(hooksMap map[string]interface{}) []string {
 		var kept []interface{}
 		hadCabrero := false
 		for _, g := range groups {
-			raw, _ := json.Marshal(g)
-			if strings.Contains(string(raw), "cabrero") {
+			if claude.HookGroupContainsCabrero(g) {
 				hadCabrero = true
 				continue
 			}

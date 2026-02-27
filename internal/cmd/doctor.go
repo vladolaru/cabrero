@@ -14,6 +14,7 @@ import (
 
 	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/daemon"
+	claude "github.com/vladolaru/cabrero/internal/integration/claude"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -564,7 +565,7 @@ func (d *doctorRunner) checkClaudeCodeIntegration() []checkResult {
 	sessionEndPath := filepath.Join(hooksDir, "session-end.sh")
 
 	// Check PreCompact hook.
-	preCompactRegistered := hookGroupContainsCabrero(hooksMap["PreCompact"])
+	preCompactRegistered := claude.HookGroupContainsCabrero(hooksMap["PreCompact"])
 	if preCompactRegistered {
 		results = append(results, checkResult{
 			name:     "PreCompact hook registered",
@@ -599,7 +600,7 @@ func (d *doctorRunner) checkClaudeCodeIntegration() []checkResult {
 	}
 
 	// Check SessionEnd hook.
-	sessionEndRegistered := hookGroupContainsCabrero(hooksMap["SessionEnd"])
+	sessionEndRegistered := claude.HookGroupContainsCabrero(hooksMap["SessionEnd"])
 	if sessionEndRegistered {
 		results = append(results, checkResult{
 			name:     "SessionEnd hook registered",
@@ -671,7 +672,7 @@ func (d *doctorRunner) makeRegisterHooksFix(settings map[string]interface{}, set
 			hooksMap = make(map[string]interface{})
 		}
 
-		if !hookGroupContainsCabrero(hooksMap["PreCompact"]) {
+		if !claude.HookGroupContainsCabrero(hooksMap["PreCompact"]) {
 			existing, _ := hooksMap["PreCompact"].([]interface{})
 			hooksMap["PreCompact"] = append(existing, map[string]interface{}{
 				"matcher": "",
@@ -685,7 +686,7 @@ func (d *doctorRunner) makeRegisterHooksFix(settings map[string]interface{}, set
 			})
 		}
 
-		if !hookGroupContainsCabrero(hooksMap["SessionEnd"]) {
+		if !claude.HookGroupContainsCabrero(hooksMap["SessionEnd"]) {
 			existing, _ := hooksMap["SessionEnd"].([]interface{})
 			hooksMap["SessionEnd"] = append(existing, map[string]interface{}{
 				"matcher": "",
@@ -773,7 +774,7 @@ func (d *doctorRunner) checkLaunchAgent() []checkResult {
 	}
 
 	// Check plist content matches expected.
-	expectedBinary := d.determineBinaryPath()
+	expectedBinary := claude.DetermineBinaryPath()
 	expectedContent, err := renderPlist(expectedBinary, daemonPATH(discoverClaudeDir()))
 	if err == nil && string(plistData) != expectedContent {
 		results = append(results, checkResult{
@@ -824,26 +825,9 @@ func extractPlistBinaryPath(plist string) string {
 	return strings.TrimSpace(rest[start : start+end])
 }
 
-func (d *doctorRunner) determineBinaryPath() string {
-	// Same logic as setup.go: prefer ~/.cabrero/bin/cabrero, fall back to current executable.
-	binaryPath := filepath.Join(store.Root(), "bin", "cabrero")
-	if _, err := os.Stat(binaryPath); err != nil {
-		exe, err := os.Executable()
-		if err != nil {
-			return binaryPath
-		}
-		resolved, err := filepath.EvalSymlinks(exe)
-		if err == nil {
-			return resolved
-		}
-		return exe
-	}
-	return binaryPath
-}
-
 func (d *doctorRunner) makeInstallPlistFix(plistPath string) func() error {
 	return func() error {
-		binaryPath := d.determineBinaryPath()
+		binaryPath := claude.DetermineBinaryPath()
 		content, err := renderPlist(binaryPath, daemonPATH(discoverClaudeDir()))
 		if err != nil {
 			return fmt.Errorf("generating plist: %w", err)

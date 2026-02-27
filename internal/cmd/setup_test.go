@@ -3,23 +3,25 @@ package cmd
 import (
 	"strings"
 	"testing"
+
+	claude "github.com/vladolaru/cabrero/internal/integration/claude"
 )
 
 func TestHookGroupContainsCabrero(t *testing.T) {
 	t.Run("nil returns false", func(t *testing.T) {
-		if hookGroupContainsCabrero(nil) {
+		if claude.HookGroupContainsCabrero(nil) {
 			t.Error("expected false for nil")
 		}
 	})
 
 	t.Run("non-slice returns false", func(t *testing.T) {
-		if hookGroupContainsCabrero("a string") {
+		if claude.HookGroupContainsCabrero("a string") {
 			t.Error("expected false for string")
 		}
 	})
 
 	t.Run("empty slice returns false", func(t *testing.T) {
-		if hookGroupContainsCabrero([]interface{}{}) {
+		if claude.HookGroupContainsCabrero([]interface{}{}) {
 			t.Error("expected false for empty slice")
 		}
 	})
@@ -32,7 +34,7 @@ func TestHookGroupContainsCabrero(t *testing.T) {
 				},
 			},
 		}
-		if hookGroupContainsCabrero(v) {
+		if claude.HookGroupContainsCabrero(v) {
 			t.Error("expected false without cabrero")
 		}
 	})
@@ -45,7 +47,7 @@ func TestHookGroupContainsCabrero(t *testing.T) {
 				},
 			},
 		}
-		if !hookGroupContainsCabrero(v) {
+		if !claude.HookGroupContainsCabrero(v) {
 			t.Error("expected true with cabrero in command")
 		}
 	})
