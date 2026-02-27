@@ -215,7 +215,7 @@ func WriteProposal(p *Proposal, sessionID string) error {
 	var marshalErr error
 
 	switch DefaultWriterMode {
-	case WriteV2, WriteBoth:
+	case WriteV2:
 		v2 := V1ToV2(p)
 		wrapped := ProposalV2WithSession{
 			SchemaVersion: 2,

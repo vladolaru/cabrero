@@ -251,7 +251,6 @@ work unchanged.
 **Writer mode:** `DefaultWriterMode` controls output format:
 - `WriteLegacy` (default) — v1 JSON only
 - `WriteV2` — v2 envelope only
-- `WriteBoth` — both formats side by side
 
 **Adapters:** `V1ToV2` and `V2ToLegacyView` provide lossless round-trip conversion.
 `LegacyType` is preserved in v2 proposals for exact v1 reconstruction; native v2

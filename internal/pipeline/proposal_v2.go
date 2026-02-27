@@ -15,8 +15,6 @@ const (
 	WriteLegacy WriterMode = iota
 	// WriteV2 writes v2 format only.
 	WriteV2
-	// WriteBoth writes both v1 and v2 (migration mode).
-	WriteBoth
 )
 
 // DefaultWriterMode is the active writer mode. Change this to advance the
