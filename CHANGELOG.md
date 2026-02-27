@@ -5,6 +5,21 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **hooks**: Remove `eval` in hook payload parsing to prevent shell injection via
+  adversarial directory names containing `$(...)` or backtick command substitutions.
+- **store**: Increase `bufio.Scanner` buffer for `changes.jsonl` to 1MB, preventing
+  silent data loss on entries with large `PreviousContent` fields.
+
+### Changed
+- **store**: Change history now tracks source origin alongside source name via new
+  `SourceOrigin` field on `ChangeEntry` and `ChangesBySourceIdentity` lookup function,
+  preventing cross-contamination between same-named sources with different origins.
+- **pipeline**: Remove unused `WriteBoth` writer mode that was never implemented
+  (shared the `WriteV2` code path).
+
 ## [0.25.0] - 2026-02-27
 
 ### Added
