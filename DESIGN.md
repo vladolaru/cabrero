@@ -146,6 +146,11 @@ Three-tier hierarchy, in priority order:
 Hooks configured in `~/.claude/settings.json` (user-level, applies to all sessions).
 `/clear` does NOT delete JSONL — it starts a new session with a new UUID, so no special handling needed.
 
+**`internal/integration/claude` package.** All Claude Code settings logic — reading/writing
+`settings.json`, checking hook registration status, resolving the cabrero binary path —
+lives in this single canonical package. Commands (`setup`, `doctor`, `uninstall`, `status`)
+and the TUI import from here instead of reimplementing settings logic inline.
+
 ### Raw Backup Store
 
 ```
@@ -321,6 +326,11 @@ Sessions flow through these statuses:
 Each line is a JSON entry with: `type`, `message`, `uuid`, `parentUuid`, `sessionId`, `timestamp`.
 Sub-agents get their own `agent-{shortId}.jsonl` files linked via `parentUuid`.
 Compaction appends `compact_boundary` markers inline — prior entries remain in the file.
+
+**Agent mapping.** The pre-parser maps `Task` tool-use entries (agent spawns) to their
+corresponding `agent-{id}.jsonl` transcript files. Agents are matched deterministically:
+spawn entries are sorted by tool-use ID, then assigned to agent IDs one-to-one via a
+claimed-set to prevent double-assignment. Unmatched spawns get `agentID: "unknown"`.
 
 ### Analysis Pipeline
 
@@ -576,6 +586,25 @@ maximums). Sessions without project metadata fall back to individual processing.
 
 `cabrero run <session_id>` always processes one session individually — batching
 only happens in the daemon and backfill when multiple sessions are queued.
+
+**Batch proposal partitioning.** After a batch Evaluator call returns proposals for
+multiple sessions, the runner must assign each proposal to its source session. Two
+strategies are used, with automatic fallback:
+
+1. **Typed contract (preferred):** Each `Proposal` carries an explicit `SessionID` field
+   (`json:"sessionId"`). The evaluator prompt instructs the LLM to populate this field.
+   Partitioning is exact-match: `proposal.SessionID == session.ID`.
+2. **Legacy prefix matching (fallback):** When proposals lack `SessionID`, the runner falls
+   back to matching proposal ID prefixes (`prop-{ShortSessionID}-`) against sessions.
+   This handles output from older evaluator prompt versions.
+
+If the total matched proposals differ from the total returned, all sessions in the chunk
+are marked as errors (possible ID format mismatch).
+
+**Pipeline bookkeeping.** The `finalizeSessionOutcome` helper centralizes the
+set-status / compute-totals / append-history / mark-store sequence that every pipeline
+exit path must execute. Adding a new field to `HistoryRecord` requires updating only
+this one function.
 
 **`PipelineStages` interface.** `pipeline.Runner` exposes a single `stages PipelineStages`
 injection point (unexported) for overriding individual pipeline stages in tests. The five
@@ -982,7 +1011,8 @@ Raw turns cited by the AI are expandable inline without leaving the view.
 Session IDs are displayed in two forms: full UUID in the proposal header, and short
 ID (first 8 characters — the first UUID segment) everywhere else (dashboard rows,
 pipeline runs, CLI output). A canonical `store.ShortSessionID()` function is used
-throughout to ensure consistency.
+throughout for display consistency. Note: `ShortSessionID` is display-only — batch
+proposal partitioning uses the explicit `Proposal.SessionID` field (see Pipeline).
 
 Target paths (skill file locations) replace the user's home directory prefix with `~`
 in both the dashboard list and detail header, keeping the meaningful suffix visible
