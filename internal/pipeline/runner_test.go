@@ -1678,3 +1678,47 @@ func writeSources(t *testing.T, entries []sourceEntry) {
 		t.Fatal(err)
 	}
 }
+
+func TestFinalizeSessionOutcome_Error(t *testing.T) {
+	setupBatchStore(t)
+	sid := "finalize-err-001"
+	createBatchSession(t, sid)
+
+	rec := HistoryRecord{SessionID: sid, Timestamp: time.Now()}
+	runStart := time.Now()
+	markErr := finalizeSessionOutcome(&rec, HistoryStatusError, fmt.Errorf("test error"), 0, runStart)
+	if markErr != nil {
+		t.Fatalf("finalizeSessionOutcome: %v", markErr)
+	}
+	if rec.Status != HistoryStatusError {
+		t.Errorf("Status = %q, want %q", rec.Status, HistoryStatusError)
+	}
+	if rec.ErrorDetail != "test error" {
+		t.Errorf("ErrorDetail = %q, want 'test error'", rec.ErrorDetail)
+	}
+	if rec.TotalDurationNs <= 0 {
+		t.Errorf("TotalDurationNs = %d, want > 0", rec.TotalDurationNs)
+	}
+}
+
+func TestFinalizeSessionOutcome_Success(t *testing.T) {
+	setupBatchStore(t)
+	sid := "finalize-ok-001"
+	createBatchSession(t, sid)
+
+	rec := HistoryRecord{SessionID: sid, Timestamp: time.Now()}
+	runStart := time.Now()
+	markErr := finalizeSessionOutcome(&rec, HistoryStatusProcessed, nil, 3, runStart)
+	if markErr != nil {
+		t.Fatalf("finalizeSessionOutcome: %v", markErr)
+	}
+	if rec.Status != HistoryStatusProcessed {
+		t.Errorf("Status = %q, want %q", rec.Status, HistoryStatusProcessed)
+	}
+	if rec.ProposalCount != 3 {
+		t.Errorf("ProposalCount = %d, want 3", rec.ProposalCount)
+	}
+	if rec.ErrorDetail != "" {
+		t.Errorf("ErrorDetail = %q, want empty", rec.ErrorDetail)
+	}
+}

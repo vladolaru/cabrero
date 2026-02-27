@@ -245,14 +245,9 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	rec.ClassifierUsage = usageFromResult(classifierCR)
 
 	if err != nil {
-		rec.Status = HistoryStatusError
-		rec.ErrorDetail = err.Error()
 		rec.ParseDurationNs = int64(parseDuration)
 		rec.ClassifierDurationNs = int64(classifierOnly)
-		rec.computeUsageTotals()
-		rec.TotalDurationNs = int64(time.Since(runStart))
-		_ = AppendHistory(rec)
-		if markErr := store.MarkError(sessionID); markErr != nil {
+		if markErr := finalizeSessionOutcome(&rec, HistoryStatusError, err, 0, runStart); markErr != nil {
 			log.Error("  marking error for %s: %v", sessionID, markErr)
 		}
 		return nil, err
@@ -271,13 +266,9 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	if classifierResult.ClassifierOutput.Triage == TriageClean {
 		log.Info("  Classifier triage: clean session — skipping Evaluator")
 		rec.Triage = TriageClean
-		rec.Status = HistoryStatusProcessed
-		rec.EvaluatorModel = "" // evaluator not used
+		rec.EvaluatorModel = ""
 		rec.EvaluatorPromptVersion = ""
-		rec.computeUsageTotals()
-		rec.TotalDurationNs = int64(time.Since(runStart))
-		_ = AppendHistory(rec)
-		if markErr := store.MarkProcessed(sessionID); markErr != nil {
+		if markErr := finalizeSessionOutcome(&rec, HistoryStatusProcessed, nil, 0, runStart); markErr != nil {
 			log.Error("  marking processed for %s: %v", sessionID, markErr)
 		}
 		return result, nil
@@ -289,14 +280,10 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	gate := CheckSourcePolicy(classifierResult.ClassifierOutput)
 	if !gate.Allowed {
 		log.Info("  Source policy gate: %s (source %q) — skipping Evaluator", gate.Reason, gate.SourceName)
-		rec.Status = HistoryStatusProcessed
 		rec.GateReason = gate.Reason
 		rec.EvaluatorModel = ""
 		rec.EvaluatorPromptVersion = ""
-		rec.computeUsageTotals()
-		rec.TotalDurationNs = int64(time.Since(runStart))
-		_ = AppendHistory(rec)
-		if markErr := store.MarkProcessed(sessionID); markErr != nil {
+		if markErr := finalizeSessionOutcome(&rec, HistoryStatusProcessed, nil, 0, runStart); markErr != nil {
 			log.Error("  marking processed for %s: %v", sessionID, markErr)
 		}
 		return result, nil
@@ -317,13 +304,8 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	rec.EvaluatorUsage = usageFromResult(evaluatorCR)
 
 	if err != nil {
-		rec.Status = HistoryStatusError
-		rec.ErrorDetail = err.Error()
 		rec.EvaluatorDurationNs = int64(evalDuration)
-		rec.computeUsageTotals()
-		rec.TotalDurationNs = int64(time.Since(runStart))
-		_ = AppendHistory(rec)
-		if markErr := store.MarkError(sessionID); markErr != nil {
+		if markErr := finalizeSessionOutcome(&rec, HistoryStatusError, err, 0, runStart); markErr != nil {
 			log.Error("  marking error for %s: %v", sessionID, markErr)
 		}
 		return nil, fmt.Errorf("evaluator failed: %w", err)
@@ -346,14 +328,8 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 		log.Info("  Evaluator: no proposals (%s)", reason)
 	}
 
-	rec.Status = HistoryStatusProcessed
-	rec.ProposalCount = len(evaluatorOutput.Proposals)
 	rec.EvaluatorDurationNs = int64(evalDuration)
-	rec.computeUsageTotals()
-	rec.TotalDurationNs = int64(time.Since(runStart))
-	_ = AppendHistory(rec)
-
-	if markErr := store.MarkProcessed(sessionID); markErr != nil {
+	if markErr := finalizeSessionOutcome(&rec, HistoryStatusProcessed, nil, len(evaluatorOutput.Proposals), runStart); markErr != nil {
 		log.Error("  marking processed for %s: %v", sessionID, markErr)
 	}
 
@@ -459,13 +435,7 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 			results[i].Error = err
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
 
-			rec.Status = HistoryStatusError
-			rec.ErrorDetail = err.Error()
-			rec.computeUsageTotals()
-			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-			_ = AppendHistory(*rec)
-
-			if markErr := store.MarkError(s.SessionID); markErr != nil {
+			if markErr := finalizeSessionOutcome(rec, HistoryStatusError, err, 0, runStarts[s.SessionID]); markErr != nil {
 				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
 			}
 			continue
@@ -483,14 +453,9 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: TriageClean})
 
 			rec.Triage = TriageClean
-			rec.Status = HistoryStatusProcessed
 			rec.EvaluatorModel = ""
 			rec.EvaluatorPromptVersion = ""
-			rec.computeUsageTotals()
-			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-			_ = AppendHistory(*rec)
-
-			if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+			if markErr := finalizeSessionOutcome(rec, HistoryStatusProcessed, nil, 0, runStarts[s.SessionID]); markErr != nil {
 				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
 			}
 			continue
@@ -504,15 +469,10 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 			results[i].Status = HistoryStatusProcessed
 			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: TriageEvaluate})
 
-			rec.Status = HistoryStatusProcessed
 			rec.GateReason = gate.Reason
 			rec.EvaluatorModel = ""
 			rec.EvaluatorPromptVersion = ""
-			rec.computeUsageTotals()
-			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-			_ = AppendHistory(*rec)
-
-			if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+			if markErr := finalizeSessionOutcome(rec, HistoryStatusProcessed, nil, 0, runStarts[s.SessionID]); markErr != nil {
 				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
 			}
 			continue
@@ -578,13 +538,7 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 		results[idx].Error = err
 		r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
 
-		rec.Status = HistoryStatusError
-		rec.ErrorDetail = err.Error()
-		rec.computeUsageTotals()
-		rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-		_ = AppendHistory(*rec)
-
-		if markErr := store.MarkError(s.SessionID); markErr != nil {
+		if markErr := finalizeSessionOutcome(rec, HistoryStatusError, err, 0, runStarts[s.SessionID]); markErr != nil {
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
 		}
 		return
@@ -599,13 +553,7 @@ func (r *Runner) runGroupEvalSingle(s BatchSession, results []BatchResult, index
 	results[idx].Proposals = proposals
 	r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
 
-	rec.Status = HistoryStatusProcessed
-	rec.ProposalCount = len(evaluatorOutput.Proposals)
-	rec.computeUsageTotals()
-	rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-	_ = AppendHistory(*rec)
-
-	if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+	if markErr := finalizeSessionOutcome(rec, HistoryStatusProcessed, nil, len(evaluatorOutput.Proposals), runStarts[s.SessionID]); markErr != nil {
 		r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
 	}
 }
@@ -659,15 +607,9 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: partitionErr})
 
 			rec := records[s.SessionID]
-			rec.Status = HistoryStatusError
-			rec.ErrorDetail = partitionErr.Error()
 			rec.EvaluatorDurationNs = int64(perSessionDuration)
 			rec.EvaluatorUsage = splitUsage[i]
-			rec.computeUsageTotals()
-			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-			_ = AppendHistory(*rec)
-
-			if markErr := store.MarkError(s.SessionID); markErr != nil {
+			if markErr := finalizeSessionOutcome(rec, HistoryStatusError, partitionErr, 0, runStarts[s.SessionID]); markErr != nil {
 				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
 			}
 		}
@@ -688,18 +630,37 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 		results[idx].Proposals = proposals
 		r.emit(s.SessionID, BatchEvent{Type: "evaluator_done"})
 
-		rec.Status = HistoryStatusProcessed
-		rec.ProposalCount = len(partitioned[i].filtered.Proposals)
 		rec.EvaluatorDurationNs = int64(perSessionDuration)
 		rec.EvaluatorUsage = splitUsage[i]
-		rec.computeUsageTotals()
-		rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-		_ = AppendHistory(*rec)
-
-		if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+		if markErr := finalizeSessionOutcome(rec, HistoryStatusProcessed, nil, len(partitioned[i].filtered.Proposals), runStarts[s.SessionID]); markErr != nil {
 			r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
 		}
 	}
+}
+
+// finalizeSessionOutcome performs the common bookkeeping sequence for
+// completing a session's pipeline run: set status, compute totals,
+// append history, and mark the session in the store.
+//
+// For error outcomes: pass status=HistoryStatusError, err=the error, proposalCount=0.
+// For success outcomes: pass status=HistoryStatusProcessed, err=nil, proposalCount=N.
+func finalizeSessionOutcome(rec *HistoryRecord, status string, err error, proposalCount int, runStart time.Time) error {
+	rec.Status = status
+	if err != nil {
+		rec.ErrorDetail = err.Error()
+	}
+	rec.ProposalCount = proposalCount
+	rec.computeUsageTotals()
+	rec.TotalDurationNs = int64(time.Since(runStart))
+	_ = AppendHistory(*rec)
+
+	switch status {
+	case HistoryStatusError:
+		return store.MarkError(rec.SessionID)
+	case HistoryStatusProcessed:
+		return store.MarkProcessed(rec.SessionID)
+	}
+	return nil
 }
 
 // splitUsageForBatch divides a single ClaudeResult's usage equally among n sessions.
