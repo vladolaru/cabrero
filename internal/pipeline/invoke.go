@@ -203,7 +203,7 @@ func invokeClaude(cfg claudeConfig) (*ClaudeResult, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
-	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from `/`
+	cmd.Dir = os.TempDir() // use temp dir — ~/.cabrero/ is one level below ~ and CC project discovery walks up, triggering macOS TCC prompts for ~/Desktop, ~/Music, etc.
 	cmd.Env = cleanClaudeEnv()
 
 	if !cfg.Agentic {
