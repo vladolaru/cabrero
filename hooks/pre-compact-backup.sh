@@ -13,7 +13,8 @@ fi
 PAYLOAD=$(cat)
 
 # Extract fields using python3 JSON parsing (robust against field ordering and escaping).
-eval "$(printf '%s' "$PAYLOAD" | python3 -c '
+# Uses RS (0x1E) as field separator and direct variable assignment — no eval.
+_PARSED=$(printf '%s' "$PAYLOAD" | python3 -c '
 import json, sys, re
 try:
     d = json.load(sys.stdin)
@@ -23,13 +24,22 @@ sid = d.get("session_id", "")
 tp = d.get("transcript_path", "")
 cwd = d.get("cwd", "")
 slug = re.sub(r"[/.]", "-", cwd)
-# Escape for shell single-quote safety.
-def sh(s): return s.replace("\\", "\\\\").replace("\"", "\\\"")
-print(f"SESSION_ID=\"{sh(sid)}\"")
-print(f"TRANSCRIPT_PATH=\"{sh(tp)}\"")
-print(f"SESSION_CWD=\"{sh(cwd)}\"")
-print(f"PROJECT_SLUG=\"{sh(slug)}\"")
-' 2>/dev/null || echo 'SESSION_ID=""; TRANSCRIPT_PATH=""')"
+# RS (Record Separator) cannot appear in paths or UUIDs.
+sys.stdout.write(sid + "\x1e" + tp + "\x1e" + cwd + "\x1e" + slug)
+' 2>/dev/null) || _PARSED=""
+
+if [ -n "$_PARSED" ]; then
+  _RS=$(printf '\036')
+  SESSION_ID=$(printf '%s' "$_PARSED" | cut -d "$_RS" -f1)
+  TRANSCRIPT_PATH=$(printf '%s' "$_PARSED" | cut -d "$_RS" -f2)
+  SESSION_CWD=$(printf '%s' "$_PARSED" | cut -d "$_RS" -f3)
+  PROJECT_SLUG=$(printf '%s' "$_PARSED" | cut -d "$_RS" -f4)
+else
+  SESSION_ID=""
+  TRANSCRIPT_PATH=""
+  SESSION_CWD=""
+  PROJECT_SLUG=""
+fi
 
 if [ -z "$SESSION_ID" ] || [ -z "$TRANSCRIPT_PATH" ]; then
   exit 0
