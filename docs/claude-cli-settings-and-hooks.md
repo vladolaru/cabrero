@@ -67,33 +67,37 @@ Cabrero spawns `claude` CLI subprocesses for the pipeline (classifier, evaluator
 
 ### Recommended approach
 
-Use `--settings '{"disableAllHooks": true}'` on all `claude` subprocess invocations.
-
-This explicitly disables the hook mechanism regardless of source — user, project, local, managed, and plugin hooks are all suppressed. It is the only **documented and reliable** way to prevent hooks from firing.
+Use `--settings` with explicit overrides on all `claude` subprocess invocations:
 
 ```bash
-claude --settings '{"disableAllHooks": true}' -p "query"
+claude --settings '{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}' -p "query"
 ```
+
+This isolates the subprocess from user settings that would affect pipeline behavior:
+- `disableAllHooks: true` — suppresses all hooks and custom status line
+- `alwaysThinkingEnabled: false` — prevents extended thinking (controls cost/latency)
+- `enabledPlugins: {}` — prevents plugins from injecting instructions into the system prompt
 
 ### Current cabrero usage
 
 | Invocation site | `--setting-sources` | `--settings` | Hooks disabled? |
 |-----------------|---------------------|--------------|-----------------|
-| Pipeline (`invokeClaude`) | — (removed in v0.27.2) | `disableAllHooks` | Yes |
-| Chat panel (`buildChatArgs`) | — | `disableAllHooks` | Yes |
-| Apply (`apply.go`) | — | `disableAllHooks` | Yes |
+| Pipeline (`invokeClaude`) | — (removed in v0.27.2) | hooks + thinking + plugins | Yes |
+| Chat panel (`buildChatArgs`) | — | hooks + thinking + plugins | Yes |
+| Apply (`apply.go`) | — | hooks + thinking + plugins | Yes |
 
-All three sites use `--settings '{"disableAllHooks": true}'` as the sole hook suppression.
-The pipeline previously used `--setting-sources ""` as defense-in-depth, but this broke
-in CLI 2.1.59+ and was removed. Non-hook settings (e.g., `alwaysThinkingEnabled`) may
-now leak through from user/project settings files — acceptable since they don't affect
-pipeline correctness.
+All three sites use `--settings` with `disableAllHooks`, `alwaysThinkingEnabled: false`,
+and `enabledPlugins: {}` to isolate subprocesses from user settings. The pipeline
+previously used `--setting-sources ""` as defense-in-depth, but this broke in CLI 2.1.59+
+and was removed. Other non-critical settings (e.g., `cleanupPeriodDays`) may still leak
+through from user/project settings files.
 
 ## Related flags
 
 | Flag | Purpose |
 |------|---------|
 | `--mcp-config '{"mcpServers":{}}'` | Prevents loading user's MCP servers/plugins (**must** include `mcpServers` key — bare `{}` silently crashes CLI 2.1.59+) |
-| `--disable-slash-commands` | Disables slash commands |
+| `--strict-mcp-config` | Only use MCP servers from `--mcp-config`, ignoring all other MCP configurations (plugins, settings, project). Combined with the empty config above, this ensures zero MCP servers load. |
+| `--disable-slash-commands` | Disables all skills and slash commands |
 | `--permission-mode dontAsk` | Prevents permission prompts |
 | `--no-session-persistence` | Doesn't persist the session transcript |

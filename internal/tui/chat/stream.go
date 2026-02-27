@@ -48,7 +48,8 @@ func buildChatArgs(cfg ChatConfig, firstMessage bool) []string {
 		"--verbose",
 		"--output-format", "stream-json",
 		"--disable-slash-commands",
-		"--settings", `{"disableAllHooks": true}`, // prevent user hooks from firing
+		"--strict-mcp-config",
+		"--settings", `{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}`, // isolate from user settings: no hooks, no extended thinking, no plugins
 	}
 
 	if firstMessage {

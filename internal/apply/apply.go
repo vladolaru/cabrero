@@ -58,9 +58,10 @@ func Blend(proposal *pipeline.Proposal, sessionID string, model string) (string,
 		"--no-session-persistence",
 		"--disable-slash-commands",
 		"--tools", "",
-		"--settings", `{"disableAllHooks": true}`, // prevent user hooks from firing
+		"--strict-mcp-config",
+		"--settings", `{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}`, // isolate from user settings: no hooks, no extended thinking, no plugins
 	)
-	cmd.Dir = store.Root() // safe local cwd; prevents CC project discovery from network volumes
+	cmd.Dir = os.TempDir() // use temp dir to prevent CC project discovery from reaching ~ and triggering macOS TCC prompts
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Env = cleanClaudeEnv()
 
