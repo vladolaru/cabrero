@@ -67,6 +67,30 @@ type PromptVersion struct {
 
 // ListPipelineRunsFromSessions reconstructs run data from pre-loaded session
 // metadata and evaluation file existence. Pass limit=0 for no limit.
+// estimateStageDurations fills in ParseDuration, ClassifierDuration, and
+// EvaluatorDuration on a PipelineRun by comparing file modification times.
+// This is a best-effort estimate when real timing data is unavailable.
+func estimateStageDurations(run *PipelineRun, sessionStart time.Time, digestInfo, classifierInfo, evaluatorInfo os.FileInfo) {
+	if run.HasDigest && digestInfo != nil && !sessionStart.IsZero() {
+		run.ParseDuration = digestInfo.ModTime().Sub(sessionStart)
+		if run.ParseDuration < 0 {
+			run.ParseDuration = 0
+		}
+	}
+	if run.HasClassifier && run.HasDigest && classifierInfo != nil && digestInfo != nil {
+		run.ClassifierDuration = classifierInfo.ModTime().Sub(digestInfo.ModTime())
+		if run.ClassifierDuration < 0 {
+			run.ClassifierDuration = 0
+		}
+	}
+	if run.HasEvaluator && run.HasClassifier && evaluatorInfo != nil && classifierInfo != nil {
+		run.EvaluatorDuration = evaluatorInfo.ModTime().Sub(classifierInfo.ModTime())
+		if run.EvaluatorDuration < 0 {
+			run.EvaluatorDuration = 0
+		}
+	}
+}
+
 func ListPipelineRunsFromSessions(sessions []store.Metadata, limit int) ([]PipelineRun, error) {
 	var runs []PipelineRun
 	for i, meta := range sessions {
@@ -106,24 +130,7 @@ func ListPipelineRunsFromSessions(sessions []store.Metadata, limit int) ([]Pipel
 		}
 
 		// Estimate per-stage timing from file modification timestamps.
-		if run.HasDigest && !ts.IsZero() {
-			run.ParseDuration = digestInfo.ModTime().Sub(ts)
-			if run.ParseDuration < 0 {
-				run.ParseDuration = 0
-			}
-		}
-		if run.HasClassifier && run.HasDigest {
-			run.ClassifierDuration = classifierInfo.ModTime().Sub(digestInfo.ModTime())
-			if run.ClassifierDuration < 0 {
-				run.ClassifierDuration = 0
-			}
-		}
-		if run.HasEvaluator && run.HasClassifier {
-			run.EvaluatorDuration = evaluatorInfo.ModTime().Sub(classifierInfo.ModTime())
-			if run.EvaluatorDuration < 0 {
-				run.EvaluatorDuration = 0
-			}
-		}
+		estimateStageDurations(&run, ts, digestInfo, classifierInfo, evaluatorInfo)
 
 		// Count proposals from evaluator output.
 		if run.HasEvaluator {
@@ -214,24 +221,7 @@ func ListPipelineRunsFromHistory(sessions []store.Metadata, limit int) ([]Pipeli
 			evaluatorInfo = info
 		}
 
-		if run.HasDigest && !ts.IsZero() {
-			run.ParseDuration = digestInfo.ModTime().Sub(ts)
-			if run.ParseDuration < 0 {
-				run.ParseDuration = 0
-			}
-		}
-		if run.HasClassifier && run.HasDigest {
-			run.ClassifierDuration = classifierInfo.ModTime().Sub(digestInfo.ModTime())
-			if run.ClassifierDuration < 0 {
-				run.ClassifierDuration = 0
-			}
-		}
-		if run.HasEvaluator && run.HasClassifier {
-			run.EvaluatorDuration = evaluatorInfo.ModTime().Sub(classifierInfo.ModTime())
-			if run.EvaluatorDuration < 0 {
-				run.EvaluatorDuration = 0
-			}
-		}
+		estimateStageDurations(&run, ts, digestInfo, classifierInfo, evaluatorInfo)
 
 		if run.HasEvaluator {
 			if so, err := ReadEvaluatorOutput(meta.SessionID); err == nil {

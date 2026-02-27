@@ -330,3 +330,62 @@ func TestListAcceptanceRateByPromptVersion(t *testing.T) {
 		t.Errorf("AcceptanceRate = %f, want ~0.5", s.AcceptanceRate)
 	}
 }
+
+func TestEstimateStageDurations(t *testing.T) {
+	tmpDir := t.TempDir()
+	base := time.Now().Add(-10 * time.Second)
+
+	// Create files with known mtimes.
+	digestPath := filepath.Join(tmpDir, "digest.json")
+	classifierPath := filepath.Join(tmpDir, "classifier.json")
+	evaluatorPath := filepath.Join(tmpDir, "evaluator.json")
+
+	os.WriteFile(digestPath, []byte("{}"), 0o644)
+	os.WriteFile(classifierPath, []byte("{}"), 0o644)
+	os.WriteFile(evaluatorPath, []byte("{}"), 0o644)
+
+	os.Chtimes(digestPath, base.Add(2*time.Second), base.Add(2*time.Second))
+	os.Chtimes(classifierPath, base.Add(5*time.Second), base.Add(5*time.Second))
+	os.Chtimes(evaluatorPath, base.Add(8*time.Second), base.Add(8*time.Second))
+
+	dInfo, _ := os.Stat(digestPath)
+	cInfo, _ := os.Stat(classifierPath)
+	eInfo, _ := os.Stat(evaluatorPath)
+
+	run := &PipelineRun{HasDigest: true, HasClassifier: true, HasEvaluator: true}
+	estimateStageDurations(run, base, dInfo, cInfo, eInfo)
+
+	if run.ParseDuration < time.Second {
+		t.Errorf("ParseDuration = %v, want >= 1s", run.ParseDuration)
+	}
+	if run.ClassifierDuration < 2*time.Second {
+		t.Errorf("ClassifierDuration = %v, want >= 2s", run.ClassifierDuration)
+	}
+	if run.EvaluatorDuration < 2*time.Second {
+		t.Errorf("EvaluatorDuration = %v, want >= 2s", run.EvaluatorDuration)
+	}
+}
+
+func TestEstimateStageDurations_PartialStages(t *testing.T) {
+	tmpDir := t.TempDir()
+	base := time.Now().Add(-5 * time.Second)
+
+	digestPath := filepath.Join(tmpDir, "digest.json")
+	os.WriteFile(digestPath, []byte("{}"), 0o644)
+	os.Chtimes(digestPath, base.Add(2*time.Second), base.Add(2*time.Second))
+	dInfo, _ := os.Stat(digestPath)
+
+	// Only digest, no classifier or evaluator.
+	run := &PipelineRun{HasDigest: true, HasClassifier: false, HasEvaluator: false}
+	estimateStageDurations(run, base, dInfo, nil, nil)
+
+	if run.ParseDuration < time.Second {
+		t.Errorf("ParseDuration = %v, want >= 1s", run.ParseDuration)
+	}
+	if run.ClassifierDuration != 0 {
+		t.Errorf("ClassifierDuration = %v, want 0", run.ClassifierDuration)
+	}
+	if run.EvaluatorDuration != 0 {
+		t.Errorf("EvaluatorDuration = %v, want 0", run.EvaluatorDuration)
+	}
+}
