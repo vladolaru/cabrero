@@ -25,6 +25,7 @@ type SourceGroup struct {
 type ChangeEntry struct {
 	ID              string    `json:"id"`
 	SourceName      string    `json:"sourceName"`
+	SourceOrigin    string    `json:"sourceOrigin,omitempty"`
 	ProposalID      string    `json:"proposalId"`
 	Description     string    `json:"description"`
 	Timestamp       time.Time `json:"timestamp"`

@@ -52,6 +52,23 @@ func ChangesBySource(sourceName string) ([]fitness.ChangeEntry, error) {
 	return result, nil
 }
 
+// ChangesBySourceIdentity returns change entries matching both source name and
+// origin. Legacy entries (empty origin) match any requested origin for backward
+// compatibility. Returns entries in chronological order (oldest first).
+func ChangesBySourceIdentity(sourceName, sourceOrigin string) ([]fitness.ChangeEntry, error) {
+	entries, err := readAllChanges()
+	if err != nil {
+		return nil, err
+	}
+	var result []fitness.ChangeEntry
+	for _, e := range entries {
+		if e.SourceName == sourceName && (e.SourceOrigin == "" || e.SourceOrigin == sourceOrigin) {
+			result = append(result, e)
+		}
+	}
+	return result, nil
+}
+
 // GetChange returns a change entry by ID, or nil if not found.
 func GetChange(id string) (*fitness.ChangeEntry, error) {
 	entries, err := readAllChanges()

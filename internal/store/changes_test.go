@@ -147,6 +147,64 @@ func TestChangeStore_LargeEntry(t *testing.T) {
 	}
 }
 
+func TestChangeStore_BySourceIdentity(t *testing.T) {
+	dir := t.TempDir()
+	old := RootOverrideForTest(dir)
+	defer ResetRootOverrideForTest(old)
+
+	// Two sources with the same name but different origins.
+	if err := AppendChange(fitness.ChangeEntry{
+		ID: "change-user-1", SourceName: "my-skill", SourceOrigin: "user",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendChange(fitness.ChangeEntry{
+		ID: "change-plugin-1", SourceName: "my-skill", SourceOrigin: "plugin:foo",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Filter by identity should return only matching origin.
+	changes, err := ChangesBySourceIdentity("my-skill", "user")
+	if err != nil {
+		t.Fatalf("ChangesBySourceIdentity: %v", err)
+	}
+	if len(changes) != 1 {
+		t.Fatalf("changes = %d, want 1", len(changes))
+	}
+	if changes[0].ID != "change-user-1" {
+		t.Errorf("ID = %q, want change-user-1", changes[0].ID)
+	}
+}
+
+func TestChangeStore_BySourceIdentity_LegacyNoOrigin(t *testing.T) {
+	dir := t.TempDir()
+	old := RootOverrideForTest(dir)
+	defer ResetRootOverrideForTest(old)
+
+	// Legacy entry without origin.
+	if err := AppendChange(fitness.ChangeEntry{
+		ID: "change-legacy", SourceName: "my-skill",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// New entry with origin.
+	if err := AppendChange(fitness.ChangeEntry{
+		ID: "change-new", SourceName: "my-skill", SourceOrigin: "user",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Query with origin should return both: legacy entries (empty origin) match any origin.
+	changes, err := ChangesBySourceIdentity("my-skill", "user")
+	if err != nil {
+		t.Fatalf("ChangesBySourceIdentity: %v", err)
+	}
+	if len(changes) != 2 {
+		t.Fatalf("changes = %d, want 2 (legacy entry should match any origin)", len(changes))
+	}
+}
+
 func TestChangeStore_FileCreatedOnDemand(t *testing.T) {
 	dir := t.TempDir()
 	old := RootOverrideForTest(dir)
