@@ -67,6 +67,7 @@ func writeSources(sources []fitness.Source) error {
 
 // UpdateSource applies fn to the source with the given name and writes back.
 // Returns an error if no source with that name exists.
+// Deprecated: Use UpdateSourceByIdentity for origin-aware updates.
 func UpdateSource(name string, fn func(*fitness.Source)) error {
 	sourcesMu.Lock()
 	defer sourcesMu.Unlock()
@@ -84,4 +85,26 @@ func UpdateSource(name string, fn func(*fitness.Source)) error {
 	}
 
 	return fmt.Errorf("source %q not found", name)
+}
+
+// UpdateSourceByIdentity applies fn to the source matching both name and origin,
+// then writes back. This prevents cross-origin collisions when multiple sources
+// share the same name under different origins.
+func UpdateSourceByIdentity(name, origin string, fn func(*fitness.Source)) error {
+	sourcesMu.Lock()
+	defer sourcesMu.Unlock()
+
+	sources, err := readSources()
+	if err != nil {
+		return err
+	}
+
+	for i := range sources {
+		if sources[i].Name == name && sources[i].Origin == origin {
+			fn(&sources[i])
+			return writeSources(sources)
+		}
+	}
+
+	return fmt.Errorf("source %q (origin %q) not found", name, origin)
 }

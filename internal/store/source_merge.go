@@ -7,22 +7,30 @@ import (
 	"github.com/vladolaru/cabrero/internal/fitness"
 )
 
+// sourceIdentity returns a canonical key for a source, combining origin and
+// name so that two sources with the same name but different origins are
+// treated as distinct entries.
+func sourceIdentity(name, origin string) string {
+	return origin + "::" + name
+}
+
 // MergeSources combines persisted sources (with user classifications) and
 // discovered sources (with session counts). Classification is always preserved
 // from persisted data; session counts are updated from discovery.
 func MergeSources(persisted, discovered []fitness.Source) []fitness.Source {
-	// Index persisted by name for O(1) lookup.
-	byName := make(map[string]*fitness.Source, len(persisted))
+	// Index persisted by (origin, name) identity for O(1) lookup.
+	byID := make(map[string]*fitness.Source, len(persisted))
 	result := make([]fitness.Source, len(persisted))
 	for i, s := range persisted {
 		result[i] = s
-		byName[s.Name] = &result[i]
+		byID[sourceIdentity(s.Name, s.Origin)] = &result[i]
 	}
 
 	// Merge discovered sources.
 	for _, d := range discovered {
-		if existing, ok := byName[d.Name]; ok {
-			// Update session count and origin (discovery has fresher data).
+		id := sourceIdentity(d.Name, d.Origin)
+		if existing, ok := byID[id]; ok {
+			// Update session count (discovery has fresher data).
 			existing.SessionCount = d.SessionCount
 			if existing.Origin == "" {
 				existing.Origin = d.Origin
@@ -30,7 +38,7 @@ func MergeSources(persisted, discovered []fitness.Source) []fitness.Source {
 		} else {
 			// New source — add as unclassified.
 			result = append(result, d)
-			byName[d.Name] = &result[len(result)-1]
+			byID[id] = &result[len(result)-1]
 		}
 	}
 

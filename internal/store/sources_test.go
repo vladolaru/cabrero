@@ -93,3 +93,65 @@ func TestUpdateSource_NotFound(t *testing.T) {
 		t.Error("expected error for nonexistent source")
 	}
 }
+
+func TestUpdateSourceByIdentity(t *testing.T) {
+	setupTestStore(t)
+
+	// Two sources with the same name but different origins.
+	sources := []fitness.Source{
+		{Name: "git-workflow", Origin: "user", Ownership: "", Approach: ""},
+		{Name: "git-workflow", Origin: "project:cabrero", Ownership: "", Approach: ""},
+	}
+	if err := WriteSources(sources); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update only the project-level source.
+	err := UpdateSourceByIdentity("git-workflow", "project:cabrero", func(s *fitness.Source) {
+		s.Ownership = "not_mine"
+		s.Approach = "evaluate"
+	})
+	if err != nil {
+		t.Fatalf("UpdateSourceByIdentity: %v", err)
+	}
+
+	got, err := ReadSources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d sources, want 2", len(got))
+	}
+
+	// User-level source should be unchanged.
+	if got[0].Ownership != "" {
+		t.Errorf("user source ownership = %q, want empty", got[0].Ownership)
+	}
+
+	// Project-level source should be updated.
+	if got[1].Ownership != "not_mine" {
+		t.Errorf("project source ownership = %q, want %q", got[1].Ownership, "not_mine")
+	}
+	if got[1].Approach != "evaluate" {
+		t.Errorf("project source approach = %q, want %q", got[1].Approach, "evaluate")
+	}
+}
+
+func TestUpdateSourceByIdentity_NotFound(t *testing.T) {
+	setupTestStore(t)
+
+	sources := []fitness.Source{
+		{Name: "git-workflow", Origin: "user", Ownership: "", Approach: ""},
+	}
+	if err := WriteSources(sources); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wrong origin should not match.
+	err := UpdateSourceByIdentity("git-workflow", "project:foo", func(s *fitness.Source) {
+		s.Ownership = "mine"
+	})
+	if err == nil {
+		t.Error("expected error for non-matching origin")
+	}
+}

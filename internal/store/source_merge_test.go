@@ -56,6 +56,54 @@ func TestMergeSources(t *testing.T) {
 	}
 }
 
+func TestMergeSources_CrossOriginCollision(t *testing.T) {
+	now := time.Now().UTC()
+
+	// Two persisted sources with the same name but different origins.
+	persisted := []fitness.Source{
+		{Name: "git-workflow", Origin: "user", Ownership: "mine", Approach: "iterate", SessionCount: 3, ClassifiedAt: &now},
+		{Name: "git-workflow", Origin: "project:cabrero", Ownership: "not_mine", Approach: "evaluate", SessionCount: 1, ClassifiedAt: &now},
+	}
+
+	// Discovery finds updated counts for both.
+	discovered := []fitness.Source{
+		{Name: "git-workflow", Origin: "user", SessionCount: 10},
+		{Name: "git-workflow", Origin: "project:cabrero", SessionCount: 5},
+	}
+
+	merged := MergeSources(persisted, discovered)
+
+	// Both sources must survive — no collision.
+	if len(merged) != 2 {
+		t.Fatalf("got %d sources, want 2", len(merged))
+	}
+
+	// Build lookup by (name, origin) to verify independence.
+	type key struct{ name, origin string }
+	byKey := map[key]fitness.Source{}
+	for _, s := range merged {
+		byKey[key{s.Name, s.Origin}] = s
+	}
+
+	// User-level source: classification preserved, count updated.
+	user := byKey[key{"git-workflow", "user"}]
+	if user.Ownership != "mine" {
+		t.Errorf("user source ownership = %q, want %q", user.Ownership, "mine")
+	}
+	if user.SessionCount != 10 {
+		t.Errorf("user source sessions = %d, want 10", user.SessionCount)
+	}
+
+	// Project-level source: classification preserved independently, count updated.
+	proj := byKey[key{"git-workflow", "project:cabrero"}]
+	if proj.Ownership != "not_mine" {
+		t.Errorf("project source ownership = %q, want %q", proj.Ownership, "not_mine")
+	}
+	if proj.SessionCount != 5 {
+		t.Errorf("project source sessions = %d, want 5", proj.SessionCount)
+	}
+}
+
 func TestGroupSources(t *testing.T) {
 	now := time.Now().UTC()
 	sources := []fitness.Source{

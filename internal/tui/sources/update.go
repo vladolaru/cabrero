@@ -217,9 +217,9 @@ func (m Model) updateOwnershipPrompt(msg tea.Msg) (Model, tea.Cmd) {
 			if s == nil {
 				return m, nil
 			}
-			name := s.Name
+			name, origin := s.Name, s.Origin
 			return m, func() tea.Msg {
-				return message.SetOwnershipFinished{SourceName: name, NewOwnership: "mine"}
+				return message.SetOwnershipFinished{SourceName: name, SourceOrigin: origin, NewOwnership: "mine"}
 			}
 		case key.Matches(msg, key.NewBinding(key.WithKeys("n", "N"))):
 			m.confirmState = ConfirmNone
@@ -228,9 +228,9 @@ func (m Model) updateOwnershipPrompt(msg tea.Msg) (Model, tea.Cmd) {
 			if s == nil {
 				return m, nil
 			}
-			name := s.Name
+			name, origin := s.Name, s.Origin
 			return m, func() tea.Msg {
-				return message.SetOwnershipFinished{SourceName: name, NewOwnership: "not_mine"}
+				return message.SetOwnershipFinished{SourceName: name, SourceOrigin: origin, NewOwnership: "not_mine"}
 			}
 		case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
 			m.confirmState = ConfirmNone
@@ -268,10 +268,10 @@ func (m Model) handleConfirmResult(result components.ConfirmResult) (Model, tea.
 		if s.Approach == "evaluate" {
 			newApproach = "iterate"
 		}
-		name := s.Name
+		name, origin := s.Name, s.Origin
 		approach := newApproach
 		return m, func() tea.Msg {
-			return message.ToggleApproachFinished{SourceName: name, NewApproach: approach}
+			return message.ToggleApproachFinished{SourceName: name, SourceOrigin: origin, NewApproach: approach}
 		}
 
 	case ConfirmRollback:
@@ -332,14 +332,15 @@ func (m Model) handleToggleFinished(msg message.ToggleApproachFinished) (Model, 
 	// Update the source in our local state.
 	for gi := range m.groups {
 		for si := range m.groups[gi].Sources {
-			if m.groups[gi].Sources[si].Name == msg.SourceName {
-				m.groups[gi].Sources[si].Approach = msg.NewApproach
+			src := &m.groups[gi].Sources[si]
+			if src.Name == msg.SourceName && src.Origin == msg.SourceOrigin {
+				src.Approach = msg.NewApproach
 				// Update detail sub-view if open on this source.
-				if m.detailOpen && m.detailSource != nil && m.detailSource.Name == msg.SourceName {
+				if m.detailOpen && m.detailSource != nil && m.detailSource.Name == msg.SourceName && m.detailSource.Origin == msg.SourceOrigin {
 					m.detailSource.Approach = msg.NewApproach
 				}
 				// Persist to disk (non-fatal if it fails).
-				_ = store.UpdateSource(msg.SourceName, func(s *fitness.Source) {
+				_ = store.UpdateSourceByIdentity(msg.SourceName, msg.SourceOrigin, func(s *fitness.Source) {
 					s.Approach = msg.NewApproach
 				})
 				return m, nil
@@ -358,15 +359,16 @@ func (m Model) handleOwnershipFinished(msg message.SetOwnershipFinished) (Model,
 	}
 	for gi := range m.groups {
 		for si := range m.groups[gi].Sources {
-			if m.groups[gi].Sources[si].Name == msg.SourceName {
-				m.groups[gi].Sources[si].Ownership = msg.NewOwnership
+			src := &m.groups[gi].Sources[si]
+			if src.Name == msg.SourceName && src.Origin == msg.SourceOrigin {
+				src.Ownership = msg.NewOwnership
 				// Update detail sub-view if open on this source.
-				if m.detailOpen && m.detailSource != nil && m.detailSource.Name == msg.SourceName {
+				if m.detailOpen && m.detailSource != nil && m.detailSource.Name == msg.SourceName && m.detailSource.Origin == msg.SourceOrigin {
 					m.detailSource.Ownership = msg.NewOwnership
 				}
 				// Persist to disk (non-fatal if it fails).
 				now := time.Now().UTC()
-				_ = store.UpdateSource(msg.SourceName, func(s *fitness.Source) {
+				_ = store.UpdateSourceByIdentity(msg.SourceName, msg.SourceOrigin, func(s *fitness.Source) {
 					s.Ownership = msg.NewOwnership
 					s.ClassifiedAt = &now
 				})

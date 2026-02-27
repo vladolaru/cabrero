@@ -149,14 +149,16 @@ type JumpToSources struct{ SourceName string }
 
 // ToggleApproachFinished carries the result of toggling a source's approach.
 type ToggleApproachFinished struct {
-	SourceName  string
-	NewApproach string
-	Err         error
+	SourceName   string
+	SourceOrigin string
+	NewApproach  string
+	Err          error
 }
 
 // SetOwnershipFinished carries the result of changing a source's ownership.
 type SetOwnershipFinished struct {
 	SourceName   string
+	SourceOrigin string
 	NewOwnership string
 	Err          error
 }
