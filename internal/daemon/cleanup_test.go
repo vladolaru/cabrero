@@ -30,6 +30,29 @@ func TestGroupProposalsByTarget(t *testing.T) {
 	}
 }
 
+func TestSelectBreakBehavior(t *testing.T) {
+	// Verify that a labeled break is needed to exit a for loop from inside a select.
+	// This test documents the Go behavior that motivated the fix.
+	cancelled := make(chan struct{})
+	close(cancelled) // immediately cancelled
+
+	// Pattern WITH label (correct):
+	launchedWithLabel := 0
+loop:
+	for range 5 {
+		select {
+		case <-cancelled:
+			break loop
+		default:
+		}
+		launchedWithLabel++
+	}
+
+	if launchedWithLabel != 0 {
+		t.Errorf("labeled break: launched %d, want 0", launchedWithLabel)
+	}
+}
+
 func TestSkipNonFileTargets(t *testing.T) {
 	proposals := []pipeline.ProposalWithSession{
 		{Proposal: pipeline.Proposal{ID: "p1", Type: "skill_improvement", Target: "local-environment"}},

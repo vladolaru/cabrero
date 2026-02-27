@@ -140,10 +140,11 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 		resultsCh := make(chan curatorResult, len(multi))
 		var wg sync.WaitGroup
 
+	curatorLoop:
 		for target, group := range multi {
 			select {
 			case <-ctx.Done():
-				break
+				break curatorLoop
 			default:
 			}
 
