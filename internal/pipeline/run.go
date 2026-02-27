@@ -65,8 +65,6 @@ type PromptVersion struct {
 	UpdatedAt time.Time
 }
 
-// ListPipelineRunsFromSessions reconstructs run data from pre-loaded session
-// metadata and evaluation file existence. Pass limit=0 for no limit.
 // estimateStageDurations fills in ParseDuration, ClassifierDuration, and
 // EvaluatorDuration on a PipelineRun by comparing file modification times.
 // This is a best-effort estimate when real timing data is unavailable.
@@ -91,6 +89,8 @@ func estimateStageDurations(run *PipelineRun, sessionStart time.Time, digestInfo
 	}
 }
 
+// ListPipelineRunsFromSessions reconstructs run data from pre-loaded session
+// metadata and evaluation file existence. Pass limit=0 for no limit.
 func ListPipelineRunsFromSessions(sessions []store.Metadata, limit int) ([]PipelineRun, error) {
 	var runs []PipelineRun
 	for i, meta := range sessions {
