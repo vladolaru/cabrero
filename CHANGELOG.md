@@ -5,6 +5,18 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.2] - 2026-02-27
+
+### Fixed
+- **pipeline**: Fix `--mcp-config {}` causing Claude CLI 2.1.59+ to silently exit with
+  empty stdout (code 0). The bare empty JSON object is not a valid MCP config — the CLI
+  expects `{"mcpServers":{}}`. This caused 100% classifier/evaluator failure rate since
+  the CLI auto-updated on Feb 26 (1364+ sessions errored). All pipeline invocations now
+  pass the valid structure.
+- **pipeline**: Remove `--setting-sources ""` from all pipeline invocations. This
+  undocumented flag also broke in CLI 2.1.59+. Hook suppression relies solely on
+  `--settings '{"disableAllHooks": true}'` which is the documented approach.
+
 ## [0.27.1] - 2026-02-27
 
 ### Fixed
