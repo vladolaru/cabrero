@@ -371,3 +371,19 @@ func TestRenderMetrics_ShowsHeader(t *testing.T) {
 		t.Error("missing Classifier FPR line")
 	}
 }
+
+func TestPipeline_ResizeUpdatesViewport(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	// Resize via WindowSizeMsg.
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+
+	// SetSize computes vpH = height - 1 (status bar).
+	if m.viewport.Width() != 80 {
+		t.Errorf("viewport.Width after resize = %d, want 80", m.viewport.Width())
+	}
+	if m.viewport.Height() != 29 {
+		t.Errorf("viewport.Height after resize = %d, want 29", m.viewport.Height())
+	}
+}

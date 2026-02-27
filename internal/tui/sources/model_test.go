@@ -801,3 +801,20 @@ func TestSources_GroupCollapsedDefault(t *testing.T) {
 		t.Fatalf("after expanding first group, flatItems = %d, want 5", len(m.flatItems))
 	}
 }
+
+func TestSources_ResizeUpdatesViewport(t *testing.T) {
+	m := newTestModel()
+	m.SetSize(120, 40)
+
+	// Resize via WindowSizeMsg (simulating terminal resize).
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+
+	// Viewport should reflect new dimensions.
+	// SetSize computes vpH = height - 2 (column header + status bar).
+	if m.viewport.Width() != 80 {
+		t.Errorf("viewport.Width after resize = %d, want 80", m.viewport.Width())
+	}
+	if m.viewport.Height() != 28 {
+		t.Errorf("viewport.Height after resize = %d, want 28", m.viewport.Height())
+	}
+}
