@@ -5,6 +5,19 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.3] - 2026-02-27
+
+### Fixed
+- **pipeline**: Use temp directory as subprocess CWD instead of `~/.cabrero/`.
+  The Claude CLI walks up from CWD for project discovery, reaching `~` and
+  scanning `~/Desktop/`, `~/Music/`, etc., which triggers macOS TCC permission
+  prompts attributed to the cabrero launch agent.
+- **hooks**: Both `pre-compact-backup.sh` and `session-end.sh` now track whether
+  the transcript copy succeeded and set session status to `"error"` when it fails,
+  preventing sessions from being permanently stuck in `"queued"` with no transcript.
+- **daemon**: Add `CleanDanglingQueued()` self-healing — queued sessions older than
+  1 hour with no transcript are automatically marked as errored during stale scans.
+
 ## [0.27.2] - 2026-02-27
 
 ### Fixed
@@ -1085,6 +1098,8 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.27.3]: https://github.com/vladolaru/cabrero/compare/v0.27.2...v0.27.3
+[0.27.2]: https://github.com/vladolaru/cabrero/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/vladolaru/cabrero/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/vladolaru/cabrero/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/vladolaru/cabrero/compare/v0.25.0...v0.26.0
