@@ -170,30 +170,51 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 	// Inject scaled turn budget into the prompt template.
 	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", strconv.Itoa(maxTurns))
 
-	// Scope filesystem access: use first session's cwd (all sessions share the same project).
-	allowedTools := evaluatorAllowedTools(sessions[0].Digest.Shape.Cwd)
-
-	cr, err := invokeClaude(claudeConfig{
-		Model:          cfg.EvaluatorModel,
-		SystemPrompt:   systemPrompt,
-		Effort:         "high",
-		Agentic:        true,
-		Prompt:         dataBuilder.String(),
-		AllowedTools:   allowedTools,
-		MaxTurns:       maxTurns,
-		Timeout:        timeout,
-		Debug:          cfg.Debug,
-		Logger:         cfg.logger(),
-		PermissionMode: "dontAsk",
-		SettingSources: &emptyStr,
-	})
-	if err != nil {
-		return nil, cr, fmt.Errorf("invoking evaluator batch: %w", err)
+	// Scope filesystem access: union of all session cwds in the batch.
+	var cwds []*string
+	for i := range sessions {
+		cwds = append(cwds, sessions[i].Digest.Shape.Cwd)
 	}
+	allowedTools := evaluatorAllowedToolsMulti(cwds)
 
-	output, err := parseEvaluatorOutput(cr.Result)
-	if err != nil {
-		return nil, cr, fmt.Errorf("parsing evaluator batch output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
+	log := cfg.logger()
+	prompt := dataBuilder.String()
+
+	var cr *ClaudeResult
+	var output *EvaluatorOutput
+	maxAttempts := 1 + cfg.MaxLLMRetries
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			log.Info("  Evaluator batch: retrying after JSON parse failure (attempt %d/%d)", attempt+1, maxAttempts)
+		}
+
+		cr, err = invokeClaude(claudeConfig{
+			Model:          cfg.EvaluatorModel,
+			SystemPrompt:   systemPrompt,
+			Effort:         "high",
+			Agentic:        true,
+			Prompt:         prompt,
+			AllowedTools:   allowedTools,
+			MaxTurns:       maxTurns,
+			Timeout:        timeout,
+			Debug:          cfg.Debug,
+			Logger:         log,
+			PermissionMode: "dontAsk",
+			SettingSources: &emptyStr,
+		})
+		if err != nil {
+			return nil, cr, fmt.Errorf("invoking evaluator batch: %w", err)
+		}
+
+		output, err = parseEvaluatorOutput(cr.Result)
+		if err != nil {
+			if attempt < maxAttempts-1 && isRetriableJSONError(err.Error()) {
+				log.Error("  Evaluator batch: JSON parse failed (attempt %d/%d): %v", attempt+1, maxAttempts, err)
+				continue
+			}
+			return nil, cr, fmt.Errorf("parsing evaluator batch output: %w\nRaw output:\n%s", err, truncateForLog(cr.Result, 500))
+		}
+		break
 	}
 
 	// Set metadata from the first session (batch output covers multiple sessions).
@@ -368,6 +389,42 @@ func evaluatorAllowedTools(cwd *string) string {
 			fmt.Sprintf("Read(//%s/**)", claudeDir),
 			fmt.Sprintf("Grep(//%s/**)", claudeDir),
 		)
+	}
+
+	return strings.Join(paths, ",")
+}
+
+// evaluatorAllowedToolsMulti builds a path-scoped --allowedTools value from
+// multiple session cwds. Deduplicates paths to avoid redundant tool scopes.
+func evaluatorAllowedToolsMulti(cwds []*string) string {
+	cabreroRoot := store.Root()
+	seen := make(map[string]bool)
+	var paths []string
+
+	add := func(p string) {
+		if !seen[p] {
+			seen[p] = true
+			paths = append(paths, p)
+		}
+	}
+
+	add(fmt.Sprintf("Read(//%s/**)", cabreroRoot))
+	add(fmt.Sprintf("Grep(//%s/**)", cabreroRoot))
+
+	// Add all unique project directories.
+	for _, cwd := range cwds {
+		if cwd != nil && *cwd != "" {
+			add(fmt.Sprintf("Read(//%s/**)", *cwd))
+			add(fmt.Sprintf("Grep(//%s/**)", *cwd))
+		}
+	}
+
+	// Allow reading ~/.claude/ for CLAUDE.md and settings context.
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		claudeDir := filepath.Join(home, ".claude")
+		add(fmt.Sprintf("Read(//%s/**)", claudeDir))
+		add(fmt.Sprintf("Grep(//%s/**)", claudeDir))
 	}
 
 	return strings.Join(paths, ",")
