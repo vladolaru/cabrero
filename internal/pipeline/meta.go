@@ -114,6 +114,56 @@ func ProposalCreatedAfter(pw ProposalWithSession, cutoff time.Time) bool {
 	return true
 }
 
+// ArchivedMetaProposalAfter returns true if any archived prompt_improvement
+// proposal targeting the given version was archived after the cutoff.
+// Used by meta cooldown to prevent re-triggering after recent approve/reject.
+func ArchivedMetaProposalAfter(promptVersion string, cutoff time.Time) bool {
+	archivedDir := store.ArchivedProposalsDir()
+	entries, err := os.ReadDir(archivedDir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(archivedDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		var raw map[string]json.RawMessage
+		if json.Unmarshal(data, &raw) != nil {
+			continue
+		}
+
+		// Check proposal type.
+		var pw ProposalWithSession
+		if json.Unmarshal(data, &pw) != nil {
+			continue
+		}
+		if pw.Proposal.Type != TypePromptImprovement {
+			continue
+		}
+		if pw.Proposal.Target != promptVersion && pw.Proposal.Rationale != promptVersion {
+			continue
+		}
+
+		// Check archivedAt timestamp.
+		if archivedAtRaw, ok := raw["archivedAt"]; ok {
+			var archivedAt time.Time
+			if json.Unmarshal(archivedAtRaw, &archivedAt) == nil && archivedAt.After(cutoff) {
+				return true
+			}
+		}
+
+		// Fallback: check creation timestamp from proposal ID.
+		if ProposalCreatedAfter(pw, cutoff) {
+			return true
+		}
+	}
+	return false
+}
+
 // countWindowedApprovals counts proposals approved after the given cutoff,
 // using the archivedAt timestamp from the archived proposal JSON.
 func countWindowedApprovals(cutoff time.Time) int {

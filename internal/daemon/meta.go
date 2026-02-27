@@ -70,22 +70,31 @@ func (d *Daemon) performMetaRun(ctx context.Context) {
 }
 
 // metaCooldownActive returns true if a prompt_improvement proposal for the
-// given version was created within the last cooldownDays.
+// given version was created within the last cooldownDays. Checks both pending
+// proposals and archived proposals (approved/rejected) to prevent re-triggering
+// shortly after a recent meta decision.
 func metaCooldownActive(promptVersion string, cooldownDays int) bool {
-	proposals, err := pipeline.ListProposals()
-	if err != nil {
-		return false
-	}
 	cutoff := pipeline.MetaCooldownCutoff(cooldownDays)
-	for _, pw := range proposals {
-		if pw.Proposal.Type != pipeline.TypePromptImprovement {
-			continue
-		}
-		if pw.Proposal.Target == promptVersion || pw.Proposal.Rationale == promptVersion {
-			if pipeline.ProposalCreatedAfter(pw, cutoff) {
-				return true
+
+	// Check pending proposals.
+	proposals, err := pipeline.ListProposals()
+	if err == nil {
+		for _, pw := range proposals {
+			if pw.Proposal.Type != pipeline.TypePromptImprovement {
+				continue
+			}
+			if pw.Proposal.Target == promptVersion || pw.Proposal.Rationale == promptVersion {
+				if pipeline.ProposalCreatedAfter(pw, cutoff) {
+					return true
+				}
 			}
 		}
 	}
+
+	// Check archived proposals (recently approved/rejected).
+	if pipeline.ArchivedMetaProposalAfter(promptVersion, cutoff) {
+		return true
+	}
+
 	return false
 }
