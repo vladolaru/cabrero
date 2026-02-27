@@ -136,11 +136,8 @@ type claudeConfig struct {
 	// Isolation fields — restrict filesystem access and plugin loading.
 	DisallowedTools string  // comma-separated deny rules for --disallowedTools
 	PermissionMode  string  // permission mode (e.g. "dontAsk" to auto-deny unapproved tools)
-	SettingSources  *string // setting sources to load (nil = default, "" = none)
+	SettingSources  *string // setting sources to load (nil = default); avoid "" — broke in CLI 2.1.59+
 }
-
-// emptyStr is a convenience value for &emptyStr when SettingSources should be "".
-var emptyStr = ""
 
 // invokeClaude runs the claude CLI with the given config.
 //
@@ -267,7 +264,7 @@ func buildClaudeArgs(cfg claudeConfig, sessionID string) []string {
 			"--system-prompt", cfg.SystemPrompt,
 			"--output-format", "json",
 			"--disable-slash-commands",
-			"--mcp-config", "{}",                      // prevent loading user's MCP servers/plugins
+			"--mcp-config", `{"mcpServers":{}}`,                      // prevent loading user's MCP servers/plugins
 			"--settings", `{"disableAllHooks": true}`, // prevent user hooks from firing
 		}
 		// Agentic mode: always pass --session-id; never pass --no-session-persistence.
@@ -298,7 +295,7 @@ func buildClaudeArgs(cfg claudeConfig, sessionID string) []string {
 			"--system-prompt", cfg.SystemPrompt,
 			"--disable-slash-commands",
 			"--tools", "",
-			"--mcp-config", "{}",                          // prevent loading user's MCP servers/plugins
+			"--mcp-config", `{"mcpServers":{}}`,                          // prevent loading user's MCP servers/plugins
 			"--settings", `{"disableAllHooks": true}`, // prevent user hooks from firing
 		}
 		if !cfg.Debug {

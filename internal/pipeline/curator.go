@@ -179,7 +179,6 @@ func RunCuratorGroup(target string, proposals []ProposalWithSession, cfg Pipelin
 		Timeout:        cfg.CuratorTimeout,
 		Logger:         cfg.Logger,
 		Debug:          cfg.Debug,
-		SettingSources: &emptyStr, // no user settings — curator is isolated
 	})
 	if err != nil {
 		return nil, cr, fmt.Errorf("curator invocation for %s: %w", target, err)

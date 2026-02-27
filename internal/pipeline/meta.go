@@ -469,7 +469,6 @@ func RunMetaAnalysis(stats AcceptanceStats, cfg PipelineConfig) (string, error) 
 		Timeout:        cfg.MetaTimeout,
 		Debug:          cfg.Debug,
 		Logger:         log,
-		SettingSources: &emptyStr,
 	})
 	if err != nil {
 		return "", fmt.Errorf("meta invocation: %w", err)

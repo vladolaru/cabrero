@@ -88,7 +88,6 @@ func runEvaluatorCore(sessionID string, digest *parser.Digest, classifierOutput 
 			Debug:          cfg.Debug,
 			Logger:         cfg.logger(),
 			PermissionMode: "dontAsk",
-			SettingSources: &emptyStr,
 		})
 		if err != nil {
 			return nil, cr, fmt.Errorf("invoking evaluator: %w", err)
@@ -201,7 +200,6 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 			Debug:          cfg.Debug,
 			Logger:         log,
 			PermissionMode: "dontAsk",
-			SettingSources: &emptyStr,
 		})
 		if err != nil {
 			return nil, cr, fmt.Errorf("invoking evaluator batch: %w", err)

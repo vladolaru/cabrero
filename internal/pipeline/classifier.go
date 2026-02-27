@@ -82,7 +82,6 @@ func runClassifierCore(sessionID string, digest *parser.Digest, aggregatorOutput
 			Debug:          cfg.Debug,
 			Logger:         cfg.logger(),
 			PermissionMode: "dontAsk",
-			SettingSources: &emptyStr,
 		})
 		if err != nil {
 			return nil, cr, fmt.Errorf("invoking classifier: %w", err)

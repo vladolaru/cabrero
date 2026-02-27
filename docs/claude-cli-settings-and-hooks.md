@@ -19,9 +19,10 @@ These are the only documented values. The default (when flag is omitted) loads a
 **Note:** Managed settings (`/Library/Application Support/ClaudeCode/managed-settings.json`
 on macOS) always load regardless of this flag and take highest precedence.
 
-**Undocumented:** Passing `""` (empty string) is assumed to skip all three files based on
-common CLI patterns, but this behavior is **not officially documented**. The pipeline
-currently relies on this — if it stops working, switch to `--settings '{"disableAllHooks": true}'`.
+**Undocumented:** Passing `""` (empty string) was assumed to skip all three files based on
+common CLI patterns, but this behavior is **not officially documented**. It broke in CLI
+2.1.59+ (Feb 2026), causing the process to exit with empty stdout. The pipeline no longer
+uses this — `--settings '{"disableAllHooks": true}'` is the sole hook suppression mechanism.
 
 ### `--settings <file-or-json>`
 
@@ -78,19 +79,21 @@ claude --settings '{"disableAllHooks": true}' -p "query"
 
 | Invocation site | `--setting-sources` | `--settings` | Hooks disabled? |
 |-----------------|---------------------|--------------|-----------------|
-| Pipeline (`invokeClaude`) | `""` (defense-in-depth) | `disableAllHooks` | Yes |
+| Pipeline (`invokeClaude`) | — (removed in v0.27.2) | `disableAllHooks` | Yes |
 | Chat panel (`buildChatArgs`) | — | `disableAllHooks` | Yes |
 | Apply (`apply.go`) | — | `disableAllHooks` | Yes |
 
-The pipeline keeps `--setting-sources ""` as defense-in-depth against non-hook settings
-leaking through (e.g., `alwaysThinkingEnabled` has no CLI flag override). All three
-sites use `--settings '{"disableAllHooks": true}'` as the primary hook suppression.
+All three sites use `--settings '{"disableAllHooks": true}'` as the sole hook suppression.
+The pipeline previously used `--setting-sources ""` as defense-in-depth, but this broke
+in CLI 2.1.59+ and was removed. Non-hook settings (e.g., `alwaysThinkingEnabled`) may
+now leak through from user/project settings files — acceptable since they don't affect
+pipeline correctness.
 
 ## Related flags
 
 | Flag | Purpose |
 |------|---------|
-| `--mcp-config "{}"` | Prevents loading user's MCP servers/plugins |
+| `--mcp-config '{"mcpServers":{}}'` | Prevents loading user's MCP servers/plugins (**must** include `mcpServers` key — bare `{}` silently crashes CLI 2.1.59+) |
 | `--disable-slash-commands` | Disables slash commands |
 | `--permission-mode dontAsk` | Prevents permission prompts |
 | `--no-session-persistence` | Doesn't persist the session transcript |
