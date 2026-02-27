@@ -285,6 +285,23 @@ func (r *Runner) RunOne(ctx context.Context, sessionID string, dryRun bool) (*Ru
 	log.Info("  Classifier triage: session worth evaluating")
 	rec.Triage = "evaluate"
 
+	// Source policy gate: skip evaluator for unclassified or paused sources.
+	gate := CheckSourcePolicy(classifierResult.ClassifierOutput)
+	if !gate.Allowed {
+		log.Info("  Source policy gate: %s (source %q) — skipping Evaluator", gate.Reason, gate.SourceName)
+		rec.Status = "processed"
+		rec.GateReason = gate.Reason
+		rec.EvaluatorModel = ""
+		rec.EvaluatorPromptVersion = ""
+		rec.computeUsageTotals()
+		rec.TotalDurationNs = int64(time.Since(runStart))
+		_ = AppendHistory(rec)
+		if markErr := store.MarkProcessed(sessionID); markErr != nil {
+			log.Error("  marking processed for %s: %v", sessionID, markErr)
+		}
+		return result, nil
+	}
+
 	// Check context before evaluator.
 	select {
 	case <-ctx.Done():
@@ -481,6 +498,26 @@ func (r *Runner) RunGroup(ctx context.Context, sessions []BatchSession) []BatchR
 
 		rec.Triage = "evaluate"
 
+		// Source policy gate: skip evaluator for unclassified or paused sources.
+		gate := CheckSourcePolicy(classifierResult.ClassifierOutput)
+		if !gate.Allowed {
+			results[i].Status = "processed"
+			r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "evaluate"})
+
+			rec.Status = "processed"
+			rec.GateReason = gate.Reason
+			rec.EvaluatorModel = ""
+			rec.EvaluatorPromptVersion = ""
+			rec.computeUsageTotals()
+			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
+			_ = AppendHistory(*rec)
+
+			if markErr := store.MarkProcessed(s.SessionID); markErr != nil {
+				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking processed: %w", markErr)})
+			}
+			continue
+		}
+
 		// Session needs evaluation.
 		r.emit(s.SessionID, BatchEvent{Type: "classifier_done", Triage: "evaluate"})
 		toEvaluate = append(toEvaluate, BatchSession{
@@ -585,25 +622,11 @@ func (r *Runner) runGroupEvalBatch(chunk []BatchSession, results []BatchResult, 
 	splitUsage := splitUsageForBatch(evaluatorCR, len(chunk))
 
 	if err != nil {
-		// Mark all sessions in the chunk as errors.
-		for i, s := range chunk {
-			idx := indexByID[s.SessionID]
-			results[idx].Status = "error"
-			results[idx].Error = err
-			r.emit(s.SessionID, BatchEvent{Type: "error", Error: err})
-
-			rec := records[s.SessionID]
-			rec.Status = "error"
-			rec.ErrorDetail = err.Error()
-			rec.EvaluatorDurationNs = int64(perSessionDuration)
-			rec.EvaluatorUsage = splitUsage[i]
-			rec.computeUsageTotals()
-			rec.TotalDurationNs = int64(time.Since(runStarts[s.SessionID]))
-			_ = AppendHistory(*rec)
-
-			if markErr := store.MarkError(s.SessionID); markErr != nil {
-				r.emit(s.SessionID, BatchEvent{Type: "error", Error: fmt.Errorf("marking error: %w", markErr)})
-			}
+		// Fallback: try per-session evaluation for each session in the chunk.
+		// Only mark individual sessions as error if per-session eval also fails.
+		r.log().Info("  Batch evaluator failed, falling back to per-session evaluation: %v", err)
+		for _, s := range chunk {
+			r.runGroupEvalSingle(s, results, indexByID, records, runStarts)
 		}
 		return
 	}

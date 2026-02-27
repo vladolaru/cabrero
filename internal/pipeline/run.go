@@ -251,6 +251,8 @@ type HistoryStats struct {
 	ClassifierRuns   int
 	EvaluatorRuns    int
 	EvaluatorSkipped int // triage == "clean"
+	SourceGated      int // evaluator skipped by source policy (unclassified or paused)
+	SkippedBusy      int // sessions skipped because all invoke slots were busy
 	ErrorRuns        int
 	RetryRuns        int // PreviousStatus == "error"
 
@@ -309,10 +311,16 @@ func ComputeStatsFromHistory(records []HistoryRecord, since time.Time) HistorySt
 		if rec.Status == "error" {
 			stats.ErrorRuns++
 		}
+		if rec.Status == "skipped_busy" {
+			stats.SkippedBusy++
+		}
 
 		// Triage.
 		if rec.Triage == "clean" {
 			stats.EvaluatorSkipped++
+		}
+		if rec.GateReason != "" {
+			stats.SourceGated++
 		}
 
 		// Timing — only include durations from non-error runs.

@@ -172,6 +172,23 @@ func TestComputeStatsFromHistory_RetryCount(t *testing.T) {
 	}
 }
 
+func TestComputeStatsFromHistory_SkippedBusy(t *testing.T) {
+	now := time.Now()
+	records := []HistoryRecord{
+		{SessionID: "s1", Timestamp: now, Source: "daemon", Status: "skipped_busy"},
+		{SessionID: "s2", Timestamp: now, Source: "daemon", Status: "skipped_busy"},
+		{SessionID: "s3", Timestamp: now, Source: "daemon", Status: "processed", TotalDurationNs: 1},
+	}
+
+	stats := ComputeStatsFromHistory(records, time.Time{})
+	if stats.SkippedBusy != 2 {
+		t.Errorf("SkippedBusy = %d, want 2", stats.SkippedBusy)
+	}
+	if stats.TotalRuns != 3 {
+		t.Errorf("TotalRuns = %d, want 3", stats.TotalRuns)
+	}
+}
+
 func TestSparklineBuckets(t *testing.T) {
 	// Pin to a fixed reference time to avoid midnight flakiness.
 	ref := time.Date(2026, 2, 15, 12, 0, 0, 0, time.UTC)

@@ -879,6 +879,10 @@ func TestRunGroup_EvalBatchError_WritesHistory(t *testing.T) {
 		EvalBatchFunc: func(_ []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
 			return nil, nil, fmt.Errorf("eval batch boom")
 		},
+		// Batch failure triggers per-session fallback; make that fail too.
+		EvalOneFunc: func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("eval per-session boom")
+		},
 	})
 	r.Source = "daemon"
 
@@ -893,8 +897,8 @@ func TestRunGroup_EvalBatchError_WritesHistory(t *testing.T) {
 		if rec.Status != "error" {
 			t.Errorf("[%s] Status = %q, want %q", sid, rec.Status, "error")
 		}
-		if !strings.Contains(rec.ErrorDetail, "eval batch boom") {
-			t.Errorf("[%s] ErrorDetail = %q, want to contain 'eval batch boom'", sid, rec.ErrorDetail)
+		if !strings.Contains(rec.ErrorDetail, "eval per-session boom") {
+			t.Errorf("[%s] ErrorDetail = %q, want to contain 'eval per-session boom'", sid, rec.ErrorDetail)
 		}
 	}
 }
@@ -1377,5 +1381,300 @@ func TestSplitUsageForBatch_DividesWebCounters(t *testing.T) {
 		if s.WebFetchRequests != 1 {
 			t.Errorf("splits[%d].WebFetchRequests = %d, want 1", i, s.WebFetchRequests)
 		}
+	}
+}
+
+// --- Source policy gate tests ---
+
+// fakeClassifyWithSignals returns a classify function whose output includes
+// skill signals. This lets tests exercise the source policy gate.
+func fakeClassifyWithSignals(signals []ClassifierSkillSignal) func(string, PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+	return func(sessionID string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+		return &ClassifierResult{
+			Digest: &parser.Digest{SessionID: sessionID},
+			ClassifierOutput: &ClassifierOutput{
+				SessionID:    sessionID,
+				Triage:       "evaluate",
+				SkillSignals: signals,
+			},
+		}, nil, nil
+	}
+}
+
+func TestRunOne_SourceGate_UnclassifiedSkipsEvaluator(t *testing.T) {
+	setupBatchStore(t)
+	sid := "gate-unclass00001"
+	createBatchSession(t, sid)
+
+	// Register a source as unclassified (ownership == "").
+	writeSources(t, []sourceEntry{
+		{Name: "brainstorming", Origin: "plugin:superpowers", Ownership: "", Approach: ""},
+	})
+
+	evalCalled := false
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyWithSignals([]ClassifierSkillSignal{
+			{SkillName: "superpowers:brainstorming"},
+		}),
+		EvalOneFunc: func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			evalCalled = true
+			return &EvaluatorOutput{}, nil, nil
+		},
+	})
+
+	result, err := r.RunOne(context.Background(), sid, false)
+	if err != nil {
+		t.Fatalf("RunOne: %v", err)
+	}
+	if evalCalled {
+		t.Error("evaluator should not be called for unclassified source")
+	}
+	if result.EvaluatorOutput != nil {
+		t.Error("EvaluatorOutput should be nil when gated")
+	}
+
+	// Verify history records the gate reason.
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record for %s", sid)
+	}
+	if rec.GateReason != "unclassified_source" {
+		t.Errorf("GateReason = %q, want %q", rec.GateReason, "unclassified_source")
+	}
+	if rec.Status != "processed" {
+		t.Errorf("Status = %q, want %q", rec.Status, "processed")
+	}
+	if rec.Triage != "evaluate" {
+		t.Errorf("Triage = %q, want %q", rec.Triage, "evaluate")
+	}
+}
+
+func TestRunOne_SourceGate_PausedSkipsEvaluator(t *testing.T) {
+	setupBatchStore(t)
+	sid := "gate-paused00001"
+	createBatchSession(t, sid)
+
+	// Register a source as classified but paused.
+	writeSources(t, []sourceEntry{
+		{Name: "brainstorming", Origin: "plugin:superpowers", Ownership: "mine", Approach: "paused"},
+	})
+
+	evalCalled := false
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyWithSignals([]ClassifierSkillSignal{
+			{SkillName: "superpowers:brainstorming"},
+		}),
+		EvalOneFunc: func(_ string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			evalCalled = true
+			return &EvaluatorOutput{}, nil, nil
+		},
+	})
+
+	result, err := r.RunOne(context.Background(), sid, false)
+	if err != nil {
+		t.Fatalf("RunOne: %v", err)
+	}
+	if evalCalled {
+		t.Error("evaluator should not be called for paused source")
+	}
+	if result.EvaluatorOutput != nil {
+		t.Error("EvaluatorOutput should be nil when gated")
+	}
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record for %s", sid)
+	}
+	if rec.GateReason != "paused_source" {
+		t.Errorf("GateReason = %q, want %q", rec.GateReason, "paused_source")
+	}
+}
+
+func TestRunOne_SourceGate_ClassifiedAllowsEvaluator(t *testing.T) {
+	setupBatchStore(t)
+	sid := "gate-allow000001"
+	createBatchSession(t, sid)
+
+	// Register a source as fully classified with iterate approach.
+	writeSources(t, []sourceEntry{
+		{Name: "brainstorming", Origin: "plugin:superpowers", Ownership: "mine", Approach: "iterate"},
+	})
+
+	evalCalled := false
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ParseSessionFunc: func(sessionID string) (*parser.Digest, error) {
+			return &parser.Digest{SessionID: sessionID}, nil
+		},
+		ClassifyFunc: fakeClassifyWithSignals([]ClassifierSkillSignal{
+			{SkillName: "superpowers:brainstorming"},
+		}),
+		EvalOneFunc: func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			evalCalled = true
+			return &EvaluatorOutput{SessionID: sessionID, Proposals: []Proposal{}}, nil, nil
+		},
+	})
+
+	_, err := r.RunOne(context.Background(), sid, false)
+	if err != nil {
+		t.Fatalf("RunOne: %v", err)
+	}
+	if !evalCalled {
+		t.Error("evaluator should be called for classified source")
+	}
+
+	records := readHistoryForTest(t)
+	rec := findRecord(records, sid)
+	if rec == nil {
+		t.Fatalf("no history record for %s", sid)
+	}
+	if rec.GateReason != "" {
+		t.Errorf("GateReason = %q, want empty", rec.GateReason)
+	}
+}
+
+func TestRunGroup_SourceGate_UnclassifiedSkipsEvaluator(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "rg-gate-unc00001")
+	s2 := createBatchSession(t, "rg-gate-cls00001")
+
+	// s1 touches an unclassified source; s2 touches a classified source.
+	writeSources(t, []sourceEntry{
+		{Name: "brainstorming", Origin: "plugin:superpowers", Ownership: "", Approach: ""},
+		{Name: "git-workflow", Origin: "user", Ownership: "mine", Approach: "iterate"},
+	})
+
+	evalCalled := map[string]bool{}
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: func(sessionID string, _ PipelineConfig) (*ClassifierResult, *ClaudeResult, error) {
+			signals := []ClassifierSkillSignal{{SkillName: "superpowers:brainstorming"}}
+			if sessionID == "rg-gate-cls00001" {
+				signals = []ClassifierSkillSignal{{SkillName: "git-workflow"}}
+			}
+			return &ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &ClassifierOutput{SessionID: sessionID, Triage: "evaluate", SkillSignals: signals},
+			}, nil, nil
+		},
+		EvalOneFunc: func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			evalCalled[sessionID] = true
+			return &EvaluatorOutput{SessionID: sessionID, Proposals: []Proposal{}}, nil, nil
+		},
+	})
+
+	results := r.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	// s1 should be gated (unclassified), s2 should be evaluated.
+	if results[0].Status != "processed" {
+		t.Errorf("s1 status = %q, want %q", results[0].Status, "processed")
+	}
+	if results[1].Status != "processed" {
+		t.Errorf("s2 status = %q, want %q", results[1].Status, "processed")
+	}
+
+	if evalCalled["rg-gate-unc00001"] {
+		t.Error("evaluator should not be called for s1 (unclassified)")
+	}
+	if !evalCalled["rg-gate-cls00001"] {
+		t.Error("evaluator should be called for s2 (classified)")
+	}
+}
+
+// --- Batch evaluator fallback tests ---
+
+func TestRunGroup_BatchFallback_PerSessionSuccess(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "rg-fall-ok000001")
+	s2 := createBatchSession(t, "rg-fall-ok000002")
+
+	evalOneCalls := 0
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalBatchFunc: func(_ []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("parsing evaluator batch output: invalid JSON: malformed")
+		},
+		EvalOneFunc: func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			evalOneCalls++
+			return &EvaluatorOutput{SessionID: sessionID, Proposals: []Proposal{}}, nil, nil
+		},
+	})
+
+	results := r.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	// Both sessions should succeed via per-session fallback.
+	if results[0].Status != "processed" {
+		t.Errorf("s1 status = %q, want %q", results[0].Status, "processed")
+	}
+	if results[1].Status != "processed" {
+		t.Errorf("s2 status = %q, want %q", results[1].Status, "processed")
+	}
+	if evalOneCalls != 2 {
+		t.Errorf("evalOne calls = %d, want 2", evalOneCalls)
+	}
+}
+
+func TestRunGroup_BatchFallback_MixedOutcomes(t *testing.T) {
+	setupBatchStore(t)
+	s1 := createBatchSession(t, "rg-fall-mx000001")
+	s2 := createBatchSession(t, "rg-fall-mx000002")
+
+	r := NewRunnerWithStages(PipelineConfig{Logger: &discardLogger{}}, TestStages{
+		ClassifyFunc: fakeClassifyEvaluate,
+		EvalBatchFunc: func(_ []BatchSession, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			return nil, nil, fmt.Errorf("parsing evaluator batch output: invalid JSON: malformed")
+		},
+		EvalOneFunc: func(sessionID string, _ *parser.Digest, _ *ClassifierOutput, _ PipelineConfig) (*EvaluatorOutput, *ClaudeResult, error) {
+			if sessionID == "rg-fall-mx000001" {
+				return &EvaluatorOutput{SessionID: sessionID, Proposals: []Proposal{}}, nil, nil
+			}
+			return nil, nil, fmt.Errorf("evaluator failed for session 2")
+		},
+	})
+
+	results := r.RunGroup(context.Background(), []BatchSession{s1, s2})
+
+	// s1 succeeds, s2 fails — independent outcomes.
+	if results[0].Status != "processed" {
+		t.Errorf("s1 status = %q, want %q", results[0].Status, "processed")
+	}
+	if results[1].Status != "error" {
+		t.Errorf("s2 status = %q, want %q", results[1].Status, "error")
+	}
+}
+
+// sourceEntry is a minimal struct for writing test sources.
+type sourceEntry struct {
+	Name      string `json:"name"`
+	Origin    string `json:"origin"`
+	Ownership string `json:"ownership"`
+	Approach  string `json:"approach"`
+}
+
+// writeSources writes a sources.json to the test store.
+func writeSources(t *testing.T, entries []sourceEntry) {
+	t.Helper()
+	if err := os.MkdirAll(store.Root(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	enc := `{"sources":[`
+	for i, e := range entries {
+		if i > 0 {
+			enc += ","
+		}
+		enc += fmt.Sprintf(`{"name":%q,"origin":%q,"ownership":%q,"approach":%q,"sessionCount":0,"healthScore":-1}`,
+			e.Name, e.Origin, e.Ownership, e.Approach)
+	}
+	enc += "]}"
+
+	if err := os.WriteFile(store.Root()+"/sources.json", []byte(enc), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

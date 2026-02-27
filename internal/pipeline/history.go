@@ -76,6 +76,7 @@ type HistoryRecord struct {
 	Status        string `json:"status"`                   // "processed", "error"
 	ProposalCount int    `json:"proposal_count"`
 	ErrorDetail   string `json:"error_detail,omitempty"`
+	GateReason    string `json:"gate_reason,omitempty"`    // "unclassified_source", "paused_source" — set when evaluator skipped by source policy
 
 	// Per-stage wall-clock durations (nanoseconds).
 	ParseDurationNs      int64 `json:"parse_duration_ns"`
@@ -172,6 +173,18 @@ func AppendHistory(rec HistoryRecord) error {
 
 	_, err = f.Write(data)
 	return err
+}
+
+// AppendSkipRecord writes a lightweight history record for a busy-slot skip.
+// The record has status "skipped_busy" with no LLM usage or timing.
+func AppendSkipRecord(sessionID, source string) error {
+	rec := HistoryRecord{
+		SessionID: sessionID,
+		Timestamp: time.Now().UTC(),
+		Source:    source,
+		Status:    "skipped_busy",
+	}
+	return AppendHistory(rec)
 }
 
 // ReadHistory reads all history records from the JSONL file.
