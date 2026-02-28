@@ -103,3 +103,19 @@ func TestCircuitBreaker_ConsecutiveErrors(t *testing.T) {
 		t.Fatalf("expected 2 consecutive errors, got %d", cb.ConsecutiveErrors())
 	}
 }
+
+func TestCircuitBreaker_ConsecutiveErrorsMatchesThresholdAfterTrip(t *testing.T) {
+	cb := NewCircuitBreaker(3, 30*time.Minute)
+	cb.RecordFailure()
+	cb.RecordFailure()
+	cb.RecordFailure()
+	if cb.ConsecutiveErrors() != 3 {
+		t.Fatalf("expected 3 consecutive errors at trip, got %d", cb.ConsecutiveErrors())
+	}
+	// Additional failures while open should not inflate the counter
+	cb.RecordFailure()
+	cb.RecordFailure()
+	if cb.ConsecutiveErrors() != 3 {
+		t.Fatalf("expected counter to stay at 3 while open, got %d", cb.ConsecutiveErrors())
+	}
+}

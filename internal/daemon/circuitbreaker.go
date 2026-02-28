@@ -37,20 +37,29 @@ func NewCircuitBreaker(threshold int, cooldown time.Duration) *CircuitBreaker {
 	}
 }
 
-// State returns the current breaker state, transitioning from open to
-// half-open when the cooldown has elapsed.
-func (cb *CircuitBreaker) State() string {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
+// stateLocked returns the current breaker state and performs the
+// open→half-open transition if the cooldown has elapsed. Must be called
+// with mu held.
+func (cb *CircuitBreaker) stateLocked() string {
 	if cb.state == CircuitOpen && time.Since(cb.openedAt) >= cb.cooldown {
 		cb.state = CircuitHalfOpen
 	}
 	return cb.state
 }
 
+// State returns the current breaker state, transitioning from open to
+// half-open when the cooldown has elapsed.
+func (cb *CircuitBreaker) State() string {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	return cb.stateLocked()
+}
+
 // Allow returns true if processing is permitted (closed or half-open).
 func (cb *CircuitBreaker) Allow() bool {
-	s := cb.State()
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	s := cb.stateLocked()
 	return s == CircuitClosed || s == CircuitHalfOpen
 }
 
@@ -71,13 +80,16 @@ func (cb *CircuitBreaker) RecordSuccess() {
 func (cb *CircuitBreaker) RecordFailure() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	cb.consecutiveErrs++
 	if cb.state == CircuitHalfOpen {
 		cb.state = CircuitOpen
 		cb.openedAt = time.Now()
 		return
 	}
-	if cb.consecutiveErrs >= cb.threshold && cb.state == CircuitClosed {
+	if cb.state == CircuitOpen {
+		return // already tripped, don't accumulate
+	}
+	cb.consecutiveErrs++
+	if cb.consecutiveErrs >= cb.threshold {
 		cb.state = CircuitOpen
 		cb.openedAt = time.Now()
 		cb.totalTrips++
