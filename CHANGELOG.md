@@ -5,7 +5,7 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.31.3] - 2026-02-28
 
 ### Fixed
 - Replace `osascript` notifications with a compiled Swift helper (`cabrero-notify`) that
