@@ -123,6 +123,25 @@ func Status(args []string) error {
 		}
 	}
 
+	// Circuit breaker state (only shown when not closed).
+	if cbState, err := store.ReadCircuitBreakerState(); err == nil && cbState.State != "closed" {
+		switch cbState.State {
+		case "open":
+			fmt.Printf("  %s  %s — %d consecutive errors, paused since %s\n",
+				cli.Bold("Circuit Breaker:"),
+				cli.Error("OPEN"),
+				cbState.ConsecutiveErrors,
+				cbState.LastTripAt.Local().Format("2006-01-02 15:04"))
+		case "half-open":
+			fmt.Printf("  %s  %s — testing recovery\n",
+				cli.Bold("Circuit Breaker:"),
+				cli.Warn("PROBING"))
+		}
+		if cbState.TotalTrips > 0 {
+			fmt.Printf("  %s  %d\n", cli.Bold("Total Trips:"), cbState.TotalTrips)
+		}
+	}
+
 	// Debug mode.
 	if store.ReadDebugFlag() {
 		fmt.Printf("  %s  %s %s\n", cli.Bold("Debug:"), cli.Warn("enabled"), cli.Muted("(via config)"))
