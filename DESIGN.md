@@ -657,7 +657,13 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Rate limiting** — 30-second delay between processing sessions (configurable via `--delay`)
 - **Error isolation** — failed pipeline sessions marked `status: "error"` (retryable via
   `cabrero run <id>`); failed captures marked `status: "capture_failed"` (unrecoverable)
-- **Notifications** — macOS notification via `osascript` when new proposals are generated
+- **Notifications** — macOS notification via `osascript` when new proposals are generated.
+  **TCC note:** `osascript` loads the AppleScript runtime which dynamically loads scripting
+  additions that reference Music, Photos, and Desktop capabilities — triggering macOS TCC
+  prompts attributed to the cabrero binary. Because the binary is ad-hoc signed (`codesign
+  -s -`), each `make install` produces a new code identity and resets macOS TCC decisions,
+  causing the prompts to recur after every release. After allowing/denying, the decision
+  persists until the next install. This is cosmetic — cabrero never accesses these services.
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (2 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
