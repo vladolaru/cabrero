@@ -29,6 +29,7 @@ var commands = []command{
 	{"rollback", "Restore a file to its pre-change content", cmd.RollbackCmd},
 	{"blocklist", "Manage the session blocklist", cmd.Blocklist},
 	{"history", "Show pipeline run history", cmd.History},
+	{"sources", "Manage tracked sources", cmd.Sources},
 	{"calibrate", "Manage calibration set for prompt testing", cmd.Calibrate},
 	{"replay", "Re-run pipeline with a different prompt", cmd.Replay},
 	{"prompts", "List prompt files with versions", cmd.Prompts},
