@@ -1,13 +1,12 @@
 package sources
 
 import (
-	"fmt"
-	"os"
 	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/vladolaru/cabrero/internal/apply"
 	"github.com/vladolaru/cabrero/internal/fitness"
 	"github.com/vladolaru/cabrero/internal/store"
 	"github.com/vladolaru/cabrero/internal/tui/components"
@@ -424,37 +423,11 @@ func (m Model) cursorGroupIdx() int {
 }
 
 // executeRollback loads the change entry, restores the file, and records
-// a rollback audit entry.
+// a rollback audit entry via the shared apply.Rollback function.
 func executeRollback(changeID string) message.RollbackFinished {
-	entry, err := store.GetChange(changeID)
+	_, err := apply.Rollback(changeID)
 	if err != nil {
-		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("load change: %w", err)}
+		return message.RollbackFinished{ChangeID: changeID, Err: err}
 	}
-	if entry == nil {
-		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("change %s not found", changeID)}
-	}
-	if entry.PreviousContent == "" {
-		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("no previous content to restore for %s", changeID)}
-	}
-
-	// Restore file content.
-	if err := os.WriteFile(entry.FilePath, []byte(entry.PreviousContent), 0o644); err != nil {
-		return message.RollbackFinished{ChangeID: changeID, Err: fmt.Errorf("write file: %w", err)}
-	}
-
-	// Record rollback audit entry.
-	rollbackEntry := fitness.ChangeEntry{
-		ID:           "rollback-" + changeID,
-		SourceName:   entry.SourceName,
-		SourceOrigin: entry.SourceOrigin,
-		ProposalID:   entry.ProposalID,
-		Description:  "Rollback of " + changeID,
-		Timestamp:    time.Now(),
-		Status:       "rollback",
-		FilePath:     entry.FilePath,
-	}
-	// Ignore audit write error — rollback itself succeeded.
-	_ = store.AppendChange(rollbackEntry)
-
 	return message.RollbackFinished{ChangeID: changeID}
 }

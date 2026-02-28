@@ -25,6 +25,8 @@ var commands = []command{
 	{"dashboard", "Interactive dashboard", cmdDashboard},
 	{"approve", "Approve and apply a proposal", cmd.Approve},
 	{"reject", "Reject a proposal with optional reason", cmd.Reject},
+	{"defer", "Defer a proposal for later review", cmd.Defer},
+	{"rollback", "Restore a file to its pre-change content", cmd.RollbackCmd},
 	{"calibrate", "Manage calibration set for prompt testing", cmd.Calibrate},
 	{"replay", "Re-run pipeline with a different prompt", cmd.Replay},
 	{"prompts", "List prompt files with versions", cmd.Prompts},
