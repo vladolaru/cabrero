@@ -5,6 +5,16 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `cabrero proposals --status` flag for listing archived proposals by outcome (approved, rejected, deferred, all)
+- `cabrero defer` command for deferring proposals (CLI equivalent of TUI defer action)
+- `cabrero rollback` command for restoring files to pre-change content
+- `cabrero blocklist` command for inspecting and managing blocked sessions (list/add/remove)
+- `cabrero history` command for viewing pipeline run history with filtering
+- `cabrero sources` command for listing and managing tracked sources (list/set-ownership/set-approach)
+
 ## [0.29.0] - 2026-02-28
 
 ### Added

@@ -96,6 +96,14 @@ cabrero proposals               # list pending proposals
 cabrero inspect <proposal_id>   # show proposal with citation chain
 cabrero approve <proposal_id>   # approve and apply
 cabrero reject <proposal_id>    # reject with optional reason
+cabrero proposals --status approved  # list archived proposals by outcome
+cabrero defer <proposal_id>          # defer proposal for later
+cabrero rollback <change_id>         # restore file to pre-change content
+cabrero blocklist list               # show blocked sessions
+cabrero blocklist add <session_id>   # block a session
+cabrero history --status error       # show errored pipeline runs
+cabrero sources list                 # show tracked sources
+cabrero sources set-ownership <name> mine  # set source ownership
 cabrero doctor                  # diagnose issues, --fix to auto-repair
 cabrero reset-breaker           # reset circuit breaker to resume queue processing
 cabrero config list --defaults   # show all config with default annotations

@@ -890,12 +890,31 @@ cabrero run <session_id>        Run the full pipeline on a session
   --evaluator-timeout <duration>  Timeout for Evaluator (default 7m)
 cabrero sessions                List captured sessions with status (processed/pending/error)
 cabrero status                  Show pipeline health: sessions, daemon, hooks
-cabrero proposals               List pending proposals
+cabrero proposals               List proposals (pending by default)
+  --status <filter>               pending, approved, rejected, deferred, culled, all
+  --limit <n>                     Maximum proposals to show (default 50)
 cabrero                         Launch the dashboard TUI (default when no subcommand given)
 cabrero dashboard               Interactive dashboard (same as bare cabrero)
 cabrero inspect <proposal_id>   Show full proposal with citation chain
 cabrero approve <proposal_id>   Approve and apply a proposal (same flow as app)
 cabrero reject <proposal_id>    Reject with optional reason
+cabrero defer <proposal_id>     Defer a proposal for later review
+  --reason "text"                 Optional reason
+  --yes                           Skip confirmation
+cabrero rollback <change_id>    Restore a file to its pre-change content
+  --yes                           Skip confirmation
+cabrero blocklist               Manage the session blocklist
+  list                            Show blocked sessions
+  add <session_id>                Block a session
+  remove <session_id>             Unblock a session
+cabrero history                 Show pipeline run history
+  --status <filter>               Filter by status (processed, error, skipped_busy)
+  --since YYYY-MM-DD              Show records since date
+  --limit <n>                     Maximum records (default 30)
+cabrero sources                 Manage tracked sources
+  list                            Show all sources with ownership and approach
+  set-ownership <name> <value>    Set ownership (mine, not_mine)
+  set-approach <name> <value>     Set approach (iterate, evaluate, paused)
 cabrero import [--from <path>]  Seed store from existing CC session files
                                   Runs pre-parser on each imported session to generate a digest.
                                   RunImport(from, dryRun, quiet) available for programmatic use
