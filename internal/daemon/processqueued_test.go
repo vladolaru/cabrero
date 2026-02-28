@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -348,5 +349,120 @@ func TestCleanDanglingQueued(t *testing.T) {
 				t.Errorf("has-transcript-002 status = %q, want %q", s.Status, store.StatusQueued)
 			}
 		}
+	}
+}
+
+func TestProcessQueued_CircuitBreakerTripsAfterConsecutiveErrors(t *testing.T) {
+	d, spy := setupTestDaemon(t)
+
+	// Override breaker with a low threshold.
+	d.breaker = NewCircuitBreaker(2, 30*time.Minute)
+
+	// Inject classifier that always errors.
+	callCount := 0
+	d.runner = pipeline.NewRunnerWithStages(d.config.Pipeline, pipeline.TestStages{
+		ClassifyFunc: func(sessionID string, cfg pipeline.PipelineConfig) (*pipeline.ClassifierResult, *pipeline.ClaudeResult, error) {
+			callCount++
+			return nil, nil, fmt.Errorf("simulated LLM failure")
+		},
+	})
+	d.runner.Source = "daemon"
+
+	createQueuedSession(t, "cb-session-1")
+	createQueuedSession(t, "cb-session-2")
+	createQueuedSession(t, "cb-session-3")
+
+	d.processQueued(context.Background())
+
+	// Breaker should trip after 2 errors. The 3rd session should NOT be attempted.
+	if callCount > 2 {
+		t.Errorf("expected at most 2 classifier calls, got %d", callCount)
+	}
+
+	if d.breaker.State() != CircuitOpen {
+		t.Errorf("breaker state = %q, want %q", d.breaker.State(), CircuitOpen)
+	}
+
+	if !spy.has("Circuit breaker tripped") {
+		t.Errorf("expected circuit breaker trip notification, got: %v", spy.messages)
+	}
+}
+
+func TestProcessQueued_CircuitBreakerPausesProcessing(t *testing.T) {
+	d, _ := setupTestDaemon(t)
+
+	// Override breaker with a low threshold and pre-trip it.
+	d.breaker = NewCircuitBreaker(2, 30*time.Minute)
+	d.breaker.RecordFailure()
+	d.breaker.RecordFailure()
+
+	if d.breaker.State() != CircuitOpen {
+		t.Fatalf("breaker should be open, got %q", d.breaker.State())
+	}
+
+	// Inject classifier that counts calls.
+	callCount := 0
+	d.runner = pipeline.NewRunnerWithStages(d.config.Pipeline, pipeline.TestStages{
+		ClassifyFunc: func(sessionID string, cfg pipeline.PipelineConfig) (*pipeline.ClassifierResult, *pipeline.ClaudeResult, error) {
+			callCount++
+			return &pipeline.ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &pipeline.ClassifierOutput{SessionID: sessionID, Triage: "clean"},
+			}, nil, nil
+		},
+	})
+	d.runner.Source = "daemon"
+
+	createQueuedSession(t, "cb-paused-session")
+
+	d.processQueued(context.Background())
+
+	// No sessions should be processed — breaker is open.
+	if callCount != 0 {
+		t.Errorf("expected 0 classifier calls (breaker open), got %d", callCount)
+	}
+}
+
+func TestProcessQueued_CircuitBreakerProbesInHalfOpen(t *testing.T) {
+	d, _ := setupTestDaemon(t)
+
+	// Override breaker with a low threshold and very short cooldown.
+	d.breaker = NewCircuitBreaker(2, 1*time.Millisecond)
+	d.breaker.RecordFailure()
+	d.breaker.RecordFailure()
+
+	// Wait for cooldown to elapse so breaker transitions to half-open.
+	time.Sleep(5 * time.Millisecond)
+
+	if d.breaker.State() != CircuitHalfOpen {
+		t.Fatalf("breaker should be half-open, got %q", d.breaker.State())
+	}
+
+	// Inject classifier that counts calls and succeeds.
+	callCount := 0
+	d.runner = pipeline.NewRunnerWithStages(d.config.Pipeline, pipeline.TestStages{
+		ClassifyFunc: func(sessionID string, cfg pipeline.PipelineConfig) (*pipeline.ClassifierResult, *pipeline.ClaudeResult, error) {
+			callCount++
+			return &pipeline.ClassifierResult{
+				Digest:           &parser.Digest{SessionID: sessionID},
+				ClassifierOutput: &pipeline.ClassifierOutput{SessionID: sessionID, Triage: "clean"},
+			}, nil, nil
+		},
+	})
+	d.runner.Source = "daemon"
+
+	createQueuedSession(t, "cb-probe-session-1")
+	createQueuedSession(t, "cb-probe-session-2")
+
+	d.processQueued(context.Background())
+
+	// Only 1 session should be processed (the probe).
+	if callCount != 1 {
+		t.Errorf("expected 1 classifier call (half-open probe), got %d", callCount)
+	}
+
+	// Successful probe should close the breaker.
+	if d.breaker.State() != CircuitClosed {
+		t.Errorf("breaker state after successful probe = %q, want %q", d.breaker.State(), CircuitClosed)
 	}
 }

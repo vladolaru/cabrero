@@ -20,6 +20,8 @@ type Config struct {
 	InterSessionDelay time.Duration           // pause between processing sessions (default 30s)
 	CleanupInterval   time.Duration           // how often to run proposal cleanup (default 24h)
 	MetaInterval      time.Duration           // how often to run the meta-pipeline (default 24h)
+	CircuitBreakerThreshold int               // consecutive errors before tripping (default 5)
+	CircuitBreakerCooldown  time.Duration     // pause duration before probe (default 30m)
 	LogPath           string                  // path to daemon log file
 	LogMaxSize        int64                   // max log file size before rotation (default 5MB)
 	Pipeline          pipeline.PipelineConfig // LLM invocation parameters
@@ -33,6 +35,8 @@ func DefaultConfig() Config {
 		InterSessionDelay: 30 * time.Second,
 		CleanupInterval:   24 * time.Hour,
 		MetaInterval:      24 * time.Hour,
+		CircuitBreakerThreshold: 5,
+		CircuitBreakerCooldown:  30 * time.Minute,
 		LogPath:           filepath.Join(store.Root(), "daemon.log"),
 		LogMaxSize:        0, // use logger default (5 MB)
 		Pipeline:          pipeline.DefaultPipelineConfig(),
@@ -41,9 +45,10 @@ func DefaultConfig() Config {
 
 // Daemon processes sessions automatically in the background.
 type Daemon struct {
-	config Config
-	log    *Logger
-	runner *pipeline.Runner
+	config  Config
+	log     *Logger
+	runner  *pipeline.Runner
+	breaker *CircuitBreaker
 
 	// Testing hook — when nil, the package-level Notify function is used.
 	NotifyFunc func(title, message string) error
@@ -59,7 +64,8 @@ func New(cfg Config) (*Daemon, error) {
 	runner := pipeline.NewRunner(cfg.Pipeline)
 	runner.Source = "daemon"
 	pipeline.InitInvokeSemaphore(cfg.Pipeline.MaxConcurrentInvocations)
-	return &Daemon{config: cfg, log: log, runner: runner}, nil
+	breaker := NewCircuitBreaker(cfg.CircuitBreakerThreshold, cfg.CircuitBreakerCooldown)
+	return &Daemon{config: cfg, log: log, runner: runner, breaker: breaker}, nil
 }
 
 // daemonPipelineLogger adapts the daemon's file-based Logger to the
@@ -159,12 +165,26 @@ func (d *Daemon) processQueued(ctx context.Context) {
 		}
 	}
 
+	if !d.breaker.Allow() {
+		d.log.Info("circuit breaker open: pausing queue processing (%d consecutive errors)",
+			d.breaker.ConsecutiveErrors())
+		return
+	}
+
+	probing := d.breaker.State() == CircuitHalfOpen
+
 	queued, err := ScanQueued()
 	if err != nil {
 		d.log.Error("scanning queued sessions: %v", err)
 		return
 	}
 	if len(queued) == 0 {
+		return
+	}
+
+	if probing {
+		d.log.Info("circuit breaker half-open: probing with session %s", queued[0].SessionID)
+		d.processOne(ctx, queued[0].SessionID)
 		return
 	}
 
@@ -191,6 +211,12 @@ func (d *Daemon) processQueued(ctx context.Context) {
 		default:
 		}
 
+		// Stop processing if the circuit breaker tripped mid-cycle.
+		if !d.breaker.Allow() {
+			d.log.Info("circuit breaker open: stopping mid-cycle processing")
+			return
+		}
+
 		// Rate limit between groups (skip delay before the first one).
 		if !first && d.config.InterSessionDelay > 0 {
 			select {
@@ -208,6 +234,12 @@ func (d *Daemon) processQueued(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				default:
+				}
+
+				// Stop processing if the circuit breaker tripped mid-cycle.
+				if !d.breaker.Allow() {
+					d.log.Info("circuit breaker open: stopping mid-cycle processing")
+					return
 				}
 
 				d.processOne(ctx, s.SessionID)
@@ -279,6 +311,25 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 	d.log.Info("batch: %d of %d session(s) needed evaluation, %d proposals",
 		toEvalCount, len(sessions), totalProposals)
 
+	// Record circuit breaker outcomes from batch results.
+	allErrored := true
+	for _, r := range results {
+		if r.Status != pipeline.HistoryStatusError {
+			allErrored = false
+			break
+		}
+	}
+	if allErrored {
+		d.breaker.RecordFailure()
+		if d.breaker.State() == CircuitOpen {
+			d.log.Error("circuit breaker tripped after %d consecutive errors — pausing queue processing", d.breaker.ConsecutiveErrors())
+			_ = d.notify("Cabrero", fmt.Sprintf("Circuit breaker tripped: %d consecutive pipeline errors. Queue processing paused.", d.breaker.ConsecutiveErrors()))
+			_ = pipeline.AppendCircuitBreakerRecord("trip", d.breaker.ConsecutiveErrors(), "daemon")
+		}
+	} else {
+		d.breaker.RecordSuccess()
+	}
+
 	if totalProposals > 0 {
 		msg := fmt.Sprintf("%d new proposal(s) from %d session(s)", totalProposals, len(sessions))
 		if err := d.notify("Cabrero", msg); err != nil {
@@ -306,6 +357,12 @@ func (d *Daemon) processOne(ctx context.Context, sessionID string) {
 		if markErr := store.MarkError(sessionID); markErr != nil {
 			d.log.Error("marking error for %s: %v", sessionID, markErr)
 		}
+		d.breaker.RecordFailure()
+		if d.breaker.State() == CircuitOpen {
+			d.log.Error("circuit breaker tripped after %d consecutive errors — pausing queue processing", d.breaker.ConsecutiveErrors())
+			_ = d.notify("Cabrero", fmt.Sprintf("Circuit breaker tripped: %d consecutive pipeline errors. Queue processing paused.", d.breaker.ConsecutiveErrors()))
+			_ = pipeline.AppendCircuitBreakerRecord("trip", d.breaker.ConsecutiveErrors(), "daemon")
+		}
 		return
 	}
 
@@ -315,6 +372,8 @@ func (d *Daemon) processOne(ctx context.Context, sessionID string) {
 	}
 
 	d.log.Info("processed %s: %d proposals", sessionID, proposalCount)
+
+	d.breaker.RecordSuccess()
 
 	if proposalCount > 0 {
 		msg := fmt.Sprintf("%d new proposal(s) from session %s", proposalCount, store.ShortSessionID(sessionID))

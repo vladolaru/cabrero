@@ -3,6 +3,7 @@ package pipeline
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -234,6 +235,18 @@ func AppendMetaRecord(status, detail string) error {
 		Source:      "meta",
 		Status:      status,
 		ErrorDetail: detail, // repurposed for meta event context
+	}
+	return AppendHistory(rec)
+}
+
+// AppendCircuitBreakerRecord writes a circuit breaker event to run history.
+func AppendCircuitBreakerRecord(event string, consecutiveErrors int, source string) error {
+	rec := HistoryRecord{
+		SessionID:   "circuit-breaker",
+		Timestamp:   time.Now().UTC(),
+		Source:      source,
+		Status:      "circuit_breaker_" + event,
+		ErrorDetail: fmt.Sprintf("%s: %d consecutive errors", event, consecutiveErrors),
 	}
 	return AppendHistory(rec)
 }
