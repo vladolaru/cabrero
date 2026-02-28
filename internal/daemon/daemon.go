@@ -65,6 +65,15 @@ func New(cfg Config) (*Daemon, error) {
 	runner.Source = "daemon"
 	pipeline.InitInvokeSemaphore(cfg.Pipeline.MaxConcurrentInvocations)
 	breaker := NewCircuitBreaker(cfg.CircuitBreakerThreshold, cfg.CircuitBreakerCooldown)
+	breaker.OnStateChange = func(state string, consecutiveErrs int, totalTrips int, lastTripAt, lastResetAt time.Time) {
+		_ = store.WriteCircuitBreakerState(store.CircuitBreakerState{
+			State:             state,
+			ConsecutiveErrors: consecutiveErrs,
+			TotalTrips:        totalTrips,
+			LastTripAt:        lastTripAt,
+			LastResetAt:       lastResetAt,
+		})
+	}
 	return &Daemon{config: cfg, log: log, runner: runner, breaker: breaker}, nil
 }
 

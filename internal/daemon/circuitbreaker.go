@@ -25,6 +25,9 @@ type CircuitBreaker struct {
 	totalTrips      int
 	lastTripAt      time.Time
 	lastResetAt     time.Time
+
+	// OnStateChange is called when the breaker state transitions. May be nil.
+	OnStateChange func(state string, consecutiveErrs int, totalTrips int, lastTripAt, lastResetAt time.Time)
 }
 
 // NewCircuitBreaker creates a breaker that trips after threshold consecutive
@@ -66,44 +69,76 @@ func (cb *CircuitBreaker) Allow() bool {
 // RecordSuccess records a successful session. Resets consecutive errors
 // and closes the breaker if it was half-open.
 func (cb *CircuitBreaker) RecordSuccess() {
+	var notify bool
 	cb.mu.Lock()
-	defer cb.mu.Unlock()
+	previousState := cb.state
 	cb.consecutiveErrs = 0
 	if cb.state == CircuitHalfOpen {
 		cb.state = CircuitClosed
 		cb.lastResetAt = time.Now()
+	}
+	notify = (cb.state == CircuitClosed && previousState == CircuitHalfOpen)
+	state := cb.state
+	errs := cb.consecutiveErrs
+	trips := cb.totalTrips
+	tripAt := cb.lastTripAt
+	resetAt := cb.lastResetAt
+	cb.mu.Unlock()
+	if notify && cb.OnStateChange != nil {
+		cb.OnStateChange(state, errs, trips, tripAt, resetAt)
 	}
 }
 
 // RecordFailure records a failed session. Trips the breaker if the
 // consecutive error threshold is reached, or re-opens if half-open.
 func (cb *CircuitBreaker) RecordFailure() {
+	var notify bool
 	cb.mu.Lock()
-	defer cb.mu.Unlock()
+	previousState := cb.state
 	if cb.state == CircuitHalfOpen {
 		cb.state = CircuitOpen
 		cb.openedAt = time.Now()
-		return
+	} else if cb.state == CircuitOpen {
+		// already tripped, don't accumulate
+	} else {
+		cb.consecutiveErrs++
+		if cb.consecutiveErrs >= cb.threshold {
+			cb.state = CircuitOpen
+			cb.openedAt = time.Now()
+			cb.totalTrips++
+			cb.lastTripAt = cb.openedAt
+		}
 	}
-	if cb.state == CircuitOpen {
-		return // already tripped, don't accumulate
-	}
-	cb.consecutiveErrs++
-	if cb.consecutiveErrs >= cb.threshold {
-		cb.state = CircuitOpen
-		cb.openedAt = time.Now()
-		cb.totalTrips++
-		cb.lastTripAt = cb.openedAt
+	notify = (cb.state == CircuitOpen && previousState != CircuitOpen)
+	state := cb.state
+	errs := cb.consecutiveErrs
+	trips := cb.totalTrips
+	tripAt := cb.lastTripAt
+	resetAt := cb.lastResetAt
+	cb.mu.Unlock()
+	if notify && cb.OnStateChange != nil {
+		cb.OnStateChange(state, errs, trips, tripAt, resetAt)
 	}
 }
 
 // Reset forces the breaker back to closed state.
 func (cb *CircuitBreaker) Reset() {
+	var notify bool
 	cb.mu.Lock()
-	defer cb.mu.Unlock()
+	previousState := cb.state
 	cb.consecutiveErrs = 0
 	cb.state = CircuitClosed
 	cb.lastResetAt = time.Now()
+	notify = (previousState != CircuitClosed)
+	state := cb.state
+	errs := cb.consecutiveErrs
+	trips := cb.totalTrips
+	tripAt := cb.lastTripAt
+	resetAt := cb.lastResetAt
+	cb.mu.Unlock()
+	if notify && cb.OnStateChange != nil {
+		cb.OnStateChange(state, errs, trips, tripAt, resetAt)
+	}
 }
 
 // ConsecutiveErrors returns the current consecutive error count.
