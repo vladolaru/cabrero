@@ -86,11 +86,11 @@ if command -v claude >/dev/null 2>&1; then
   CC_VERSION=$(claude --version 2>/dev/null || true)
 fi
 
-# Only queue if transcript was successfully copied; otherwise mark as error.
+# Only queue if transcript was successfully copied; otherwise mark as capture_failed.
 if [ "$TRANSCRIPT_COPIED" = "1" ]; then
   SESSION_STATUS="queued"
 else
-  SESSION_STATUS="error"
+  SESSION_STATUS="capture_failed"
 fi
 
 # Write metadata.

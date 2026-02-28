@@ -42,10 +42,11 @@ type PipelineRun struct {
 
 // PipelineStats holds aggregated pipeline statistics.
 type PipelineStats struct {
-	SessionsCaptured   int
-	SessionsProcessed  int
-	SessionsQueued     int
-	SessionsErrored    int
+	SessionsCaptured       int
+	SessionsProcessed      int
+	SessionsQueued         int
+	SessionsErrored        int
+	SessionsCaptureFailed  int
 	ProposalsGenerated int
 	ProposalsApproved  int
 	ProposalsRejected  int
@@ -378,6 +379,8 @@ func GatherPipelineStatsFromSessions(sessions []store.Metadata, runs []PipelineR
 			stats.SessionsQueued++
 		case store.StatusError:
 			stats.SessionsErrored++
+		case store.StatusCaptureFailed:
+			stats.SessionsCaptureFailed++
 		}
 	}
 

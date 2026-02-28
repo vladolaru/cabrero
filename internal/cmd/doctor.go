@@ -1046,7 +1046,7 @@ func (d *doctorRunner) checkPipeline() []checkResult {
 		return results
 	}
 
-	// Sessions in error status.
+	// Sessions in error status (actionable pipeline failures).
 	var errorSessions []store.Metadata
 	for _, s := range sessions {
 		if s.Status == "error" {
@@ -1080,6 +1080,81 @@ func (d *doctorRunner) checkPipeline() []checkResult {
 			category: "Pipeline",
 			status:   checkPass,
 		})
+	}
+
+	// Sessions with failed capture (no transcript, unrecoverable).
+	var captureFailedSessions []store.Metadata
+	for _, s := range sessions {
+		if s.Status == "capture_failed" {
+			captureFailedSessions = append(captureFailedSessions, s)
+		}
+	}
+
+	if len(captureFailedSessions) > 0 {
+		// Check if any error sessions without transcripts could be migrated.
+		var migratableCount int
+		if d.autoFix {
+			for _, s := range errorSessions {
+				if !store.TranscriptExists(s.SessionID) {
+					migratableCount++
+				}
+			}
+		}
+
+		msg := fmt.Sprintf("%d session(s) with failed capture (no transcript)", len(captureFailedSessions))
+		results = append(results, checkResult{
+			name:     "Sessions with failed capture",
+			category: "Pipeline",
+			status:   checkPass,
+			message:  msg,
+		})
+
+		// If --fix and there are error sessions without transcripts, migrate them.
+		if d.autoFix && migratableCount > 0 {
+			migrated := 0
+			for _, s := range errorSessions {
+				if !store.TranscriptExists(s.SessionID) {
+					if err := store.MarkCaptureFailed(s.SessionID); err == nil {
+						migrated++
+					}
+				}
+			}
+			if migrated > 0 {
+				results = append(results, checkResult{
+					name:     "Migrate error→capture_failed",
+					category: "Pipeline",
+					status:   checkPass,
+					message:  fmt.Sprintf("reclassified %d error session(s) without transcripts as capture_failed", migrated),
+				})
+			}
+		}
+	} else {
+		// Even if no capture_failed sessions exist yet, check for migratable error sessions.
+		var migratableErrors []store.Metadata
+		for _, s := range errorSessions {
+			if !store.TranscriptExists(s.SessionID) {
+				migratableErrors = append(migratableErrors, s)
+			}
+		}
+
+		if len(migratableErrors) > 0 {
+			results = append(results, checkResult{
+				name:     "Error sessions without transcripts",
+				category: "Pipeline",
+				status:   checkWarn,
+				message:  fmt.Sprintf("%d error session(s) have no transcript and should be capture_failed", len(migratableErrors)),
+				fixable:  true,
+				fixDesc:  "Reclassify error sessions without transcripts as capture_failed",
+				fix: func() error {
+					for _, s := range migratableErrors {
+						if err := store.MarkCaptureFailed(s.SessionID); err != nil {
+							return fmt.Errorf("marking %s as capture_failed: %w", s.SessionID, err)
+						}
+					}
+					return nil
+				},
+			})
+		}
 	}
 
 	// Sessions stuck in queued status for >24h.

@@ -12,10 +12,11 @@ import (
 
 // Session status values.
 const (
-	StatusQueued    = "queued"
-	StatusImported  = "imported"
-	StatusProcessed = "processed"
-	StatusError     = "error"
+	StatusQueued         = "queued"
+	StatusImported       = "imported"
+	StatusProcessed      = "processed"
+	StatusError          = "error"
+	StatusCaptureFailed  = "capture_failed"
 )
 
 // Metadata stored alongside each raw session backup.
@@ -24,7 +25,7 @@ type Metadata struct {
 	Timestamp      string `json:"timestamp"`
 	CaptureTrigger string `json:"capture_trigger"`
 	CCVersion      string `json:"cc_version,omitempty"`
-	Status         string `json:"status"`              // "queued", "imported", "processed", or "error"
+	Status         string `json:"status"`              // "queued", "imported", "processed", "error", or "capture_failed"
 	Project        string `json:"project,omitempty"`    // CC project slug (parent dir name)
 	WorkDir        string `json:"work_dir,omitempty"`   // working directory from CC hook payload
 }
@@ -135,6 +136,18 @@ func MarkError(sessionID string) error {
 		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
 	}
 	meta.Status = StatusError
+	return WriteMetadata(RawDir(sessionID), meta)
+}
+
+// MarkCaptureFailed sets a session's status to "capture_failed".
+// Used for sessions where the transcript copy failed during hook capture
+// (no transcript available, unrecoverable).
+func MarkCaptureFailed(sessionID string) error {
+	meta, err := ReadMetadata(sessionID)
+	if err != nil {
+		return fmt.Errorf("reading metadata for %s: %w", sessionID, err)
+	}
+	meta.Status = StatusCaptureFailed
 	return WriteMetadata(RawDir(sessionID), meta)
 }
 

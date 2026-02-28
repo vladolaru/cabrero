@@ -259,13 +259,13 @@ func TestCleanDanglingQueued(t *testing.T) {
 		t.Fatalf("cleaned %d sessions, want 1", cleaned)
 	}
 
-	// Verify the old one was marked as error.
+	// Verify the old one was marked as capture_failed.
 	sessions, _ := store.ListSessions()
 	for _, s := range sessions {
 		switch s.SessionID {
 		case "dangling-old-001":
-			if s.Status != store.StatusError {
-				t.Errorf("dangling-old-001 status = %q, want %q", s.Status, store.StatusError)
+			if s.Status != store.StatusCaptureFailed {
+				t.Errorf("dangling-old-001 status = %q, want %q", s.Status, store.StatusCaptureFailed)
 			}
 		case "dangling-fresh-001":
 			if s.Status != store.StatusQueued {

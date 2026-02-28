@@ -37,6 +37,7 @@ func Status(args []string) error {
 		imported := 0
 		processed := 0
 		errored := 0
+		captureFailed := 0
 		for _, s := range sessions {
 			switch s.Status {
 			case "queued":
@@ -47,12 +48,17 @@ func Status(args []string) error {
 				processed++
 			case "error":
 				errored++
+			case "capture_failed":
+				captureFailed++
 			}
 		}
 		statusLine := fmt.Sprintf("  %s  %d captured, %d queued, %d imported, %d processed",
 			cli.Bold("Sessions:"), len(sessions), queued, imported, processed)
 		if errored > 0 {
 			statusLine += fmt.Sprintf(", %s", cli.Error(fmt.Sprintf("%d errored", errored)))
+		}
+		if captureFailed > 0 {
+			statusLine += fmt.Sprintf(", %s", cli.Muted(fmt.Sprintf("%d capture_failed", captureFailed)))
 		}
 		fmt.Println(statusLine)
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 // danglingQueuedThreshold is how long a queued session can remain without a
-// transcript before being marked as errored. Generous to allow for slow
+// transcript before being marked as capture_failed. Generous to allow for slow
 // transcript copies or delayed pre-compact → session-end sequences.
 const danglingQueuedThreshold = 1 * time.Hour
 
@@ -54,7 +54,7 @@ func ScanQueued() ([]QueuedSession, error) {
 	return ready, nil
 }
 
-// CleanDanglingQueued marks queued sessions as errored if they have no
+// CleanDanglingQueued marks queued sessions as capture_failed if they have no
 // transcript and have been queued for longer than danglingQueuedThreshold.
 // This handles cases where the hook wrote metadata but the transcript copy
 // failed. Returns the number of sessions cleaned up.
@@ -85,8 +85,8 @@ func CleanDanglingQueued(log *Logger) int {
 		if now.Sub(ts) < danglingQueuedThreshold {
 			continue
 		}
-		if err := store.MarkError(s.SessionID); err != nil {
-			log.Error("dangling queue cleanup: failed to mark %s as error: %v", s.SessionID, err)
+		if err := store.MarkCaptureFailed(s.SessionID); err != nil {
+			log.Error("dangling queue cleanup: failed to mark %s as capture_failed: %v", s.SessionID, err)
 			continue
 		}
 		cleaned++

@@ -39,6 +39,12 @@ func (m Model) layoutMode() layout {
 func (m Model) SubHeader() string {
 	statsLine := fmt.Sprintf("  captured: %d  ·  processed: %d  ·  queued: %d",
 		m.stats.SessionsCaptured, m.stats.SessionsProcessed, m.stats.SessionsQueued)
+	if m.stats.SessionsErrored > 0 {
+		statsLine += fmt.Sprintf("  ·  errored: %d", m.stats.SessionsErrored)
+	}
+	if m.stats.SessionsCaptureFailed > 0 {
+		statsLine += fmt.Sprintf("  ·  cap.failed: %d", m.stats.SessionsCaptureFailed)
+	}
 	return shared.RenderSubHeader("  Pipeline Monitor", statsLine)
 }
 
@@ -176,7 +182,11 @@ func (m Model) renderActivityStats() string {
 	if mode == layoutNarrow {
 		// Stacked: one stat per line.
 		b.WriteString(fmt.Sprintf("  Captured:  %d   Processed: %d\n", m.stats.SessionsCaptured, m.stats.SessionsProcessed))
-		b.WriteString(fmt.Sprintf("  Queued:    %d   Errored:   %d\n", m.stats.SessionsQueued, m.stats.SessionsErrored))
+		errLine := fmt.Sprintf("  Queued:    %d   Errored:   %d", m.stats.SessionsQueued, m.stats.SessionsErrored)
+		if m.stats.SessionsCaptureFailed > 0 {
+			errLine += fmt.Sprintf("   Cap.fail: %d", m.stats.SessionsCaptureFailed)
+		}
+		b.WriteString(errLine + "\n")
 		b.WriteString(fmt.Sprintf("  Proposals: %d gen  %d ok  %d rej\n", m.stats.ProposalsGenerated, m.stats.ProposalsApproved, m.stats.ProposalsRejected))
 		b.WriteString(fmt.Sprintf("  Tokens:    %s in / %s out  %s",
 			formatTokenCount(m.stats.TotalInputTokens),
@@ -191,8 +201,12 @@ func (m Model) renderActivityStats() string {
 			m.stats.SessionsProcessed, m.stats.ProposalsApproved))
 		b.WriteString(fmt.Sprintf("  Sessions queued:    %-8d Proposals rejected:   %d\n",
 			m.stats.SessionsQueued, m.stats.ProposalsRejected))
-		b.WriteString(fmt.Sprintf("  Sessions errored:   %-8d Proposals pending:    %d\n",
-			m.stats.SessionsErrored, m.stats.ProposalsPending))
+		erroredLine := fmt.Sprintf("  Sessions errored:   %-8d Proposals pending:    %d\n",
+			m.stats.SessionsErrored, m.stats.ProposalsPending)
+		b.WriteString(erroredLine)
+		if m.stats.SessionsCaptureFailed > 0 {
+			b.WriteString(fmt.Sprintf("  Sessions cap.failed:%-8d\n", m.stats.SessionsCaptureFailed))
+		}
 		tokenLeft := fmt.Sprintf("  Tokens: %s in / %s out",
 			formatTokenCount(m.stats.TotalInputTokens),
 			formatTokenCount(m.stats.TotalOutputTokens))

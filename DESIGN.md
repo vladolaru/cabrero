@@ -306,6 +306,7 @@ signals a complete write.
 - **`store.MarkQueued(sessionID)`** — sets a session's status to `"queued"` (ready for daemon).
 - **`store.MarkProcessed(sessionID)`** — sets a session's status to `"processed"`.
 - **`store.MarkError(sessionID)`** — sets a session's status to `"error"`.
+- **`store.MarkCaptureFailed(sessionID)`** — sets a session's status to `"capture_failed"`.
 
 All helpers read the current metadata, update the status field, and write atomically.
 
@@ -320,6 +321,10 @@ Sessions flow through these statuses:
   pre-compact), stale recovery, and `cabrero backfill --enqueue`.
 - **`processed`** — pipeline completed successfully.
 - **`error`** — pipeline failed. Retry with `cabrero run <session_id>`.
+- **`capture_failed`** — transcript copy failed during hook capture. No transcript
+  available, unrecoverable. Separates capture noise from actionable pipeline errors.
+  Set by hooks when transcript copy fails, and by `CleanDanglingQueued` for queued
+  sessions that remain without a transcript past the threshold.
 
 ### JSONL Structure (key facts)
 
@@ -427,9 +432,9 @@ contention:
 
 **Trigger:** The daemon only processes sessions with status `"queued"`. Hook-captured
 sessions (session-end, pre-compact) are written with `"queued"` status when the transcript
-copy succeeds, or `"error"` status when the copy fails — preventing permanently dangling
-queued sessions. Bulk-imported sessions get `"imported"` status and must be explicitly
-enqueued via `cabrero backfill --enqueue`.
+copy succeeds, or `"capture_failed"` status when the copy fails — preventing permanently
+dangling queued sessions. Bulk-imported sessions get `"imported"` status and must be
+explicitly enqueued via `cabrero backfill --enqueue`.
 
 ### Pre-Parser (pure code, no LLM)
 
@@ -650,8 +655,8 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
   `RotateCleanupHistory` runs on startup (90-day retention)
 - **Single instance** — PID file at `~/.cabrero/daemon.pid` prevents concurrent daemons
 - **Rate limiting** — 30-second delay between processing sessions (configurable via `--delay`)
-- **Error isolation** — failed sessions marked `status: "error"` to prevent infinite retry;
-  use `cabrero run <id>` to retry manually
+- **Error isolation** — failed pipeline sessions marked `status: "error"` (retryable via
+  `cabrero run <id>`); failed captures marked `status: "capture_failed"` (unrecoverable)
 - **Notifications** — macOS notification via `osascript` when new proposals are generated
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (2 MB × 3 files)
@@ -887,7 +892,8 @@ cabrero run <session_id>        Run the full pipeline on a session
   --evaluator-max-turns <int>     Max agentic turns for Evaluator (default 20)
   --classifier-timeout <duration> Timeout for Classifier (default 3m)
   --evaluator-timeout <duration>  Timeout for Evaluator (default 7m)
-cabrero sessions                List captured sessions with status (processed/pending/error)
+cabrero sessions                List captured sessions with status
+  --status <filter>               queued, imported, processed, error, capture_failed, all
 cabrero status                  Show pipeline health: sessions, daemon, hooks
 cabrero proposals               List proposals (pending by default)
   --status <filter>               pending, approved, rejected, deferred, culled, all
