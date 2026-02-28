@@ -20,7 +20,7 @@ var commands = []command{
 	{"run", "Run the full pipeline on a session", cmd.Run},
 	{"sessions", "List captured sessions", cmd.Sessions},
 	{"status", "Show pipeline health and store overview", cmd.Status},
-	{"proposals", "List pending proposals", cmd.Proposals},
+	{"proposals", "List proposals (pending by default, --status for archived)", cmd.Proposals},
 	{"inspect", "Show a proposal with full citation chain", cmd.Inspect},
 	{"dashboard", "Interactive dashboard", cmdDashboard},
 	{"approve", "Approve and apply a proposal", cmd.Approve},

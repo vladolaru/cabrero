@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/vladolaru/cabrero/internal/store"
 )
@@ -311,4 +312,87 @@ func writeEvaluation(filename string, v interface{}) error {
 
 func evaluationPath(filename string) string {
 	return filepath.Join(store.Root(), "evaluations", filename)
+}
+
+// ArchivedProposal wraps a proposal with its archive metadata.
+type ArchivedProposal struct {
+	SessionID  string    `json:"sessionId"`
+	Proposal   Proposal  `json:"proposal"`
+	Outcome    string    `json:"outcome"`    // "approved", "rejected", "deferred", "culled", "auto-rejected"
+	ArchivedAt time.Time `json:"archivedAt"`
+	Note       string    `json:"note,omitempty"`
+}
+
+// ListArchivedProposals returns all archived proposal files.
+// Supports both v1 and v2 on-disk formats via dual-read.
+func ListArchivedProposals() ([]ArchivedProposal, error) {
+	dir := filepath.Join(store.Root(), "proposals", "archived")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var results []ArchivedProposal
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+
+		// Decode proposal body (v1/v2 dual-read).
+		pw, err := decodeProposalFile(data)
+		if err != nil {
+			continue
+		}
+
+		// Extract archive metadata from raw JSON.
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(data, &raw); err != nil {
+			continue
+		}
+
+		ap := ArchivedProposal{
+			SessionID: pw.SessionID,
+			Proposal:  pw.Proposal,
+		}
+
+		if outcomeRaw, ok := raw["outcome"]; ok {
+			json.Unmarshal(outcomeRaw, &ap.Outcome)
+		}
+		if ap.Outcome == "" {
+			// Migrate from old archiveReason field.
+			if reasonRaw, ok := raw["archiveReason"]; ok {
+				var reason string
+				json.Unmarshal(reasonRaw, &reason)
+				switch {
+				case reason == "approved":
+					ap.Outcome = "approved"
+				case reason == "deferred":
+					ap.Outcome = "deferred"
+				case strings.HasPrefix(reason, "rejected"):
+					ap.Outcome = "rejected"
+				case strings.HasPrefix(reason, "auto-culled"):
+					ap.Outcome = "culled"
+				default:
+					ap.Outcome = "rejected"
+				}
+			}
+		}
+		if atRaw, ok := raw["archivedAt"]; ok {
+			json.Unmarshal(atRaw, &ap.ArchivedAt)
+		}
+		if noteRaw, ok := raw["note"]; ok {
+			json.Unmarshal(noteRaw, &ap.Note)
+		}
+
+		results = append(results, ap)
+	}
+
+	return results, nil
 }
