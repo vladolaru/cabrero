@@ -98,6 +98,10 @@ cabrero approve <proposal_id>   # approve and apply
 cabrero reject <proposal_id>    # reject with optional reason
 cabrero doctor                  # diagnose issues, --fix to auto-repair
 cabrero reset-breaker           # reset circuit breaker to resume queue processing
+cabrero config list --defaults   # show all config with default annotations
+cabrero config get <key>         # read a single value
+cabrero config set <key> <value> # set a value
+cabrero config unset <key>       # revert to default
 cabrero backfill                # bulk re-process sessions
   --retry-errors                #   include errored sessions
   --enqueue                     #   queue for daemon (non-blocking)

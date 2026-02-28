@@ -5,6 +5,12 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `cabrero config` command for reading and updating system configuration (models,
+  timeouts, circuit breaker, debug flag) with git-config-style `get`/`set`/`unset`/`list`
+
 ## [0.28.1] - 2026-02-28
 
 ### Changed

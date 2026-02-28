@@ -950,9 +950,32 @@ cabrero uninstall               Remove Cabrero from this system
   --yes                           Skip all confirmations
   --keep-data                     Keep ~/.cabrero data directory
   --remove-data                   Remove ~/.cabrero data directory
+cabrero config                  Read or update system configuration
+  get <key>                       Read a config value
+  set <key> <value>               Set a config value
+  unset <key>                     Remove override (revert to default)
+  list [--defaults]               Show all config values with optional default annotations
 cabrero update                  Update Cabrero to latest release from GitHub
   --check                         Check for updates without downloading
 ```
+
+#### Config Keys
+
+The `config` command provides a git-config-style interface for system settings.
+Keys use dot-notation; values are validated by type before writing.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `debug` | bool | `false` | Persist CC sessions for inspection |
+| `classifier.model` | string | `claude-haiku-4-5` | Claude model for classification |
+| `evaluator.model` | string | `claude-sonnet-4-6` | Claude model for evaluation |
+| `classifier.timeout` | duration | `3m` | Classifier invocation timeout |
+| `evaluator.timeout` | duration | `7m` | Evaluator invocation timeout |
+| `circuit-breaker.threshold` | int | `5` | Consecutive errors before circuit opens |
+| `circuit-breaker.cooldown` | duration | `30m` | Cooldown before circuit half-opens |
+
+Values are stored as typed JSON in `~/.cabrero/config.json` alongside TUI settings.
+Setting a key preserves all other fields; unsetting reverts to the compile-time default.
 
 ### Separation of concerns
 
