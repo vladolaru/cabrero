@@ -657,13 +657,16 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Rate limiting** — 30-second delay between processing sessions (configurable via `--delay`)
 - **Error isolation** — failed pipeline sessions marked `status: "error"` (retryable via
   `cabrero run <id>`); failed captures marked `status: "capture_failed"` (unrecoverable)
-- **Notifications** — macOS notification via `osascript` when new proposals are generated.
-  **TCC note:** `osascript` loads the AppleScript runtime which dynamically loads scripting
-  additions that reference Music, Photos, and Desktop capabilities — this can intermittently
-  trigger macOS TCC prompts (Desktop, Music Library, Photos) attributed to the cabrero binary.
-  The prompts are cosmetic — cabrero never accesses these services. The root cause of their
-  intermittent recurrence is not fully understood; they appear regardless of whether a new
-  binary was installed.
+- **Notifications** — macOS notification when new proposals are generated. Uses a compiled
+  Swift helper (`cabrero-notify`) that calls `NSUserNotification` directly, avoiding the
+  AppleScript runtime. Falls back to `osascript` if the helper is not installed.
+  **TCC background:** The original `osascript` approach loaded the AppleScript runtime which
+  auto-loads all installed scripting additions (OSAXes): Standard Additions links CoreAudio
+  and AudioToolbox (→ Music Library TCC), Digital Hub Scripting handles media devices
+  (→ Photos TCC), and Standard Additions declares file commands (→ Desktop TCC). macOS
+  attributes these prompts to cabrero as the "responsible process" for its child processes.
+  The Swift helper avoids this entirely — it links only Foundation and UserNotifications,
+  with no media frameworks.
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (2 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit

@@ -5,6 +5,15 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Replace `osascript` notifications with a compiled Swift helper (`cabrero-notify`) that
+  uses `NSUserNotification` directly, avoiding the AppleScript runtime. `osascript` loaded
+  scripting additions (Standard Additions → CoreAudio/AudioToolbox, Digital Hub → media
+  devices) that intermittently triggered macOS TCC prompts for Desktop, Music Library, and
+  Photos attributed to cabrero
+
 ## [0.31.2] - 2026-02-28
 
 ### Fixed

@@ -1,4 +1,5 @@
 cabrero
+/cabrero-notify
 *.log
 .worktrees
 snapshots/

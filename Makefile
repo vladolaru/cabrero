@@ -2,11 +2,19 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 build:
 	go build -ldflags "-s -w -X main.version=$(VERSION)" -o cabrero .
+	@swiftc -suppress-warnings -o cabrero-notify cmd/cabrero-notify/main.swift 2>/dev/null \
+		&& echo "Built cabrero-notify (Swift notification helper)" \
+		|| echo "Note: Swift not available — notifications will use osascript fallback"
 
 install: build
 	mkdir -p $(HOME)/.cabrero/bin
 	cp cabrero $(HOME)/.cabrero/bin/cabrero
 	@codesign -s - $(HOME)/.cabrero/bin/cabrero 2>/dev/null || true
+	@if [ -f cabrero-notify ]; then \
+		cp cabrero-notify $(HOME)/.cabrero/bin/cabrero-notify; \
+		codesign -s - $(HOME)/.cabrero/bin/cabrero-notify 2>/dev/null || true; \
+		echo "Installed cabrero-notify to ~/.cabrero/bin/"; \
+	fi
 	@echo "Installed to ~/.cabrero/bin/cabrero"
 	@ln -sf $(HOME)/.cabrero/bin/cabrero /usr/local/bin/cabrero 2>/dev/null \
 		&& echo "Symlinked to /usr/local/bin/cabrero" \
