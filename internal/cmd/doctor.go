@@ -920,6 +920,43 @@ func (d *doctorRunner) checkDaemon() []checkResult {
 		}
 	}
 
+	// Circuit breaker state.
+	cbState, err := store.ReadCircuitBreakerState()
+	if err == nil {
+		switch cbState.State {
+		case "closed":
+			results = append(results, checkResult{
+				name:     "Circuit breaker",
+				category: "Daemon",
+				status:   checkPass,
+				message:  "closed (normal operation)",
+			})
+		case "half-open":
+			results = append(results, checkResult{
+				name:     "Circuit breaker",
+				category: "Daemon",
+				status:   checkWarn,
+				message:  fmt.Sprintf("probing recovery (%d total trips)", cbState.TotalTrips),
+			})
+		case "open":
+			results = append(results, checkResult{
+				name:     "Circuit breaker",
+				category: "Daemon",
+				status:   checkFail,
+				message:  fmt.Sprintf("OPEN — %d consecutive errors, %d total trips", cbState.ConsecutiveErrors, cbState.TotalTrips),
+				fixable:  true,
+				fixDesc:  "Reset circuit breaker to resume queue processing",
+				fix: func() error {
+					reset := store.CircuitBreakerState{
+						State:      "closed",
+						TotalTrips: cbState.TotalTrips,
+					}
+					return store.WriteCircuitBreakerState(reset)
+				},
+			})
+		}
+	}
+
 	return results
 }
 
