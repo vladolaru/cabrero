@@ -84,6 +84,30 @@ cabrero status    # daemon running, hooks registered
 
 **Important:** `make install` copies the binary and re-signs it (`codesign -s -`). Without the re-sign step, macOS kills the binary due to an invalidated ad-hoc code signature. If you see `killed` when running cabrero after install, check that the Makefile includes the codesign step.
 
+## CLI Quick Reference
+
+Full details in DESIGN.md § Cabrero CLI. Common operations:
+
+```bash
+cabrero status                  # pipeline health: sessions, daemon, hooks
+cabrero sessions --status error # list sessions by status (queued/imported/processed/error)
+cabrero run <session_id>        # re-process a single session manually
+cabrero proposals               # list pending proposals
+cabrero inspect <proposal_id>   # show proposal with citation chain
+cabrero approve <proposal_id>   # approve and apply
+cabrero reject <proposal_id>    # reject with optional reason
+cabrero doctor                  # diagnose issues, --fix to auto-repair
+cabrero reset-breaker           # reset circuit breaker to resume queue processing
+cabrero backfill                # bulk re-process sessions
+  --retry-errors                #   include errored sessions
+  --enqueue                     #   queue for daemon (non-blocking)
+  --since 2026-02-20            #   date filter
+  --project cabrero             #   project filter
+  --dry-run                     #   preview only
+cabrero replay --session <id> --prompt <path>  # test alternate prompts
+cabrero calibrate tag <id> --label approve     # tag calibration examples
+```
+
 ## Git
 
 - Remote: `git@github.com:vladolaru/cabrero.git`

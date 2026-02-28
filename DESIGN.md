@@ -417,6 +417,13 @@ contention:
   JSON (markdown fences, prose preamble). When parsing fails with a retriable JSON error,
   the stage is re-invoked up to `MaxLLMRetries` times (default 1). Non-JSON errors are
   not retried.
+- **Circuit breaker** — the daemon tracks consecutive pipeline errors. When the count
+  reaches the threshold (default 5, configurable via `circuitBreakerThreshold` in
+  `config.json`), queue processing pauses and a macOS notification fires. After a cooldown
+  period (default 30m, configurable via `circuitBreakerCooldown`), a single probe session
+  is processed: success resumes normal operation, failure extends the pause. State is
+  persisted to `circuit_breaker.json` for visibility via `cabrero status` and `cabrero
+  doctor`. Manual override: `cabrero reset-breaker`.
 
 **Trigger:** The daemon only processes sessions with status `"queued"`. Hook-captured
 sessions (session-end, pre-compact) are written with `"queued"` status when the transcript

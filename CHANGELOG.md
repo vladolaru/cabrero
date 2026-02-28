@@ -5,6 +5,15 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Circuit breaker for daemon queue processing — pauses after consecutive pipeline errors,
+  auto-recovers via cooldown probe, prevents wasting LLM calls on systemic failures
+- `cabrero reset-breaker` command to manually resume processing
+- Circuit breaker state shown in `cabrero status` (when tripped) and `cabrero doctor`
+- `circuitBreakerThreshold` and `circuitBreakerCooldown` config.json options
+
 ## [0.27.4] - 2026-02-27
 
 ### Fixed
