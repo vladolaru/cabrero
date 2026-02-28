@@ -86,28 +86,38 @@ source ~/.zshrc
 Enough intro. Here's a rundown of what the CLI gives you:
 
 ```
-cabrero setup       Set everything up (hooks, daemon, configuration)
-cabrero status      Check health: store, hooks, daemon, sessions
-cabrero sessions    Browse captured sessions
-cabrero run         Run the analysis pipeline on a specific session
-cabrero proposals   See what Cabrero is suggesting
-cabrero inspect     Drill into a proposal with full evidence chain
-cabrero             Interactive dashboard (the good stuff)
-cabrero dashboard   Same as above, explicit form
-cabrero approve     Approve and apply a proposal (non-interactive)
-cabrero reject      Reject a proposal with optional reason
-cabrero backfill    Process existing sessions through the full pipeline
-cabrero doctor      Diagnose issues and auto-fix problems
-cabrero update      Self-update to the latest release
-cabrero uninstall   Clean removal of Cabrero from your system
-cabrero daemon      Background processor (managed by launchd)
+cabrero              Interactive dashboard (the good stuff)
+cabrero status       Check health: store, hooks, daemon, sessions
+cabrero sessions     Browse captured sessions
+cabrero run          Run the analysis pipeline on a specific session
+cabrero proposals    See what Cabrero is suggesting (--status for archived)
+cabrero inspect      Drill into a proposal with full evidence chain
+cabrero approve      Approve and apply a proposal
+cabrero reject       Reject a proposal with optional reason
+cabrero defer        Defer a proposal for later review
+cabrero rollback     Restore a file to its pre-change content
+cabrero blocklist    Manage the session blocklist (list/add/remove)
+cabrero history      Show pipeline run history with filtering
+cabrero sources      Manage tracked sources (list/set-ownership/set-approach)
+cabrero config       Read or update system configuration (get/set/unset/list)
+cabrero backfill     Process existing sessions through the full pipeline
+cabrero calibrate    Manage calibration set for prompt testing
+cabrero replay       Re-run pipeline with a different prompt
+cabrero prompts      List prompt files with versions
+cabrero import       Seed the store from existing CC session files
+cabrero reset-breaker Reset circuit breaker to resume queue processing
+cabrero setup        Set everything up (hooks, daemon, configuration)
+cabrero doctor       Diagnose issues and auto-fix problems
+cabrero update       Self-update to the latest release
+cabrero uninstall    Clean removal of Cabrero from your system
+cabrero daemon       Background processor (managed by launchd)
 ```
 
 Run `cabrero help` for the full list with flags and options.
 
 ## The Review TUI
 
-This is where most of the interaction happens. `cabrero review` launches an interactive terminal interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) that brings together everything the pipeline produces.
+This is where most of the interaction happens. `cabrero` (or `cabrero dashboard`) launches an interactive terminal interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) that brings together everything the pipeline produces.
 
 ### Dashboard
 
