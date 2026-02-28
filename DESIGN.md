@@ -381,7 +381,7 @@ constrained tool access (Read, Grep). Apply stage uses `--print` (non-agentic).
 - **Environment:** `CLAUDECODE` and other CC-internal env vars are stripped (via `cleanClaudeEnv()`); `CABRERO_SESSION=1` is added to prevent loop capture by hooks
 - **CWD:** `os.TempDir()` — prevents CC's project-discovery walk-up from `~/.cabrero/` into `~/`, which triggers macOS TCC prompts for `~/Desktop`, `~/Music`, etc.
 - **MCP isolation:** `--mcp-config '{"mcpServers":{}}'` with `--strict-mcp-config` — ignores all other MCP sources (plugins, user settings, project config)
-- **Settings overrides:** `--settings '{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}'` — disables hooks, extended thinking, and plugins
+- **Settings overrides:** `--settings '{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}'` — disables hooks, extended thinking, and plugins. Exception: Evaluator enables `alwaysThinkingEnabled: true` with `--effort medium` for higher-quality proposal evaluation
 - **Slash commands:** `--disable-slash-commands`
 
 See `docs/subprocess-isolation.md` for the complete isolation model including per-mode specifics and known leaks.

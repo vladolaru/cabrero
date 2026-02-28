@@ -77,17 +77,18 @@ func runEvaluatorCore(sessionID string, digest *parser.Digest, classifierOutput 
 		}
 
 		cr, err = invokeClaude(claudeConfig{
-			Model:          cfg.EvaluatorModel,
-			SystemPrompt:   systemPrompt,
-			Effort:         "high",
-			Agentic:        true,
-			Prompt:         data,
-			AllowedTools:   allowedTools,
-			MaxTurns:       cfg.EvaluatorMaxTurns,
-			Timeout:        cfg.EvaluatorTimeout,
-			Debug:          cfg.Debug,
-			Logger:         cfg.logger(),
-			PermissionMode: "dontAsk",
+			Model:           cfg.EvaluatorModel,
+			SystemPrompt:    systemPrompt,
+			Effort:          "medium",
+			ThinkingEnabled: true,
+			Agentic:         true,
+			Prompt:          data,
+			AllowedTools:    allowedTools,
+			MaxTurns:        cfg.EvaluatorMaxTurns,
+			Timeout:         cfg.EvaluatorTimeout,
+			Debug:           cfg.Debug,
+			Logger:          cfg.logger(),
+			PermissionMode:  "dontAsk",
 		})
 		if err != nil {
 			return nil, cr, fmt.Errorf("invoking evaluator: %w", err)
@@ -189,17 +190,18 @@ func RunEvaluatorBatch(sessions []BatchSession, cfg PipelineConfig) (*EvaluatorO
 		}
 
 		cr, err = invokeClaude(claudeConfig{
-			Model:          cfg.EvaluatorModel,
-			SystemPrompt:   systemPrompt,
-			Effort:         "high",
-			Agentic:        true,
-			Prompt:         prompt,
-			AllowedTools:   allowedTools,
-			MaxTurns:       maxTurns,
-			Timeout:        timeout,
-			Debug:          cfg.Debug,
-			Logger:         log,
-			PermissionMode: "dontAsk",
+			Model:           cfg.EvaluatorModel,
+			SystemPrompt:    systemPrompt,
+			Effort:          "medium",
+			ThinkingEnabled: true,
+			Agentic:         true,
+			Prompt:          prompt,
+			AllowedTools:    allowedTools,
+			MaxTurns:        maxTurns,
+			Timeout:         timeout,
+			Debug:           cfg.Debug,
+			Logger:          log,
+			PermissionMode:  "dontAsk",
 		})
 		if err != nil {
 			return nil, cr, fmt.Errorf("invoking evaluator batch: %w", err)

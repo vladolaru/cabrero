@@ -79,7 +79,7 @@ Applied to **all** subprocess invocations (pipeline, chat, blend):
 | `--disable-slash-commands` | Disables all skills | No user skills fire inside subprocesses. |
 | `--mcp-config '{"mcpServers":{}}'` | Empty MCP server list | Must include `mcpServers` key — bare `{}` silently crashes CLI 2.1.59+. |
 | `--strict-mcp-config` | Only servers from `--mcp-config` | Ignores plugins, user settings, project `.mcp.json`. Combined with empty config = zero MCP servers. |
-| `--settings '{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}'` | Override user settings | Suppresses hooks, prevents extended thinking (cost/latency), attempts to disable plugins. |
+| `--settings '{"disableAllHooks": true, "alwaysThinkingEnabled": false, "enabledPlugins": {}}'` | Override user settings | Suppresses hooks, prevents extended thinking (cost/latency), attempts to disable plugins. Evaluator overrides `alwaysThinkingEnabled` to `true` with `--effort medium` for higher-quality proposal evaluation. |
 
 ## Per-Mode Flags
 
