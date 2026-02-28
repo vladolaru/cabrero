@@ -97,6 +97,7 @@ func StartChat(question string, cfg ChatConfig, firstMessage bool) tea.Cmd {
 
 		cmd := exec.CommandContext(ctx, "claude", args...)
 		var stderrBuf bytes.Buffer
+		cmd.Dir = os.TempDir() // prevent CC project discovery from walking up to ~ and triggering macOS TCC prompts
 		cmd.Env = cleanClaudeEnv()
 		cmd.Stdin = strings.NewReader(question)
 		cmd.Stderr = &stderrBuf
