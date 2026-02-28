@@ -185,6 +185,10 @@ func (d *Daemon) processQueued(ctx context.Context) {
 	if probing {
 		d.log.Info("circuit breaker half-open: probing with session %s", queued[0].SessionID)
 		d.processOne(ctx, queued[0].SessionID)
+		if d.breaker.State() == CircuitClosed {
+			d.log.Info("circuit breaker recovered after successful probe")
+			_ = pipeline.AppendCircuitBreakerRecord("reset", 0, "daemon")
+		}
 		return
 	}
 
