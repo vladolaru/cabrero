@@ -5,6 +5,13 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.1] - 2026-02-28
+
+### Changed
+- Evaluator now runs with extended thinking enabled (`--effort medium`,
+  `alwaysThinkingEnabled: true`) for higher-quality proposal evaluation.
+  All other pipeline stages remain with thinking disabled for cost/latency.
+
 ## [0.28.0] - 2026-02-28
 
 ### Added
@@ -1122,6 +1129,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.28.1]: https://github.com/vladolaru/cabrero/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/vladolaru/cabrero/compare/v0.27.4...v0.28.0
 [0.27.4]: https://github.com/vladolaru/cabrero/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/vladolaru/cabrero/compare/v0.27.2...v0.27.3
