@@ -659,11 +659,11 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
   `cabrero run <id>`); failed captures marked `status: "capture_failed"` (unrecoverable)
 - **Notifications** — macOS notification via `osascript` when new proposals are generated.
   **TCC note:** `osascript` loads the AppleScript runtime which dynamically loads scripting
-  additions that reference Music, Photos, and Desktop capabilities — triggering macOS TCC
-  prompts attributed to the cabrero binary. Because the binary is ad-hoc signed (`codesign
-  -s -`), each `make install` produces a new code identity and resets macOS TCC decisions,
-  causing the prompts to recur after every release. After allowing/denying, the decision
-  persists until the next install. This is cosmetic — cabrero never accesses these services.
+  additions that reference Music, Photos, and Desktop capabilities — this can intermittently
+  trigger macOS TCC prompts (Desktop, Music Library, Photos) attributed to the cabrero binary.
+  The prompts are cosmetic — cabrero never accesses these services. The root cause of their
+  intermittent recurrence is not fully understood; they appear regardless of whether a new
+  binary was installed.
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (2 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit
