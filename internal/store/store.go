@@ -236,6 +236,62 @@ func IsBlocked(sessionID string) bool {
 	return m[sessionID]
 }
 
+// ReadBlocklistEntries returns the full blocklist with timestamps.
+func ReadBlocklistEntries() (map[string]BlocklistEntry, error) {
+	blocklistMu.Lock()
+	defer blocklistMu.Unlock()
+
+	return readBlocklistEntries()
+}
+
+func readBlocklistEntries() (map[string]BlocklistEntry, error) {
+	data, err := os.ReadFile(blocklistPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return make(map[string]BlocklistEntry), nil
+		}
+		return nil, err
+	}
+	trimmed := strings.TrimSpace(string(data))
+	if strings.HasPrefix(trimmed, "[") {
+		// Old array format — convert to entries with zero timestamps.
+		var ids []string
+		if err := json.Unmarshal(data, &ids); err != nil {
+			return nil, fmt.Errorf("parsing old-format blocklist: %w", err)
+		}
+		entries := make(map[string]BlocklistEntry, len(ids))
+		for _, id := range ids {
+			entries[id] = BlocklistEntry{}
+		}
+		return entries, nil
+	}
+	var entries map[string]BlocklistEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, fmt.Errorf("parsing blocklist: %w", err)
+	}
+	return entries, nil
+}
+
+// UnblockSession removes a session ID from the blocklist.
+// Returns true if the session was found and removed, false if it wasn't blocked.
+func UnblockSession(sessionID string) (bool, error) {
+	blocklistMu.Lock()
+	defer blocklistMu.Unlock()
+
+	entries, err := readBlocklistEntries()
+	if err != nil {
+		return false, err
+	}
+	if _, exists := entries[sessionID]; !exists {
+		return false, nil
+	}
+	delete(entries, sessionID)
+	if err := writeBlocklistEntries(entries); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // RotateBlocklist removes blocklist entries older than maxAge.
 // Returns the number of entries removed and rewrites the file atomically.
 // Entries with a zero BlockedAt (migrated from old format) are treated as
