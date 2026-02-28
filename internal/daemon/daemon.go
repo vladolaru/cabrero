@@ -165,13 +165,13 @@ func (d *Daemon) processQueued(ctx context.Context) {
 		}
 	}
 
-	if !d.breaker.Allow() {
+	currentState := d.breaker.State()
+	if currentState == CircuitOpen {
 		d.log.Info("circuit breaker open: pausing queue processing (%d consecutive errors)",
 			d.breaker.ConsecutiveErrors())
 		return
 	}
-
-	probing := d.breaker.State() == CircuitHalfOpen
+	probing := currentState == CircuitHalfOpen
 
 	queued, err := ScanQueued()
 	if err != nil {
@@ -216,7 +216,7 @@ func (d *Daemon) processQueued(ctx context.Context) {
 		}
 
 		// Stop processing if the circuit breaker tripped mid-cycle.
-		if !d.breaker.Allow() {
+		if d.breaker.State() == CircuitOpen {
 			d.log.Info("circuit breaker open: stopping mid-cycle processing")
 			return
 		}
@@ -241,7 +241,7 @@ func (d *Daemon) processQueued(ctx context.Context) {
 				}
 
 				// Stop processing if the circuit breaker tripped mid-cycle.
-				if !d.breaker.Allow() {
+				if d.breaker.State() == CircuitOpen {
 					d.log.Info("circuit breaker open: stopping mid-cycle processing")
 					return
 				}
@@ -315,23 +315,19 @@ func (d *Daemon) processProjectBatch(ctx context.Context, project string, sessio
 	d.log.Info("batch: %d of %d session(s) needed evaluation, %d proposals",
 		toEvalCount, len(sessions), totalProposals)
 
-	// Record circuit breaker outcomes from batch results.
-	allErrored := true
+	// Record circuit breaker outcomes per-session from batch results.
 	for _, r := range results {
-		if r.Status != pipeline.HistoryStatusError {
-			allErrored = false
-			break
+		if r.Status == pipeline.HistoryStatusError {
+			d.breaker.RecordFailure()
+			if d.breaker.State() == CircuitOpen {
+				d.log.Error("circuit breaker tripped after %d consecutive errors — pausing queue processing", d.breaker.ConsecutiveErrors())
+				_ = d.notify("Cabrero", fmt.Sprintf("Circuit breaker tripped: %d consecutive pipeline errors. Queue processing paused.", d.breaker.ConsecutiveErrors()))
+				_ = pipeline.AppendCircuitBreakerRecord("trip", d.breaker.ConsecutiveErrors(), "daemon")
+				return
+			}
+		} else {
+			d.breaker.RecordSuccess()
 		}
-	}
-	if allErrored {
-		d.breaker.RecordFailure()
-		if d.breaker.State() == CircuitOpen {
-			d.log.Error("circuit breaker tripped after %d consecutive errors — pausing queue processing", d.breaker.ConsecutiveErrors())
-			_ = d.notify("Cabrero", fmt.Sprintf("Circuit breaker tripped: %d consecutive pipeline errors. Queue processing paused.", d.breaker.ConsecutiveErrors()))
-			_ = pipeline.AppendCircuitBreakerRecord("trip", d.breaker.ConsecutiveErrors(), "daemon")
-		}
-	} else {
-		d.breaker.RecordSuccess()
 	}
 
 	if totalProposals > 0 {

@@ -41,6 +41,12 @@ const GateReasonPaused = "paused_source"
 
 // --- Meta event status constants ---
 
+// HistoryStatusCircuitBreakerTrip indicates a circuit breaker trip event.
+const HistoryStatusCircuitBreakerTrip = "circuit_breaker_trip"
+
+// HistoryStatusCircuitBreakerReset indicates a circuit breaker reset event.
+const HistoryStatusCircuitBreakerReset = "circuit_breaker_reset"
+
 // HistoryStatusMetaTriggered indicates a meta analysis was triggered and run.
 const HistoryStatusMetaTriggered = "meta_triggered"
 

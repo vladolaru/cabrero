@@ -70,9 +70,11 @@ func setupTestDaemon(t *testing.T) (*Daemon, *notifySpy) {
 
 	logPath := filepath.Join(dir, "daemon.log")
 	cfg := Config{
-		LogPath:           logPath,
-		InterSessionDelay: 0,
-		Pipeline:          pipeline.DefaultPipelineConfig(),
+		LogPath:                 logPath,
+		InterSessionDelay:       0,
+		CircuitBreakerThreshold: 5,
+		CircuitBreakerCooldown:  30 * time.Minute,
+		Pipeline:                pipeline.DefaultPipelineConfig(),
 	}
 
 	d, err := New(cfg)
