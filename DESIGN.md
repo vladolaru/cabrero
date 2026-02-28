@@ -653,7 +653,6 @@ Implementation TBD: menu bar app, Raycast extension, or simple TUI.
 - **Error isolation** — failed sessions marked `status: "error"` to prevent infinite retry;
   use `cabrero run <id>` to retry manually
 - **Notifications** — macOS notification via `osascript` when new proposals are generated
-  and when queue processing completes
 - **Logging** — timestamped log at `~/.cabrero/daemon.log` with size-based rotation
   (2 MB × 3 files)
 - **Graceful shutdown** — responds to SIGTERM/SIGINT, finishes current session before exit

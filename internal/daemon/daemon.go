@@ -289,13 +289,6 @@ func (d *Daemon) processQueued(ctx context.Context) {
 
 		d.processProjectBatch(ctx, project, sessions)
 	}
-
-	// Re-scan before notifying — new sessions may have arrived during processing.
-	if remaining, err := ScanQueued(); err == nil && len(remaining) == 0 {
-		if err := d.notify("Cabrero", "Queue processing complete"); err != nil {
-			d.log.Error("queue-drain notification failed: %v", err)
-		}
-	}
 }
 
 // processProjectBatch runs the Classifier individually on each session in a project,
