@@ -30,6 +30,7 @@ var commands = []command{
 	{"prompts", "List prompt files with versions", cmd.Prompts},
 	{"import", "Seed the store from existing CC session files", cmd.Import},
 	{"backfill", "Run pipeline on existing sessions with date/project filtering", cmd.Backfill},
+	{"reset-breaker", "Reset circuit breaker to resume queue processing", cmd.ResetBreaker},
 	{"daemon", "Run background session processor (for launchd)", cmd.Daemon},
 	{"setup", "Install and configure Cabrero", cmdSetup},
 	{"update", "Update Cabrero to latest release", cmdUpdate},

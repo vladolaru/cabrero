@@ -402,6 +402,15 @@ func TestProcessQueued_CircuitBreakerPausesProcessing(t *testing.T) {
 		t.Fatalf("breaker should be open, got %q", d.breaker.State())
 	}
 
+	// Persist the open state so the external-reset check in processQueued
+	// sees "open" and does not reset the in-memory breaker.
+	if err := store.WriteCircuitBreakerState(store.CircuitBreakerState{
+		State:             CircuitOpen,
+		ConsecutiveErrors: d.breaker.ConsecutiveErrors(),
+	}); err != nil {
+		t.Fatalf("WriteCircuitBreakerState: %v", err)
+	}
+
 	// Inject classifier that counts calls.
 	callCount := 0
 	d.runner = pipeline.NewRunnerWithStages(d.config.Pipeline, pipeline.TestStages{
@@ -438,6 +447,17 @@ func TestProcessQueued_CircuitBreakerProbesInHalfOpen(t *testing.T) {
 
 	if d.breaker.State() != CircuitHalfOpen {
 		t.Fatalf("breaker should be half-open, got %q", d.breaker.State())
+	}
+
+	// Persist the open state so the external-reset check in processQueued
+	// sees "open" (not "closed") and does not reset the in-memory breaker.
+	// The breaker will naturally transition to half-open via State() once the
+	// cooldown has elapsed, which processQueued observes on the next State() call.
+	if err := store.WriteCircuitBreakerState(store.CircuitBreakerState{
+		State:             CircuitOpen,
+		ConsecutiveErrors: d.breaker.ConsecutiveErrors(),
+	}); err != nil {
+		t.Fatalf("WriteCircuitBreakerState: %v", err)
 	}
 
 	// Inject classifier that counts calls and succeeds.

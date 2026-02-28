@@ -184,6 +184,14 @@ func (d *Daemon) processQueued(ctx context.Context) {
 		}
 	}
 
+	// Check if breaker was reset externally (e.g., via "cabrero reset-breaker").
+	if cbState, err := store.ReadCircuitBreakerState(); err == nil {
+		if cbState.State == "closed" && d.breaker.State() != CircuitClosed {
+			d.log.Info("circuit breaker reset externally — resuming processing")
+			d.breaker.Reset()
+		}
+	}
+
 	currentState := d.breaker.State()
 	if currentState == CircuitOpen {
 		d.log.Info("circuit breaker open: pausing queue processing (%d consecutive errors)",
