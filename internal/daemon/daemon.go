@@ -29,18 +29,28 @@ type Config struct {
 
 // DefaultConfig returns a Config with production defaults.
 func DefaultConfig() Config {
-	return Config{
-		PollInterval:      2 * time.Minute,
-		StaleInterval:     30 * time.Minute,
-		InterSessionDelay: 30 * time.Second,
-		CleanupInterval:   24 * time.Hour,
-		MetaInterval:      24 * time.Hour,
+	cfg := Config{
+		PollInterval:            2 * time.Minute,
+		StaleInterval:           30 * time.Minute,
+		InterSessionDelay:       30 * time.Second,
+		CleanupInterval:         24 * time.Hour,
+		MetaInterval:            24 * time.Hour,
 		CircuitBreakerThreshold: 5,
 		CircuitBreakerCooldown:  30 * time.Minute,
-		LogPath:           filepath.Join(store.Root(), "daemon.log"),
-		LogMaxSize:        0, // use logger default (5 MB)
-		Pipeline:          pipeline.DefaultPipelineConfig(),
+		LogPath:                 filepath.Join(store.Root(), "daemon.log"),
+		LogMaxSize:              0, // use logger default (5 MB)
+		Pipeline:                pipeline.DefaultPipelineConfig(),
 	}
+	cbOverrides := store.ReadCircuitBreakerOverrides()
+	if cbOverrides.Threshold > 0 {
+		cfg.CircuitBreakerThreshold = cbOverrides.Threshold
+	}
+	if cbOverrides.Cooldown != "" {
+		if d, err := time.ParseDuration(cbOverrides.Cooldown); err == nil {
+			cfg.CircuitBreakerCooldown = d
+		}
+	}
+	return cfg
 }
 
 // Daemon processes sessions automatically in the background.

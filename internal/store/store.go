@@ -291,11 +291,13 @@ func RotateBlocklist(maxAge time.Duration) (int, error) {
 
 // storeConfig is the minimal subset of config.json needed by store-level helpers.
 type storeConfig struct {
-	Debug             bool   `json:"debug"`
-	ClassifierModel   string `json:"classifierModel"`
-	EvaluatorModel    string `json:"evaluatorModel"`
-	ClassifierTimeout string `json:"classifierTimeout"`
-	EvaluatorTimeout  string `json:"evaluatorTimeout"`
+	Debug                   bool   `json:"debug"`
+	ClassifierModel         string `json:"classifierModel"`
+	EvaluatorModel          string `json:"evaluatorModel"`
+	ClassifierTimeout       string `json:"classifierTimeout"`
+	EvaluatorTimeout        string `json:"evaluatorTimeout"`
+	CircuitBreakerThreshold int    `json:"circuitBreakerThreshold"`
+	CircuitBreakerCooldown  string `json:"circuitBreakerCooldown"` // e.g. "30m", "1h"
 }
 
 // readConfig reads and parses config.json once.
@@ -335,6 +337,21 @@ func ReadPipelineOverrides() PipelineOverrides {
 		EvaluatorModel:    cfg.EvaluatorModel,
 		ClassifierTimeout: cfg.ClassifierTimeout,
 		EvaluatorTimeout:  cfg.EvaluatorTimeout,
+	}
+}
+
+// CircuitBreakerOverrides holds optional circuit breaker overrides from config.json.
+type CircuitBreakerOverrides struct {
+	Threshold int    `json:"circuitBreakerThreshold"`
+	Cooldown  string `json:"circuitBreakerCooldown"`
+}
+
+// ReadCircuitBreakerOverrides reads circuit breaker overrides from config.json.
+func ReadCircuitBreakerOverrides() CircuitBreakerOverrides {
+	cfg := readConfig()
+	return CircuitBreakerOverrides{
+		Threshold: cfg.CircuitBreakerThreshold,
+		Cooldown:  cfg.CircuitBreakerCooldown,
 	}
 }
 
