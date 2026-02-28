@@ -5,6 +5,11 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.1] - 2026-02-28
+
+### Fixed
+- `cabrero doctor --fix` now correctly runs the capture_failed migration (was shown as advisory instead of fixable issue)
+
 ## [0.31.0] - 2026-02-28
 
 ### Added
@@ -1157,6 +1162,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 - Parser emits `[]` instead of `null` for empty slices
 - Pipeline disables skills and tools in LLM invocations
 
+[0.31.1]: https://github.com/vladolaru/cabrero/compare/v0.31.0...v0.31.1
 [0.31.0]: https://github.com/vladolaru/cabrero/compare/v0.30.1...v0.31.0
 [0.30.1]: https://github.com/vladolaru/cabrero/compare/v0.30.0...v0.30.1
 [0.30.0]: https://github.com/vladolaru/cabrero/compare/v0.29.0...v0.30.0

@@ -1141,7 +1141,7 @@ func (d *doctorRunner) checkPipeline() []checkResult {
 			results = append(results, checkResult{
 				name:     "Error sessions without transcripts",
 				category: "Pipeline",
-				status:   checkWarn,
+				status:   checkFail,
 				message:  fmt.Sprintf("%d error session(s) have no transcript and should be capture_failed", len(migratableErrors)),
 				fixable:  true,
 				fixDesc:  "Reclassify error sessions without transcripts as capture_failed",
