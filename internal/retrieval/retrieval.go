@@ -13,8 +13,9 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
-// maxScanBuffer is 10 MB to handle large JSONL lines (tool results can be 100KB+).
-const maxScanBuffer = 10 * 1024 * 1024
+// maxScanBuffer is 20 MB — must match or exceed the parser's buffer to avoid
+// silently stopping at oversized lines that the parser handles successfully.
+const maxScanBuffer = 20 * 1024 * 1024
 
 // uuidField is the minimal struct for extracting just the uuid from a JSONL line.
 type uuidField struct {
