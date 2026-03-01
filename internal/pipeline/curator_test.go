@@ -169,17 +169,15 @@ func TestCleanLLMJSONArray(t *testing.T) {
 	}
 }
 
-func TestCuratorAllowedToolsAreScoped(t *testing.T) {
-	// Verify the curator uses path-scoped tools, not bare "Read,Grep".
-	tools := curatorAllowedTools("/home/user/projects/myapp/CLAUDE.md")
-	if tools == "Read,Grep" {
-		t.Error("curator tools should be path-scoped, not bare Read,Grep")
+func TestCuratorUsesNonAgenticMode(t *testing.T) {
+	// The Curator switched from agentic to --print mode to avoid output
+	// truncation. This test verifies the prompt doesn't reference tools.
+	prompt := defaultCuratorPrompt
+	if strings.Contains(prompt, "Read tool") {
+		t.Error("curator prompt should not reference Read tool (now uses --print mode with pre-read file)")
 	}
-	if !strings.Contains(tools, "Read(//") {
-		t.Errorf("curator tools should contain path-scoped Read, got: %s", tools)
-	}
-	if !strings.Contains(tools, "Grep(//") {
-		t.Errorf("curator tools should contain path-scoped Grep, got: %s", tools)
+	if strings.Contains(prompt, "tool-call rounds") {
+		t.Error("curator prompt should not reference tool-call budget (now uses --print mode)")
 	}
 }
 

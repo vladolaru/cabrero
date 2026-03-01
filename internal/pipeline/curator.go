@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/vladolaru/cabrero/internal/store"
 )
 
 // IsFileTarget returns true if target looks like a filesystem path
@@ -265,6 +263,9 @@ func runCuratorChunked(target string, proposals []ProposalWithSession, cfg Pipel
 }
 
 // runCuratorSingle processes one chunk of proposals through the Curator LLM.
+// Uses non-agentic --print mode with pre-read file content to maximize
+// output token budget (agentic mode spent turns on tool calls, leaving
+// insufficient budget for large JSON manifests).
 // Includes retry logic for non-deterministic JSON parse failures.
 func runCuratorSingle(target string, proposals []ProposalWithSession, cfg PipelineConfig) (*CuratorManifest, *ClaudeResult, error) {
 	if err := EnsureCuratorPrompts(); err != nil {
@@ -275,14 +276,19 @@ func runCuratorSingle(target string, proposals []ProposalWithSession, cfg Pipeli
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading curator prompt: %w", err)
 	}
-	systemPrompt = strings.ReplaceAll(systemPrompt, "{{MAX_TURNS}}", fmt.Sprintf("%d", cfg.CuratorMaxTurns))
 
-	// Serialize proposals as the user prompt.
+	// Pre-read the target file so the LLM doesn't need tool access.
+	fileContent := readFileOrEmpty(target)
+
+	// Build the stdin payload: target, file content, and proposals.
 	proposalData, err := json.MarshalIndent(proposals, "", "  ")
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshaling proposals: %w", err)
 	}
-	userPrompt := fmt.Sprintf("Target: %s\n\nProposals:\n%s", target, string(proposalData))
+	var input strings.Builder
+	fmt.Fprintf(&input, "Target: %s\n\n", target)
+	fmt.Fprintf(&input, "<current_file_content>\n%s\n</current_file_content>\n\n", fileContent)
+	fmt.Fprintf(&input, "Proposals:\n%s", string(proposalData))
 
 	log := cfg.logger()
 	var cr *ClaudeResult
@@ -295,10 +301,8 @@ func runCuratorSingle(target string, proposals []ProposalWithSession, cfg Pipeli
 		cr, err = invokeClaude(claudeConfig{
 			Model:        cfg.CuratorModel,
 			SystemPrompt: systemPrompt,
-			Agentic:      true,
-			Prompt:       userPrompt,
-			AllowedTools: curatorAllowedTools(target),
-			MaxTurns:     cfg.CuratorMaxTurns,
+			Agentic:      false,
+			Stdin:        strings.NewReader(input.String()),
 			Timeout:      cfg.CuratorTimeout,
 			Logger:       cfg.Logger,
 			Debug:        cfg.Debug,
@@ -327,25 +331,3 @@ func runCuratorSingle(target string, proposals []ProposalWithSession, cfg Pipeli
 	return nil, cr, fmt.Errorf("curator exhausted retries for %s", target)
 }
 
-// curatorAllowedTools builds a path-scoped --allowedTools value for the curator.
-// Scopes access to the target file's directory and ~/.cabrero.
-func curatorAllowedTools(target string) string {
-	cabreroRoot := store.Root()
-	paths := []string{
-		fmt.Sprintf("Read(//%s/**)", cabreroRoot),
-		fmt.Sprintf("Grep(//%s/**)", cabreroRoot),
-	}
-
-	// Add the target file's parent directory.
-	if target != "" {
-		targetDir := filepath.Dir(target)
-		if targetDir != "" && targetDir != "." {
-			paths = append(paths,
-				fmt.Sprintf("Read(//%s/**)", targetDir),
-				fmt.Sprintf("Grep(//%s/**)", targetDir),
-			)
-		}
-	}
-
-	return strings.Join(paths, ",")
-}

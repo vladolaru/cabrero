@@ -169,7 +169,7 @@ and the TUI import from here instead of reimplementing settings logic inline.
   prompts/
     classifier-v3.txt        # Classifier stage prompt (v3: agentic with Read/Grep, triage, turn budget)
     evaluator-v3.txt         # Evaluator stage prompt (v3: agentic with unrestricted Read/Grep, turn budget)
-    curator-v1.txt           # Curator stage prompt (cluster synthesis + rank-and-cull)
+    curator-v2.txt           # Curator stage prompt (cluster synthesis + rank-and-cull)
     curator-check-v1.txt     # Curator batch-check prompt (Haiku "already applied?" check)
   replays/
     {replayId}/
@@ -503,11 +503,12 @@ tool access. Apply and chat stages remain non-agentic.
   Runs on approval only — infrequent, quality-critical. Non-agentic (`--print`).
 - **Evaluator** — chat: interactive proposal interrogation in the TUI. Latency-
   sensitive; fast enough to feel conversational. Non-agentic (`--print`).
-- **Curator** (`claude-sonnet-4-6`) — agentic curator with `Read,Grep` access, isolated
+- **Curator** (`claude-sonnet-4-6`) — non-agentic (`--print`) curator, isolated
   via the standard subprocess isolation model (see above). Runs once per multi-proposal
-  target group in the daily cleanup. Receives the full proposal list for that target as its
-  user prompt. Identifies concern clusters, produces a `CuratorManifest` with per-proposal
-  decisions and synthesized proposals. Max 15 turns, 5-minute timeout.
+  target group in the daily cleanup. Receives the proposal list and pre-read target file
+  content via stdin. Identifies concern clusters, produces a `CuratorManifest` with
+  per-proposal decisions and synthesized proposals. 5-minute timeout. Groups larger than
+  `DefaultCuratorChunkSize` (8) are split into independent sub-invocations.
 - **Curator check** (`claude-haiku-4-5`) — non-agentic (`--print`) batch check. Receives
   all single-proposal file-target proposals as a JSON array with full file content embedded.
   Returns a `CheckDecision` array indicating which proposals are already applied. One call
@@ -713,14 +714,15 @@ low-signal redundancy, and auto-rejecting proposals that have already been appli
   array indicating which proposals are already applied.
 - Already-applied proposals are archived immediately. The rest are left for the next cycle.
 
-**Stage 2 — Sonnet Curator** (agentic, one session per multi-proposal target):
-- Groups proposals by target. Targets with 2+ non-scaffold proposals get a Curator session.
+**Stage 2 — Sonnet Curator** (non-agentic `--print`, one call per chunk):
+- Groups proposals by target. Targets with 2+ non-scaffold proposals get a Curator call.
 - Scaffold proposals are never sent to the Curator — they bypass grouping into the check list.
+- **Pre-read:** The target file is read by Go code and included in the prompt (in
+  `<current_file_content>` tags). This avoids agentic tool calls and gives the model its
+  full output token budget for the JSON manifest.
 - **Chunking:** Groups larger than `DefaultCuratorChunkSize` (8) are split into sub-groups.
-  Each chunk is processed as an independent Curator invocation, then manifests are merged.
-  This prevents output truncation that occurs with large proposal groups.
-- Each Curator session receives the proposal list as its user prompt. The Curator reads the
-  target file using its `Read` tool, identifies concern clusters, and returns a `CuratorManifest`.
+  Each chunk is processed as an independent invocation, then manifests are merged.
+  Partial failures are tolerated — remaining chunks still proceed.
 - **Retry logic:** JSON parse failures are retried once (same as classifier/evaluator), since
   truncated or malformed output is non-deterministic and often succeeds on retry.
 - The daemon's `applyManifest` interprets decisions: `cull`/`auto-reject` → archive original;
@@ -728,7 +730,7 @@ low-signal redundancy, and auto-rejecting proposals that have already been appli
 - All Curator sessions run in parallel (goroutines), sharing the existing invoke semaphore
   for backpressure.
 
-**Isolation:** Curator sessions use the same subprocess isolation as all pipeline stages —
+**Isolation:** Curator calls use the same subprocess isolation as all pipeline stages —
 `--strict-mcp-config`, `--settings` overrides, and `CABRERO_SESSION=1`. The Curator should
 not be influenced by the same skill infrastructure it is evaluating. See
 `docs/subprocess-isolation.md` for details.

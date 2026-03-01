@@ -13,8 +13,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (Sonnet). Previously only ran on the daemon's 24h ticker, which reset on every restart.
 
 ### Fixed
+- Curator switched from agentic mode to `--print` mode with pre-read file content — agentic
+  tool calls consumed the output token budget, causing truncated JSON on large proposal groups
 - Curator now chunks large proposal groups (>8 proposals per target) into sub-groups to
-  prevent JSON output truncation that caused "unexpected end of JSON input" failures
+  keep output within reliable bounds; partial failures are tolerated
 - Curator now retries on JSON parse failures (same as classifier/evaluator), recovering
   from non-deterministic truncated or malformed LLM output
 - Curator logs raw output on JSON parse failure for debugging future issues
