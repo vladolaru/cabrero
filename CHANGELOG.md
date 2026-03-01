@@ -5,6 +5,18 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.32.1] - 2026-03-02
+
+### Fixed
+- Parser now skips progress entries (CC streaming status updates) before processing — in
+  large sessions these were 80%+ of all entries (e.g. 2535 of 3111), inflating digest size
+  and causing downstream Classifier failures. Digest size for affected sessions drops ~80%
+- Parser scan buffer increased from 10 MB to 20 MB to handle transcript lines up to ~14 MB
+  (large tool outputs with full-file reads or base64 images)
+- Retrieval scan buffer increased to 20 MB to match parser — the previous 10 MB limit caused
+  UUID lookups to silently stop at oversized lines, making valid Classifier citations appear
+  as hallucinations and triggering the >50% invalid UUID safety check
+
 ## [0.32.0] - 2026-03-01
 
 ### Added
@@ -1225,6 +1237,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 [0.20.0]: https://github.com/vladolaru/cabrero/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/vladolaru/cabrero/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vladolaru/cabrero/compare/v0.17.0...v0.18.0
+[0.32.1]: https://github.com/vladolaru/cabrero/compare/v0.32.0...v0.32.1
 [0.17.0]: https://github.com/vladolaru/cabrero/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/vladolaru/cabrero/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vladolaru/cabrero/compare/v0.15.0...v0.16.0
