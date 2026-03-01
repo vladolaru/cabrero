@@ -12,6 +12,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   for already-applied status (Haiku), then clusters and synthesizes multi-target groups
   (Sonnet). Previously only ran on the daemon's 24h ticker, which reset on every restart.
 
+### Fixed
+- Curator now chunks large proposal groups (>8 proposals per target) into sub-groups to
+  prevent JSON output truncation that caused "unexpected end of JSON input" failures
+- Curator now retries on JSON parse failures (same as classifier/evaluator), recovering
+  from non-deterministic truncated or malformed LLM output
+- Curator logs raw output on JSON parse failure for debugging future issues
+
 ### Changed
 - Move `GroupProposalsByTarget` to `pipeline` package as a single canonical implementation
   (was duplicated between daemon and CLI)

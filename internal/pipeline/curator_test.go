@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -189,5 +190,44 @@ func TestNewProposalTypes_Defined(t *testing.T) {
 	}
 	if TypePipelineInsight != "pipeline_insight" {
 		t.Errorf("TypePipelineInsight = %q", TypePipelineInsight)
+	}
+}
+
+func TestDefaultCuratorChunkSize(t *testing.T) {
+	if DefaultCuratorChunkSize < 2 {
+		t.Errorf("DefaultCuratorChunkSize = %d, must be >= 2", DefaultCuratorChunkSize)
+	}
+	if DefaultCuratorChunkSize > 15 {
+		t.Errorf("DefaultCuratorChunkSize = %d, should be <= CuratorMaxTurns (15)", DefaultCuratorChunkSize)
+	}
+}
+
+func TestGroupProposalsByTarget_LargeGroupChunkable(t *testing.T) {
+	// Verify that GroupProposalsByTarget can produce groups larger than
+	// DefaultCuratorChunkSize, which RunCuratorGroup will chunk.
+	proposals := make([]ProposalWithSession, 0, 12)
+	for i := 0; i < 12; i++ {
+		change := fmt.Sprintf("change %d", i)
+		proposals = append(proposals, ProposalWithSession{
+			Proposal: Proposal{
+				ID:     fmt.Sprintf("prop-%d", i),
+				Type:   "claude_addition",
+				Target: "/Users/test/.claude/CLAUDE.md",
+				Change: &change,
+			},
+		})
+	}
+
+	multi, _ := GroupProposalsByTarget(proposals)
+	group, ok := multi["/Users/test/.claude/CLAUDE.md"]
+	if !ok {
+		t.Fatal("expected multi-target group for CLAUDE.md")
+	}
+	if len(group) != 12 {
+		t.Errorf("group size = %d, want 12", len(group))
+	}
+	// RunCuratorGroup would split this into 2 chunks of 8+4.
+	if len(group) <= DefaultCuratorChunkSize {
+		t.Errorf("group size %d should exceed DefaultCuratorChunkSize %d for this test", len(group), DefaultCuratorChunkSize)
 	}
 }

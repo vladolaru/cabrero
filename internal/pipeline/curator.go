@@ -194,14 +194,79 @@ type CheckDecision struct {
 	Reason         string `json:"reason"`
 }
 
+// DefaultCuratorChunkSize is the maximum number of proposals per Curator
+// invocation. Larger groups are split into chunks to keep the LLM output
+// within reliable bounds and reduce truncation failures.
+const DefaultCuratorChunkSize = 8
+
 // RunCuratorGroup invokes an agentic Sonnet Curator session for a single target group.
 // proposals must all target the same file.
 // Returns the CuratorManifest, LLM usage, and any error.
+//
+// Groups larger than DefaultCuratorChunkSize are split into chunks, each
+// processed as an independent Curator invocation. Manifests are merged.
 func RunCuratorGroup(target string, proposals []ProposalWithSession, cfg PipelineConfig) (*CuratorManifest, *ClaudeResult, error) {
 	if len(proposals) == 0 {
 		return nil, nil, nil
 	}
 
+	// Chunk large groups to keep LLM output within reliable bounds.
+	if len(proposals) > DefaultCuratorChunkSize {
+		return runCuratorChunked(target, proposals, cfg)
+	}
+
+	return runCuratorSingle(target, proposals, cfg)
+}
+
+// runCuratorChunked splits a large proposal group into chunks of
+// DefaultCuratorChunkSize, processes each independently, and merges results.
+func runCuratorChunked(target string, proposals []ProposalWithSession, cfg PipelineConfig) (*CuratorManifest, *ClaudeResult, error) {
+	log := cfg.logger()
+	log.Info("  Splitting %d proposals for %s into chunks of %d", len(proposals), target, DefaultCuratorChunkSize)
+
+	merged := &CuratorManifest{Target: target}
+	var totalUsage ClaudeResult
+	var lastErr error
+
+	for i := 0; i < len(proposals); i += DefaultCuratorChunkSize {
+		end := i + DefaultCuratorChunkSize
+		if end > len(proposals) {
+			end = len(proposals)
+		}
+		chunk := proposals[i:end]
+		chunkIdx := i/DefaultCuratorChunkSize + 1
+
+		manifest, cr, err := runCuratorSingle(target, chunk, cfg)
+		if cr != nil {
+			totalUsage.InputTokens += cr.InputTokens
+			totalUsage.OutputTokens += cr.OutputTokens
+			totalUsage.CacheCreationTokens += cr.CacheCreationTokens
+			totalUsage.CacheReadTokens += cr.CacheReadTokens
+			totalUsage.TotalCostUSD += cr.TotalCostUSD
+			totalUsage.SessionID = cr.SessionID // last chunk's session ID
+		}
+		if err != nil {
+			log.Error("  Chunk %d failed for %s: %v", chunkIdx, target, err)
+			lastErr = err
+			continue // try remaining chunks
+		}
+		if manifest != nil {
+			merged.Decisions = append(merged.Decisions, manifest.Decisions...)
+			merged.Clusters = append(merged.Clusters, manifest.Clusters...)
+		}
+	}
+
+	// If ALL chunks failed, return the last error.
+	if len(merged.Decisions) == 0 && lastErr != nil {
+		return nil, &totalUsage, lastErr
+	}
+
+	return merged, &totalUsage, nil
+}
+
+// runCuratorSingle processes one chunk of proposals through the Curator LLM.
+// Includes retry logic for non-deterministic JSON parse failures.
+func runCuratorSingle(target string, proposals []ProposalWithSession, cfg PipelineConfig) (*CuratorManifest, *ClaudeResult, error) {
 	if err := EnsureCuratorPrompts(); err != nil {
 		return nil, nil, fmt.Errorf("ensuring curator prompts: %w", err)
 	}
@@ -219,28 +284,47 @@ func RunCuratorGroup(target string, proposals []ProposalWithSession, cfg Pipelin
 	}
 	userPrompt := fmt.Sprintf("Target: %s\n\nProposals:\n%s", target, string(proposalData))
 
-	cr, err := invokeClaude(claudeConfig{
-		Model:          cfg.CuratorModel,
-		SystemPrompt:   systemPrompt,
-		Agentic:        true,
-		Prompt:         userPrompt,
-		AllowedTools:   curatorAllowedTools(target),
-		MaxTurns:       cfg.CuratorMaxTurns,
-		Timeout:        cfg.CuratorTimeout,
-		Logger:         cfg.Logger,
-		Debug:          cfg.Debug,
-	})
-	if err != nil {
-		return nil, cr, fmt.Errorf("curator invocation for %s: %w", target, err)
+	log := cfg.logger()
+	var cr *ClaudeResult
+	maxAttempts := 1 + cfg.MaxLLMRetries
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			log.Info("  Curator: retrying after JSON parse failure (attempt %d/%d) for %s", attempt+1, maxAttempts, target)
+		}
+
+		cr, err = invokeClaude(claudeConfig{
+			Model:        cfg.CuratorModel,
+			SystemPrompt: systemPrompt,
+			Agentic:      true,
+			Prompt:       userPrompt,
+			AllowedTools: curatorAllowedTools(target),
+			MaxTurns:     cfg.CuratorMaxTurns,
+			Timeout:      cfg.CuratorTimeout,
+			Logger:       cfg.Logger,
+			Debug:        cfg.Debug,
+		})
+		if err != nil {
+			return nil, cr, fmt.Errorf("curator invocation for %s: %w", target, err)
+		}
+
+		cleaned := cleanLLMJSON(cr.Result)
+		var manifest CuratorManifest
+		if err := json.Unmarshal([]byte(cleaned), &manifest); err != nil {
+			parseErr := fmt.Errorf("parsing curator manifest for %s: invalid JSON: %w", target, err)
+			// Log raw output for debugging.
+			log.Error("  Curator: JSON parse failed for %s: %v\n  Raw output (first 500 chars): %s",
+				target, err, truncateForLog(cleaned, 500))
+			if attempt < maxAttempts-1 && isRetriableJSONError(parseErr.Error()) {
+				continue
+			}
+			return nil, cr, parseErr
+		}
+		manifest.Target = target // ensure target is set even if LLM omitted it
+		return &manifest, cr, nil
 	}
 
-	cleaned := cleanLLMJSON(cr.Result)
-	var manifest CuratorManifest
-	if err := json.Unmarshal([]byte(cleaned), &manifest); err != nil {
-		return nil, cr, fmt.Errorf("parsing curator manifest for %s: %w", target, err)
-	}
-	manifest.Target = target // ensure target is set even if LLM omitted it
-	return &manifest, cr, nil
+	// Should not reach here, but satisfy the compiler.
+	return nil, cr, fmt.Errorf("curator exhausted retries for %s", target)
 }
 
 // curatorAllowedTools builds a path-scoped --allowedTools value for the curator.

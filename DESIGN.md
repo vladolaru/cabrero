@@ -716,8 +716,13 @@ low-signal redundancy, and auto-rejecting proposals that have already been appli
 **Stage 2 — Sonnet Curator** (agentic, one session per multi-proposal target):
 - Groups proposals by target. Targets with 2+ non-scaffold proposals get a Curator session.
 - Scaffold proposals are never sent to the Curator — they bypass grouping into the check list.
+- **Chunking:** Groups larger than `DefaultCuratorChunkSize` (8) are split into sub-groups.
+  Each chunk is processed as an independent Curator invocation, then manifests are merged.
+  This prevents output truncation that occurs with large proposal groups.
 - Each Curator session receives the proposal list as its user prompt. The Curator reads the
   target file using its `Read` tool, identifies concern clusters, and returns a `CuratorManifest`.
+- **Retry logic:** JSON parse failures are retried once (same as classifier/evaluator), since
+  truncated or malformed output is non-deterministic and often succeeds on retry.
 - The daemon's `applyManifest` interprets decisions: `cull`/`auto-reject` → archive original;
   `synthesize` → archive original, write new synthesized proposal; `keep` → no action.
 - All Curator sessions run in parallel (goroutines), sharing the existing invoke semaphore
