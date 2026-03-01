@@ -27,6 +27,56 @@ func IsFileTarget(target string) bool {
 	return false
 }
 
+// PreservedProposalTypes lists proposal types that are never synthesized or
+// culled by the Curator. They always bypass curation.
+var PreservedProposalTypes = map[string]bool{
+	"skill_scaffold":    true,
+	TypePromptImprovement: true,
+	TypePipelineInsight:   true,
+}
+
+// GroupProposalsByTarget separates proposals into:
+//   - multi: targets with 2+ non-preserved proposals (map from target → proposals)
+//   - single: file-target proposals that are the only proposal for their target
+//
+// Preserved types (scaffolds, prompt improvements, pipeline insights) in multi
+// targets are moved to single — they are never curated.
+// Non-file targets are excluded from single (no "already applied?" check possible).
+func GroupProposalsByTarget(proposals []ProposalWithSession) (
+	multi map[string][]ProposalWithSession,
+	single []ProposalWithSession,
+) {
+	byTarget := make(map[string][]ProposalWithSession)
+	for _, pw := range proposals {
+		byTarget[pw.Proposal.Target] = append(byTarget[pw.Proposal.Target], pw)
+	}
+
+	multi = make(map[string][]ProposalWithSession)
+	for target, group := range byTarget {
+		var nonPreserved, preserved []ProposalWithSession
+		for _, pw := range group {
+			if PreservedProposalTypes[pw.Proposal.Type] {
+				preserved = append(preserved, pw)
+			} else {
+				nonPreserved = append(nonPreserved, pw)
+			}
+		}
+		for _, pw := range preserved {
+			if IsFileTarget(pw.Proposal.Target) {
+				single = append(single, pw)
+			}
+		}
+		if len(nonPreserved) >= 2 {
+			multi[target] = nonPreserved
+		} else if len(nonPreserved) == 1 {
+			if IsFileTarget(nonPreserved[0].Proposal.Target) {
+				single = append(single, nonPreserved[0])
+			}
+		}
+	}
+	return multi, single
+}
+
 // CheckItem is one entry in the Haiku batch check prompt.
 type CheckItem struct {
 	ProposalID         string `json:"proposalId"`

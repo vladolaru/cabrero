@@ -1,59 +1,86 @@
-package daemon
+package cmd
 
 import (
-	"context"
+	"flag"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/vladolaru/cabrero/internal/apply"
+	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/pipeline"
 )
 
-// performCleanup runs the daily proposal cleanup:
-//  1. Batched Haiku check for all single-proposal file-target proposals.
-//  2. Parallelized Sonnet Curator for each multi-proposal target group.
-//  3. Archives culled/rejected proposals and writes synthesized proposals.
-//  4. Appends a CleanupRecord to cleanup_history.jsonl.
-//  5. Sends a macOS notification with the summary.
-func (d *Daemon) performCleanup(ctx context.Context) {
-	runStart := time.Now()
+// Curate runs the Curator pipeline on demand: checks single-target proposals
+// for already-applied status, then clusters and synthesizes multi-target groups.
+func Curate(args []string) error {
+	fs := flag.NewFlagSet("curate", flag.ExitOnError)
+	dryRun := fs.Bool("dry-run", false, "show what would be curated without making changes")
+	fs.Parse(args)
 
 	proposals, err := pipeline.ListProposals()
 	if err != nil {
-		d.log.Error("cleanup: listing proposals: %v", err)
-		return
+		return fmt.Errorf("listing proposals: %w", err)
 	}
 	if len(proposals) == 0 {
-		d.log.Info("cleanup: no proposals to process")
-		return
+		fmt.Println("No pending proposals to curate.")
+		return nil
 	}
-
-	d.log.Info("cleanup: starting (%d proposals)", len(proposals))
 
 	multi, single := pipeline.GroupProposalsByTarget(proposals)
 
+	fmt.Println(cli.Bold("Curate Proposals"))
+	fmt.Println(cli.Muted("════════════════════════════════════════"))
+	fmt.Println()
+	fmt.Printf("  %s  %d pending proposals\n", cli.Bold("Total:"), len(proposals))
+	fmt.Printf("  %s  %d (Haiku batch check: already applied?)\n", cli.Bold("Single-target:"), len(single))
+
+	multiCount := 0
+	for _, g := range multi {
+		multiCount += len(g)
+	}
+	fmt.Printf("  %s  %d across %d targets (Sonnet Curator: cluster + synthesize)\n",
+		cli.Bold("Multi-target:"), multiCount, len(multi))
+	fmt.Println()
+
+	if *dryRun {
+		if len(multi) > 0 {
+			fmt.Println(cli.Bold("Multi-proposal targets:"))
+			for target, group := range multi {
+				fmt.Printf("  %s (%d proposals)\n", cli.Muted(target), len(group))
+			}
+			fmt.Println()
+		}
+		fmt.Println(cli.Muted("Dry run — no changes made."))
+		return nil
+	}
+
+	// Initialize the invoke semaphore for CLI usage.
+	cfg := pipeline.DefaultPipelineConfig()
+	pipeline.InitInvokeSemaphore(cfg.MaxConcurrentInvocations)
+
+	runStart := time.Now()
 	var allDecisions []pipeline.CuratorDecision
 	var curatorUsages []pipeline.InvocationUsage
 	var checkUsage *pipeline.InvocationUsage
 
-	// Stage 1: Haiku batch check for single-proposal targets.
+	// Stage 1: Haiku batch check for single-target proposals.
 	if len(single) > 0 {
-		checkDecisions, cr, err := pipeline.RunCuratorCheck(single, d.config.Pipeline)
+		fmt.Printf("Stage 1: checking %d single-target proposals...", len(single))
+		checkDecisions, cr, err := pipeline.RunCuratorCheck(single, cfg)
 		if err != nil {
-			d.log.Error("cleanup: curator check failed: %v", err)
-			// Non-fatal: continue with multi-proposal curation.
+			fmt.Printf(" %s\n", cli.Error(fmt.Sprintf("failed: %v", err)))
 		} else {
 			if cr != nil {
 				u := pipeline.InvocationUsageFromResult(cr)
 				checkUsage = &u
 			}
-			// Apply check decisions.
+			autoRejected := 0
 			for _, cd := range checkDecisions {
 				if cd.AlreadyApplied {
 					reason := "auto-culled: already applied to target"
 					if archErr := apply.Archive(cd.ProposalID, apply.OutcomeAutoRejected, reason); archErr != nil {
-						d.log.Error("cleanup: archiving %s: %v", cd.ProposalID, archErr)
+						fmt.Printf("\n  %s archiving %s: %v\n", cli.Error("error"), cd.ProposalID, archErr)
 						continue
 					}
 					allDecisions = append(allDecisions, pipeline.CuratorDecision{
@@ -61,6 +88,7 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 						Action:     "auto-reject",
 						Reason:     reason,
 					})
+					autoRejected++
 				} else {
 					allDecisions = append(allDecisions, pipeline.CuratorDecision{
 						ProposalID: cd.ProposalID,
@@ -69,11 +97,14 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 					})
 				}
 			}
+			fmt.Printf(" done (%d already applied, %d kept)\n", autoRejected, len(checkDecisions)-autoRejected)
 		}
 	}
 
 	// Stage 2: Sonnet Curator for multi-proposal targets (parallelized).
 	if len(multi) > 0 {
+		fmt.Printf("Stage 2: curating %d multi-proposal targets...\n", len(multi))
+
 		type curatorResult struct {
 			target   string
 			manifest *pipeline.CuratorManifest
@@ -84,18 +115,11 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 		resultsCh := make(chan curatorResult, len(multi))
 		var wg sync.WaitGroup
 
-	curatorLoop:
 		for target, group := range multi {
-			select {
-			case <-ctx.Done():
-				break curatorLoop
-			default:
-			}
-
 			wg.Add(1)
 			go func(t string, g []pipeline.ProposalWithSession) {
 				defer wg.Done()
-				manifest, cr, err := pipeline.RunCuratorGroup(t, g, d.config.Pipeline)
+				manifest, cr, err := pipeline.RunCuratorGroup(t, g, cfg)
 				resultsCh <- curatorResult{target: t, manifest: manifest, cr: cr, err: err}
 			}(target, group)
 		}
@@ -105,7 +129,7 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 
 		for res := range resultsCh {
 			if res.err != nil {
-				d.log.Error("cleanup: curator for %s: %v", res.target, res.err)
+				fmt.Printf("  %s %s: %v\n", cli.Error("error"), res.target, res.err)
 				continue
 			}
 			if res.cr != nil {
@@ -115,17 +139,29 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 				continue
 			}
 
-			// Apply manifest decisions.
-			if err := d.applyManifest(res.manifest); err != nil {
-				d.log.Error("cleanup: applying manifest for %s: %v", res.target, err)
+			if err := applyManifest(res.manifest); err != nil {
+				fmt.Printf("  %s applying manifest for %s: %v\n", cli.Error("error"), res.target, err)
 				continue
 			}
 			allDecisions = append(allDecisions, res.manifest.Decisions...)
-			d.log.Info("cleanup: target %s — %d decisions", res.target, len(res.manifest.Decisions))
+
+			kept, culled, synthesized := 0, 0, 0
+			for _, d := range res.manifest.Decisions {
+				switch d.Action {
+				case "keep":
+					kept++
+				case "cull", "auto-reject":
+					culled++
+				case "synthesize":
+					synthesized++
+				}
+			}
+			fmt.Printf("  %s: %d kept, %d culled, %d synthesized\n",
+				cli.Muted(res.target), kept, culled, synthesized)
 		}
 	}
 
-	// Count outcome.
+	// Summary.
 	after, _ := pipeline.ListProposals()
 	archived := 0
 	synthesized := 0
@@ -139,8 +175,11 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 	}
 
 	duration := time.Since(runStart)
-	d.log.Info("cleanup: complete in %s — %d→%d proposals (%d archived, %d synthesized new)",
-		duration.Round(time.Second), len(proposals), len(after), archived, synthesized)
+
+	fmt.Println()
+	fmt.Printf("%s  %d → %d proposals (%d archived, %d synthesized) in %s\n",
+		cli.Bold("Done:"), len(proposals), len(after), archived, synthesized,
+		duration.Round(time.Second))
 
 	// Append cleanup record.
 	rec := pipeline.CleanupRecord{
@@ -153,48 +192,40 @@ func (d *Daemon) performCleanup(ctx context.Context) {
 		CheckUsage:      checkUsage,
 	}
 	if err := pipeline.AppendCleanupHistory(rec); err != nil {
-		d.log.Error("cleanup: appending history: %v", err)
+		return fmt.Errorf("appending cleanup history: %w", err)
 	}
 
-	// Notify.
-	msg := fmt.Sprintf("Cleanup: %d→%d proposals (%d archived)", len(proposals), len(after), archived)
-	if err := d.notify("Cabrero", msg); err != nil {
-		d.log.Error("cleanup notification failed: %v", err)
-	}
+	return nil
 }
 
 // applyManifest archives culled/rejected proposals and writes synthesized proposals.
-func (d *Daemon) applyManifest(manifest *pipeline.CuratorManifest) error {
-	// Process decisions.
+func applyManifest(manifest *pipeline.CuratorManifest) error {
 	for _, dec := range manifest.Decisions {
 		switch dec.Action {
 		case "cull":
 			reason := "auto-culled: " + dec.Reason
 			if err := apply.Archive(dec.ProposalID, apply.OutcomeCulled, reason); err != nil {
-				d.log.Error("cleanup: archiving %s: %v", dec.ProposalID, err)
+				return err
 			}
 		case "auto-reject":
 			reason := "auto-culled: " + dec.Reason
 			if err := apply.Archive(dec.ProposalID, apply.OutcomeAutoRejected, reason); err != nil {
-				d.log.Error("cleanup: archiving %s: %v", dec.ProposalID, err)
+				return err
 			}
 		case "synthesize":
 			reason := "auto-culled: synthesized into " + dec.SupersededBy
 			if err := apply.Archive(dec.ProposalID, apply.OutcomeCulled, reason); err != nil {
-				d.log.Error("cleanup: archiving %s: %v", dec.ProposalID, err)
+				return err
 			}
-		case "keep":
-			// No action needed.
 		}
 	}
 
-	// Write synthesized proposals from clusters.
 	for _, cluster := range manifest.Clusters {
 		if cluster.Synthesis == nil {
 			continue
 		}
 		if err := pipeline.WriteProposal(cluster.Synthesis, "curator"); err != nil {
-			d.log.Error("cleanup: writing synthesized proposal %s: %v", cluster.Synthesis.ID, err)
+			return err
 		}
 	}
 

@@ -933,6 +933,8 @@ cabrero import [--from <path>]  Seed store from existing CC session files
                                   Runs pre-parser on each imported session to generate a digest.
                                   RunImport(from, dryRun, quiet) available for programmatic use
                                   (quiet mode suppresses per-session output, used by setup wizard).
+cabrero curate                  Run Curator on pending proposals on demand
+  --dry-run                       Show grouping preview without making changes
 cabrero backfill                Process existing sessions through the full pipeline
   --since <date>                  Start date filter, YYYY-MM-DD (default: 30 days ago)
   --until <date>                  End date filter, YYYY-MM-DD (default: now)

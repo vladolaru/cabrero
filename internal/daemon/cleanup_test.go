@@ -14,7 +14,7 @@ func TestGroupProposalsByTarget(t *testing.T) {
 		{SessionID: "s4", Proposal: pipeline.Proposal{ID: "p4", Type: "skill_improvement", Target: "/c/skill.md"}},
 	}
 
-	multi, single := groupProposalsByTarget(proposals)
+	multi, single := pipeline.GroupProposalsByTarget(proposals)
 
 	if len(multi) != 1 {
 		t.Errorf("multi: got %d targets, want 1", len(multi))
@@ -58,7 +58,7 @@ func TestSkipNonFileTargets(t *testing.T) {
 		{Proposal: pipeline.Proposal{ID: "p1", Type: "skill_improvement", Target: "local-environment"}},
 		{Proposal: pipeline.Proposal{ID: "p2", Type: "claude_addition", Target: "/a/CLAUDE.md"}},
 	}
-	_, single := groupProposalsByTarget(proposals)
+	_, single := pipeline.GroupProposalsByTarget(proposals)
 	// "local-environment" is not a file target — should be excluded from single-check list.
 	for _, pw := range single {
 		if !pipeline.IsFileTarget(pw.Proposal.Target) {

@@ -5,6 +5,17 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `cabrero curate` command to run the Curator on demand — checks single-target proposals
+  for already-applied status (Haiku), then clusters and synthesizes multi-target groups
+  (Sonnet). Previously only ran on the daemon's 24h ticker, which reset on every restart.
+
+### Changed
+- Move `GroupProposalsByTarget` to `pipeline` package as a single canonical implementation
+  (was duplicated between daemon and CLI)
+
 ## [0.31.3] - 2026-02-28
 
 ### Fixed

@@ -35,6 +35,7 @@ var commands = []command{
 	{"prompts", "List prompt files with versions", cmd.Prompts},
 	{"import", "Seed the store from existing CC session files", cmd.Import},
 	{"backfill", "Run pipeline on existing sessions with date/project filtering", cmd.Backfill},
+	{"curate", "Run Curator on pending proposals (check, cluster, synthesize)", cmd.Curate},
 	{"reset-breaker", "Reset circuit breaker to resume queue processing", cmd.ResetBreaker},
 	{"config", "Read or update system configuration", cmd.Config},
 	{"daemon", "Run background session processor (for launchd)", cmd.Daemon},
