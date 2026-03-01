@@ -15,8 +15,9 @@ import (
 	"github.com/vladolaru/cabrero/internal/store"
 )
 
-// maxScanBuffer is 10 MB — handles the largest observed JSONL lines (100KB+).
-const maxScanBuffer = 10 * 1024 * 1024
+// maxScanBuffer is 20 MB — handles the largest observed JSONL lines (up to ~14 MB
+// in sessions with large tool outputs like full-file reads or base64-encoded images).
+const maxScanBuffer = 20 * 1024 * 1024
 
 // retryWindowSeconds is the maximum gap between tool calls to consider them a retry.
 const retryWindowSeconds = 60.0
