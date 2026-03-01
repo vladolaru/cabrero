@@ -26,7 +26,6 @@ const retryWindowSeconds = 60.0
 var knownEntryTypes = map[string]bool{
 	"user":                  true,
 	"assistant":             true,
-	"progress":              true,
 	"system":                true,
 	"summary":               true,
 	"file-history-snapshot": true,
@@ -160,6 +159,13 @@ func ParseSession(sessionID string) (*Digest, error) {
 			continue
 		}
 
+		// Skip progress entries — streaming status updates (tool call
+		// progress, thinking indicators) that contribute nothing to the
+		// digest. In large sessions they can be 80%+ of all entries.
+		if entry.Type == "progress" {
+			continue
+		}
+
 		d.Shape.EntryCount++
 
 		// Track timestamps for segment tracking.
@@ -256,10 +262,6 @@ func ParseSession(sessionID string) (*Digest, error) {
 					d.Completion.QueueDequeueCount++
 				}
 			}
-
-		case "progress":
-			// Progress entries tracked only for agent detection.
-			d.processProgress(&entry)
 
 		case "file-history-snapshot":
 			d.processFileSnapshot(&entry, claudeMdSeen)
@@ -512,11 +514,6 @@ func (d *Digest) processAssistant(entry *rawEntry, modelsSet map[string]bool, ag
 		}
 		(*seqIndex)++
 	}
-}
-
-func (d *Digest) processProgress(entry *rawEntry) {
-	// Progress entries are acknowledged; their data contributes to agent detection
-	// via the agentId field (already tracked in the main loop).
 }
 
 func (d *Digest) processAgentSpawn(tu contentBlock, uuid string, agentSpawns map[string]*AgentInventoryItem) {
