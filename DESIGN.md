@@ -441,6 +441,18 @@ explicitly enqueued via `cabrero backfill --enqueue`.
 Defensive design: skip anything ambiguous, leave nulls for Classifier to fill, validate
 JSONL line-by-line, preserve unknown entry types in `raw_unknown` bucket.
 
+**Progress entries** (`"type":"progress"`) are CC streaming status updates — tool call
+progress, thinking indicators. They carry no extractable signal (the `processProgress`
+handler was an empty stub). In large sessions they can be 80%+ of all entries (e.g. 2535
+of 3111). Skipped immediately after JSON unmarshal, before counting or routing.
+
+**Scan buffer** is 20 MB (`maxScanBuffer`). CC transcripts occasionally contain JSONL
+lines exceeding 10 MB, caused by `TaskOutput` poll results that embed a background
+agent's full accumulated transcript as a string inside `toolUseResult`. Observed: 112
+oversized lines across 42 of 6430 sessions (0.65%), largest 14 MB. The retrieval package
+(`internal/retrieval`) uses the same 20 MB buffer — mismatched limits cause silent scan
+termination that makes valid UUID lookups fail. Both must stay in sync.
+
 Extracts deterministically:
 - Session shape: duration, turn count, token usage, cache hit ratio, compaction count
 - Sub-agent inventory: count, depth, abandoned agents (JSONL exists but result unreferenced)
@@ -465,6 +477,11 @@ Both Classifier and Evaluator are agentic — they run as tool-using `claude` se
 `--print`) with access to the `claude` CLI's built-in Read and Grep tools. This
 replaces the earlier design of custom retrieval functions; the built-in tools are
 sufficient for navigating JSONL by UUID, reading raw turns, and inspecting files.
+
+The `retrieval` package (`internal/retrieval`) provides `GetEntry` and `GetTurns` for
+programmatic UUID lookup (used by the Classifier UUID validator). Its scan buffer must
+match the parser's — if the parser can read a line, retrieval must be able to find UUIDs
+in or after that line.
 
 The pre-parser digest provides the map: every signal includes `uuid` + `sessionId`
 references. Classifier and Evaluator use these to pull raw turns on demand via Read/Grep
