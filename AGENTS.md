@@ -6,11 +6,15 @@ This file provides guidance to AI coding agents when working with code in this r
 
 **cabrero** — CC auto-improvement system (MIT licensed). Go binary that observes Claude Code sessions, extracts behavioral signals, and proposes improvements to SKILL.md files with human approval. See DESIGN.md for full architecture.
 
-**Authorship model:** This codebase is AI-agent-written and AI-agent-maintained. The human owner directs work but does not hold the code in memory. No agent carries context between sessions — every agent reads the code cold. Implications:
+## Development Model
 
-- Prefer single canonical implementations over duplicated patterns. An agent will copy whichever pattern it encounters first; if two conventions exist for the same thing, drift is inevitable.
-- Constants, types, and named helpers are more valuable here than in a human-authored codebase — they are the primary mechanism by which agents discover the "right" way to do something.
-- When refactoring, consolidating duplicated logic is not polish — it is drift prevention.
+This project is AI-written and AI-maintained. The human (Vlad) sets direction, makes architectural decisions, and reviews work. Claude Code agents do the implementation, testing, analysis, and maintenance. "Single maintainer" does not mean capacity-constrained — it means single human decision-maker with AI execution capacity. Do not assume limited implementation bandwidth when reasoning about priorities or feasibility.
+
+No agent carries context between sessions — every agent reads the code cold. This has practical implications:
+
+- **Prefer single canonical implementations** over duplicated patterns. An agent will copy whichever pattern it encounters first; if two conventions exist for the same thing, drift is inevitable.
+- **Constants, types, and named helpers are discovery mechanisms.** They are more valuable here than in a human-authored codebase — they are the primary way agents find the "right" way to do something.
+- **Consolidating duplicated logic is drift prevention**, not polish. Treat it accordingly when prioritizing work.
 
 ## Documentation
 
