@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,9 +58,30 @@ func writeIgnoredPatterns(patterns []IgnoredPattern) error {
 	return AtomicWrite(ignoredProjectsPath(), data, 0o644)
 }
 
-// AddIgnoredPattern adds a substring pattern. No-op if already present
+// matchesAnyPattern reports whether slug matches any of the given patterns
+// (case-insensitive substring match). Callers must ensure patterns are
+// already loaded so this function does no I/O.
+func matchesAnyPattern(slug string, patterns []IgnoredPattern) bool {
+	if slug == "" {
+		return false
+	}
+	lower := strings.ToLower(slug)
+	for _, p := range patterns {
+		if strings.Contains(lower, strings.ToLower(p.Pattern)) {
+			return true
+		}
+	}
+	return false
+}
+
+// AddIgnoredPattern adds a substring pattern. Returns an error if the
+// pattern is empty or whitespace-only. No-op if already present
 // (case-insensitive match on pattern text).
 func AddIgnoredPattern(pattern string) error {
+	if strings.TrimSpace(pattern) == "" {
+		return fmt.Errorf("ignored pattern must not be empty")
+	}
+
 	ignoreMu.Lock()
 	defer ignoreMu.Unlock()
 
@@ -112,9 +134,6 @@ func RemoveIgnoredPattern(pattern string) (bool, error) {
 // IsProjectIgnored returns true if the project slug matches any ignored pattern
 // (case-insensitive substring match).
 func IsProjectIgnored(slug string) bool {
-	if slug == "" {
-		return false
-	}
 	ignoreMu.Lock()
 	defer ignoreMu.Unlock()
 
@@ -122,25 +141,23 @@ func IsProjectIgnored(slug string) bool {
 	if err != nil {
 		return false
 	}
-	lower := strings.ToLower(slug)
-	for _, p := range patterns {
-		if strings.Contains(lower, strings.ToLower(p.Pattern)) {
-			return true
-		}
-	}
-	return false
+	return matchesAnyPattern(slug, patterns)
 }
 
 // CountIgnoredSessions returns the number of existing sessions whose project
-// matches an ignored pattern.
+// matches an ignored pattern. Reads patterns once for the entire batch.
 func CountIgnoredSessions() int {
+	patterns, err := ReadIgnoredPatterns()
+	if err != nil {
+		return 0
+	}
 	sessions, err := ListSessions()
 	if err != nil {
 		return 0
 	}
 	count := 0
 	for _, s := range sessions {
-		if IsProjectIgnored(s.Project) {
+		if matchesAnyPattern(s.Project, patterns) {
 			count++
 		}
 	}
@@ -149,25 +166,35 @@ func CountIgnoredSessions() int {
 
 // CleanIgnoredSessions removes raw session directories for sessions whose
 // project matches an ignored pattern. Also removes matching entries from the
-// blocklist. Returns the number of sessions removed.
+// blocklist. Returns the number of sessions removed and a combined error if
+// any removals failed.
 func CleanIgnoredSessions() (int, error) {
+	patterns, err := ReadIgnoredPatterns()
+	if err != nil {
+		return 0, err
+	}
 	sessions, err := ListSessions()
 	if err != nil {
 		return 0, err
 	}
 
+	var errs []error
 	removed := 0
 	for _, s := range sessions {
-		if !IsProjectIgnored(s.Project) {
+		if !matchesAnyPattern(s.Project, patterns) {
 			continue
 		}
 		dir := RawDir(s.SessionID)
 		if err := os.RemoveAll(dir); err != nil {
+			errs = append(errs, fmt.Errorf("removing %s: %w", s.SessionID, err))
 			continue
 		}
 		// Best-effort: remove from blocklist if present.
 		UnblockSession(s.SessionID) //nolint:errcheck
 		removed++
+	}
+	if len(errs) > 0 {
+		return removed, fmt.Errorf("partial cleanup (%d removed, %d errors): %w", removed, len(errs), errors.Join(errs...))
 	}
 	return removed, nil
 }

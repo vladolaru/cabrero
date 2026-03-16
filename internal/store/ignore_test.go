@@ -42,6 +42,29 @@ func TestAddIgnoredPattern(t *testing.T) {
 	}
 }
 
+func TestAddIgnoredPattern_EmptyRejected(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	if err := Init(); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	for _, pattern := range []string{"", "   ", "\t\n"} {
+		if err := AddIgnoredPattern(pattern); err == nil {
+			t.Errorf("AddIgnoredPattern(%q) should have returned an error", pattern)
+		}
+	}
+
+	// Verify nothing was written.
+	patterns, err := ReadIgnoredPatterns()
+	if err != nil {
+		t.Fatalf("ReadIgnoredPatterns: %v", err)
+	}
+	if len(patterns) != 0 {
+		t.Errorf("expected 0 patterns after rejected adds, got %d", len(patterns))
+	}
+}
+
 func TestAddIgnoredPattern_Duplicate(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
