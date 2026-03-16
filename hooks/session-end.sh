@@ -51,6 +51,24 @@ case "$SESSION_ID" in
 esac
 
 CABRERO_ROOT="${HOME}/.cabrero"
+
+# Check ignored projects — exit before writing anything.
+IGNORED_FILE="${CABRERO_ROOT}/ignored_projects.json"
+if [ -f "$IGNORED_FILE" ]; then
+  if python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    patterns = [p["pattern"].lower() for p in d.get("patterns", [])]
+    slug = sys.argv[2].lower()
+    sys.exit(0 if any(pat in slug for pat in patterns) else 1)
+except Exception:
+    sys.exit(1)
+' "$IGNORED_FILE" "$PROJECT_SLUG" 2>/dev/null; then
+    exit 0
+  fi
+fi
+
 BLOCKLIST="${CABRERO_ROOT}/blocklist.json"
 
 # Check blocklist using JSON-aware lookup.
