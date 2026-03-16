@@ -5,6 +5,13 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `cabrero ignore` command to skip entire projects from capture by substring pattern
+- Hook-level filtering: ignored projects produce zero disk footprint
+- `cabrero ignore clean` to purge existing sessions from ignored projects
+
 ## [0.32.1] - 2026-03-02
 
 ### Fixed

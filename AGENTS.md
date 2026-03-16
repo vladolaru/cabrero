@@ -22,6 +22,13 @@ No agent carries context between sessions — every agent reads the code cold. T
 - **CHANGELOG.md** follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Add an entry under an `[Unreleased]` section for every user-visible change (new feature, fix, removal, deprecation). When a version is tagged, move unreleased entries under the new version heading with the release date.
 - **docs/claude-cli-settings-and-hooks.md** — reference for `--setting-sources`, `--settings`, and `disableAllHooks` when invoking the `claude` CLI programmatically. Consult when modifying `invokeClaude`, `buildChatArgs`, or any code that spawns `claude` subprocesses.
 - **docs/subprocess-isolation.md** — complete isolation model for `claude` CLI subprocesses: env vars (`CLAUDECODE`, `CABRERO_SESSION`), CLI flags, settings overrides, per-mode specifics, and what still leaks through. Consult when adding new subprocess invocation sites or debugging isolation failures.
+- **`.claude/docs/`** — all agent-generated working documents: plans, analysis, reviews, research, decisions, patterns, and learnings. These are working artifacts, not shipped documentation. Subdirectories:
+  - `plans/` — implementation plans (`YYYY-MM-DD-<topic>.md`)
+  - `analysis/` — research and analysis documents (`YYYY-MM-DD-<topic>.md`)
+  - `reviews/` — code review findings (`YYYY-MM-DD-<topic>.md`)
+  - `decisions/`, `learnings/`, `patterns/`, `research/` — knowledge capture
+
+  **Do NOT** put these documents in `docs/` — that directory is for reference documentation that ships with the project (CLI guides, isolation model, etc.).
 
 ## Snapshots
 
@@ -105,6 +112,10 @@ cabrero defer <proposal_id>          # defer proposal for later
 cabrero rollback <change_id>         # restore file to pre-change content
 cabrero blocklist list               # show blocked sessions
 cabrero blocklist add <session_id>   # block a session
+cabrero ignore list                  # show ignored project patterns
+cabrero ignore add <pattern>         # ignore projects matching substring
+cabrero ignore remove <pattern>      # stop ignoring a pattern
+cabrero ignore clean [--dry-run]     # purge sessions from ignored projects
 cabrero history --status error       # show errored pipeline runs
 cabrero sources list                 # show tracked sources
 cabrero sources set-ownership <name> mine  # set source ownership

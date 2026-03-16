@@ -179,6 +179,7 @@ and the TUI import from here instead of reimplementing settings logic inline.
   calibration.json           # calibration set: sessions tagged as ground-truth examples
   config.json                # TUI and daemon settings (debug toggle, navigation, theme, model overrides, etc.)
   blocklist.json             # session IDs to never process (loop prevention)
+  ignored_projects.json      # project slug patterns to skip entirely
   run_history.jsonl          # append-only pipeline run history (one JSON object per line)
   cleanup_history.jsonl      # append-only curator cleanup run history (one JSON object per line)
   daemon.log                 # background daemon log (rotated, 2MB × 3)
@@ -865,6 +866,24 @@ unlikely scenario of a malformed or adversarial hook payload.
 The env var approach handles the common case cleanly. The blocklist, path restriction,
 and SESSION_ID guard make the guarantee structural rather than behavioral.
 
+## Project Ignore List
+
+Users can skip entire projects from Cabrero's capture pipeline using substring patterns
+matched (case-insensitive) against project slugs. Managed via `cabrero ignore` and stored
+in `~/.cabrero/ignored_projects.json`.
+
+**Hook integration.** Both `pre-compact-backup.sh` and `session-end.sh` check the ignore
+list before any capture work. Sessions from ignored projects produce zero disk footprint —
+no raw backup, no digest, no queue entry.
+
+**Daemon guard.** `ScanQueued` and `CleanDanglingQueued` also skip sessions whose project
+slug matches an ignored pattern. This is a belt-and-suspenders layer — hooks handle the
+common case, the daemon guard catches anything that slipped through (e.g., sessions queued
+before a pattern was added).
+
+**Cleanup.** `cabrero ignore clean` purges existing sessions (raw backups, digests, queue
+entries) whose project slug matches any ignored pattern. Supports `--dry-run` for preview.
+
 ## Key Design Principles
 
 - Hooks are the primary capture mechanism, daemon stale scan is the safety net
@@ -945,6 +964,11 @@ cabrero blocklist               Manage the session blocklist
   list                            Show blocked sessions
   add <session_id>                Block a session
   remove <session_id>             Unblock a session
+cabrero ignore                  Manage the project ignore list
+  list                            Show ignored project patterns
+  add <pattern>                   Ignore projects matching substring (case-insensitive)
+  remove <pattern>                Stop ignoring a pattern
+  clean [--dry-run]               Purge existing sessions from ignored projects
 cabrero history                 Show pipeline run history
   --status <filter>               Filter by status (processed, error, skipped_busy)
   --since YYYY-MM-DD              Show records since date
