@@ -39,6 +39,9 @@ func ScanQueued() ([]QueuedSession, error) {
 		if blocked[s.SessionID] {
 			continue
 		}
+		if store.IsProjectIgnored(s.Project) {
+			continue
+		}
 		if !store.TranscriptExists(s.SessionID) {
 			continue
 		}
@@ -72,6 +75,9 @@ func CleanDanglingQueued(log *Logger) int {
 			continue
 		}
 		if store.TranscriptExists(s.SessionID) {
+			continue
+		}
+		if store.IsProjectIgnored(s.Project) {
 			continue
 		}
 		ts, err := time.Parse(time.RFC3339, s.Timestamp)
