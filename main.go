@@ -28,6 +28,7 @@ var commands = []command{
 	{"defer", "Defer a proposal for later review", cmd.Defer},
 	{"rollback", "Restore a file to its pre-change content", cmd.RollbackCmd},
 	{"blocklist", "Manage the session blocklist", cmd.Blocklist},
+	{"ignore", "Manage ignored projects (skip capture entirely)", cmd.Ignore},
 	{"history", "Show pipeline run history", cmd.History},
 	{"sources", "Manage tracked sources", cmd.Sources},
 	{"calibrate", "Manage calibration set for prompt testing", cmd.Calibrate},
