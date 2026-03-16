@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/vladolaru/cabrero/internal/cli"
 	"github.com/vladolaru/cabrero/internal/store"
@@ -73,7 +74,7 @@ func ignoreAdd(args []string, w io.Writer) error {
 		return err
 	}
 	for _, p := range patterns {
-		if p.Pattern == pattern {
+		if strings.EqualFold(p.Pattern, pattern) {
 			fmt.Fprintf(w, "Pattern %q is already ignored.\n", pattern)
 			return nil
 		}
