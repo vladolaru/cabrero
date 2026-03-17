@@ -3,3 +3,5 @@ cabrero
 *.log
 .worktrees
 snapshots/
+.tmp/
+.claude/docs/
