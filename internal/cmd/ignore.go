@@ -48,7 +48,7 @@ func ignoreList(w io.Writer) error {
 	}
 
 	fmt.Fprintf(w, "%-30s  %s\n", "PATTERN", "ADDED")
-	fmt.Fprintln(w, "──────────────────────────────────────────────")
+	fmt.Fprintln(w, cli.Accent("──────────────────────────────────────────────"))
 
 	for _, p := range patterns {
 		added := cli.RelativeTime(p.AddedAt)

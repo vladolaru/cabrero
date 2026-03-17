@@ -64,7 +64,7 @@ func blocklistList(args []string, w io.Writer) error {
 	}
 
 	fmt.Fprintf(w, "%-40s  %s\n", "SESSION ID", "BLOCKED")
-	fmt.Fprintln(w, "────────────────────────────────────────────────────────────")
+	fmt.Fprintln(w, cli.Accent("────────────────────────────────────────────────────────────"))
 
 	for _, e := range sorted {
 		blocked := cli.RelativeTime(e.blockedAt)
