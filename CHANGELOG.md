@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `cabrero ignore` command to skip entire projects from capture by substring pattern
 - Hook-level filtering: ignored projects produce zero disk footprint
 - `cabrero ignore clean` to purge existing sessions from ignored projects
+- `cabrero sessions purge --status <statuses> [--dry-run]` to remove dead sessions by status (error, capture_failed)
 
 ## [0.32.1] - 2026-03-02
 

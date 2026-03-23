@@ -946,6 +946,9 @@ cabrero run <session_id>        Run the full pipeline on a session
   --evaluator-timeout <duration>  Timeout for Evaluator (default 7m)
 cabrero sessions                List captured sessions with status
   --status <filter>               queued, imported, processed, error, capture_failed, all
+cabrero sessions purge          Remove dead sessions by status
+  --status <statuses>             comma-separated (allowed: error, capture_failed)
+  --dry-run                       list sessions that would be purged
 cabrero status                  Show pipeline health: sessions, daemon, hooks
 cabrero proposals               List proposals (pending by default)
   --status <filter>               pending, approved, rejected, deferred, culled, all

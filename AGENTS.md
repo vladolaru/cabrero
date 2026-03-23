@@ -107,6 +107,7 @@ Full details in DESIGN.md § Cabrero CLI. Common operations:
 ```bash
 cabrero status                  # pipeline health: sessions, daemon, hooks
 cabrero sessions --status error # list sessions by status (queued/imported/processed/error)
+cabrero sessions purge --status error,capture_failed [--dry-run]  # remove dead sessions
 cabrero run <session_id>        # re-process a single session manually
 cabrero proposals               # list pending proposals
 cabrero inspect <proposal_id>   # show proposal with citation chain
