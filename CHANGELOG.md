@@ -5,13 +5,18 @@ All notable changes to Cabrero are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.33.0] - 2026-03-23
 
 ### Added
 - `cabrero ignore` command to skip entire projects from capture by substring pattern
 - Hook-level filtering: ignored projects produce zero disk footprint
 - `cabrero ignore clean` to purge existing sessions from ignored projects
 - `cabrero sessions purge --status <statuses> [--dry-run]` to remove dead sessions by status (error, capture_failed)
+
+### Fixed
+- Daemon queue scanner now skips ignored projects
+- Blocklist and ignore list CLI output uses accent-colored separators for consistency
+- `cabrero ignore add` uses case-insensitive duplicate check
 
 ## [0.32.1] - 2026-03-02
 
@@ -1245,6 +1250,7 @@ First tagged release. Covers Phases 0–3.5 of the design.
 [0.20.0]: https://github.com/vladolaru/cabrero/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/vladolaru/cabrero/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vladolaru/cabrero/compare/v0.17.0...v0.18.0
+[0.33.0]: https://github.com/vladolaru/cabrero/compare/v0.32.1...v0.33.0
 [0.32.1]: https://github.com/vladolaru/cabrero/compare/v0.32.0...v0.32.1
 [0.17.0]: https://github.com/vladolaru/cabrero/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/vladolaru/cabrero/compare/v0.16.0...v0.16.1
