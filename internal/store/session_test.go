@@ -165,3 +165,88 @@ func TestTranscriptExists_False_NoDir(t *testing.T) {
 		t.Error("TranscriptExists = true, want false")
 	}
 }
+
+func TestPurgeSessions(t *testing.T) {
+	setupTestStore(t)
+
+	for _, tc := range []struct {
+		id     string
+		status string
+	}{
+		{"purge-err-1", StatusError},
+		{"purge-err-2", StatusError},
+		{"purge-cf-1", StatusCaptureFailed},
+		{"purge-proc-1", StatusProcessed},
+		{"purge-queued-1", StatusQueued},
+	} {
+		dir := RawDir(tc.id)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		meta := Metadata{
+			SessionID: tc.id,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Status:    tc.status,
+		}
+		if err := WriteMetadata(dir, meta); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	removed, err := PurgeSessions([]string{StatusError})
+	if err != nil {
+		t.Fatalf("PurgeSessions: %v", err)
+	}
+	if removed != 2 {
+		t.Errorf("removed = %d, want 2", removed)
+	}
+
+	if SessionExists("purge-err-1") {
+		t.Error("purge-err-1 still exists")
+	}
+	if SessionExists("purge-err-2") {
+		t.Error("purge-err-2 still exists")
+	}
+	if !SessionExists("purge-cf-1") {
+		t.Error("purge-cf-1 should still exist")
+	}
+	if !SessionExists("purge-proc-1") {
+		t.Error("purge-proc-1 should still exist")
+	}
+}
+
+func TestPurgeSessions_MultipleStatuses(t *testing.T) {
+	setupTestStore(t)
+
+	for _, tc := range []struct {
+		id     string
+		status string
+	}{
+		{"purge-m-err", StatusError},
+		{"purge-m-cf", StatusCaptureFailed},
+		{"purge-m-proc", StatusProcessed},
+	} {
+		dir := RawDir(tc.id)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := WriteMetadata(dir, Metadata{
+			SessionID: tc.id,
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Status:    tc.status,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	removed, err := PurgeSessions([]string{StatusError, StatusCaptureFailed})
+	if err != nil {
+		t.Fatalf("PurgeSessions: %v", err)
+	}
+	if removed != 2 {
+		t.Errorf("removed = %d, want 2", removed)
+	}
+	if !SessionExists("purge-m-proc") {
+		t.Error("purge-m-proc should still exist")
+	}
+}

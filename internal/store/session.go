@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -149,6 +150,40 @@ func MarkCaptureFailed(sessionID string) error {
 	}
 	meta.Status = StatusCaptureFailed
 	return WriteMetadata(RawDir(sessionID), meta)
+}
+
+// PurgeSessions removes raw directories for sessions matching any of the given
+// statuses. Also removes matching entries from the blocklist.
+// Returns the number of sessions removed.
+func PurgeSessions(statuses []string) (int, error) {
+	sessions, err := ListSessions()
+	if err != nil {
+		return 0, err
+	}
+
+	statusSet := make(map[string]bool, len(statuses))
+	for _, s := range statuses {
+		statusSet[s] = true
+	}
+
+	var errs []error
+	removed := 0
+	for _, s := range sessions {
+		if !statusSet[s.Status] {
+			continue
+		}
+		dir := RawDir(s.SessionID)
+		if err := os.RemoveAll(dir); err != nil {
+			errs = append(errs, fmt.Errorf("removing %s: %w", s.SessionID, err))
+			continue
+		}
+		UnblockSession(s.SessionID) //nolint:errcheck
+		removed++
+	}
+	if len(errs) > 0 {
+		return removed, fmt.Errorf("partial purge (%d removed, %d errors): %w", removed, len(errs), errors.Join(errs...))
+	}
+	return removed, nil
 }
 
 // ListSessions returns metadata for all sessions in the store, sorted by
